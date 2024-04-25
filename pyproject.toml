@@ -11,6 +11,7 @@ python = "^3.12"
 pycliarr = "^1.0.25"
 python-dotenv = "^1.0.1"
 loguru = "^0.7.2"
+python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.dev-dependencies]
 

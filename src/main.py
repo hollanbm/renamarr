@@ -1,12 +1,15 @@
-import os, sys
+from os import environ
+from datetime import datetime,timezone,timedelta
+from dateutil import parser
 from pycliarr.api import SonarrCli,CliServerError
 from loguru import logger
-#from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-#load_dotenv()
+load_dotenv()
 
 def series_scanner():
-  sonarr_cli = SonarrCli(os.environ["SONARR_URL"], os.environ["SONARR_API_KEY"])
+  environ['LOGURU_LEVEL'] = 'INFO'
+  sonarr_cli = SonarrCli(environ["SONARR_URL"], environ["SONARR_API_KEY"])
 
   series = sonarr_cli.get_serie()
 
@@ -26,23 +29,33 @@ def series_scanner():
       else:
         logger.debug(f'{show.title} - Retrieved episode list')
 
-      # Filter episode list, so it only contains grabbed episodes, with TBA title
-      episode_list[:] = [e for e in episode_list if e.get('title') == 'TBA' and e.get('grabbed')]
+      # Filter episode list, so it only contains episodes with TBA title
+      episode_list[:] = [e for e in episode_list if e.get('seasonNumber') > 0 and e.get('title') == 'TBA' and e.get('airDateUtc') != None ]
 
-      if len(episode_list) > 0:
-        logger.info(f'{show.title} - Found grabbed episode with TBA title')
-        logger.info(f'{show.title} - Rescanning series')
+      for episode in episode_list:
+        air_date_utc = parser.parse(episode['airDateUtc']).astimezone(timezone.utc)
+        hour_delta = (datetime.now(timezone.utc) - air_date_utc).total_seconds()/3600
+        
+        if -4 <= hour_delta < 0:
+          logger.info(f'{show.title} - Found episode airing in the next 4 hours, with TBA title')
+          logger.info(f'{show.title} - Rescanning series')
 
-        sonarr_cli.refresh_serie(show.id)
-      else:
-        logger.debug(f'{show.title} - No grabbed episodes with TBA title')
+          sonarr_cli.refresh_serie(show.id)
+          break
+        elif hour_delta >= 0:
+          logger.info(f'{show.title} - Found aired episode, with TBA title')
+          logger.info(f'{show.title} - Rescanning series')
+
+          sonarr_cli.refresh_serie(show.id)
+          break
+          
 
 if __name__ == '__main__':
-  if os.environ.get('SONARR_URL') is None:
+  if environ.get('SONARR_URL') is None:
     logger.error("SONARR_URL not set")
     exit(1)
 
-  if os.environ.get('SONARR_API_KEY') is None:
+  if environ.get('SONARR_API_KEY') is None:
     logger.error("SONARR_API_KEY not set")
     exit(1)
 
