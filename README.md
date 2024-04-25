@@ -5,7 +5,7 @@
 * [Python 3.12](https://www.python.org/downloads/release/python-3123/)
 * [pipx](https://pipx.pypa.io/stable/installation/)
 * [poetry](https://python-poetry.org/docs/#installation)
-* [Sonarr](https://sonarr.tv/).
+* [Sonarr](https://sonarr.tv/)
  * This script is intended to be used alongside the `Episode Title Required` setting
    * Settings -> Media Management -> Episode Title Required -> `Always`
 
