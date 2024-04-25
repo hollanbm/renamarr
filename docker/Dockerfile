@@ -12,7 +12,7 @@ RUN pipx ensurepath
 # install poetry
 RUN pipx --global install poetry
 
-# setup user, zsh default shell
+# setup user, bash default shell
 RUN useradd app -m -s /bin/bash
 USER app
 
