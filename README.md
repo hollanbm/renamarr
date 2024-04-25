@@ -1,0 +1,1 @@
+# sonarr-series-scanner
