@@ -1,20 +1,19 @@
 [tool.poetry]
-name = "sonarrseriesscanner"
+name = "sonarr-series-scanner"
 version = "0.1.0"
 description = ""
 authors = ["Brad Holland <hollanbm@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
 pycliarr = "^1.0.25"
 python-dotenv = "^1.0.1"
+loguru = "^0.7.2"
 
 [tool.poetry.dev-dependencies]
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-series_scanner = "main:series_scanner"
