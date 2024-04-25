@@ -34,7 +34,7 @@ The app will immediately exit upon completion. You will need to use cron or simi
 ### Local Setup
 
 #### devcontainer
-There is a [devcontainer](https://containers.dev/) provided; it is optional but recommended.
+There is a [devcontainer](https://containers.dev/) provided; it is optional but recommended.  
 [DevContainer's in VS Code](https://code.visualstudio.com/docs/devcontainers/containers)
 
 #### 
