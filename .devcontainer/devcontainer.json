@@ -1,0 +1,35 @@
+{
+    "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.base.schema.json",
+    "name": "poetry DevContainer",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "containerUser": "poetry",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "configureZshAsDefaultShell": true,
+            "nonFreePackages": true,
+            "username": "poetry"
+        },
+        "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
+            "plugins": "sudo git zsh-syntax-highlighting zsh-autosuggestions poetry poetry-env",
+            "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/poetry/.ssh,type=bind,consistency=cached"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/usr/bin/zsh"
+                    }
+                }
+            }
+        }
+    }
+}

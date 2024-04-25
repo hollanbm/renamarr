@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "sonarrseriesscanner"
+version = "0.1.0"
+description = ""
+authors = ["Brad Holland <hollanbm@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pycliarr = "^1.0.25"
+dynaconf = "^3.2.5"
+pydantic = "^2.7.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
