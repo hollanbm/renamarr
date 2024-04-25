@@ -24,4 +24,4 @@ RUN poetry install --no-interaction --no-ansi --no-cache --quiet
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOGURU_LEVEL="INFO"
 
-RUN poetry run python src/main.py
+ENTRYPOINT poetry run python src/main.py
