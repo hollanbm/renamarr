@@ -1,5 +1,5 @@
-version: "2"
-
+# This has not been tested, but should work
+# No ARM64 support unfortunately
 services:
   tasker:
     image: strm/tasker:latest
@@ -9,9 +9,9 @@ services:
       configuration: |
         schedule:
           - every: hour
-            task: hello
+            task: series_scanner
         tasks:
           docker:
             - name: series_scanner
-              image: ghcr.io/hollanbm/sonarr-series-scanner
+              image: ghcr.io/hollanbm/sonarr-series-scanner:latest
  
