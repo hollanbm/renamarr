@@ -122,27 +122,6 @@ files = [
 ]
 
 [[package]]
-name = "dynaconf"
-version = "3.2.5"
-description = "The dynamic configurator for your Python Project"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "dynaconf-3.2.5-py2.py3-none-any.whl", hash = "sha256:12202fc26546851c05d4194c80bee00197e7c2febcb026e502b0863be9cbbdd8"},
-    {file = "dynaconf-3.2.5.tar.gz", hash = "sha256:42c8d936b32332c4b84e4d4df6dd1626b6ef59c5a94eb60c10cd3c59d6b882f2"},
-]
-
-[package.extras]
-all = ["configobj", "hvac", "redis", "ruamel.yaml"]
-configobj = ["configobj"]
-ini = ["configobj"]
-redis = ["redis"]
-test = ["configobj", "django", "flask (>=0.12)", "hvac (>=1.1.0)", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
-toml = ["toml"]
-vault = ["hvac"]
-yaml = ["ruamel.yaml"]
-
-[[package]]
 name = "idna"
 version = "3.7"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -195,6 +174,20 @@ m2r2 = "*"
 requests = "*"
 
 [[package]]
+name = "python-dotenv"
+version = "1.0.1"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "python-dotenv-1.0.1.tar.gz", hash = "sha256:e324ee90a023d808f1959c46bcbc04446a10ced277783dc6ee09987c37ec10ca"},
+    {file = "python_dotenv-1.0.1-py3-none-any.whl", hash = "sha256:f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "requests"
 version = "2.31.0"
 description = "Python HTTP for Humans."
@@ -235,4 +228,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "537bd3b82235bc754a0b965e4ffb8ff5ac7d5ee90bfbe09b003ca763d679fa36"
+content-hash = "ae105b0ceed13f19b4a7d1c48bd555ecf3c0c7e2d848e2c98e885674a6f1b3ca"
