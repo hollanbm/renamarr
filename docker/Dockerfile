@@ -15,15 +15,23 @@ RUN pipx --global install poetry
 # setup user, bash default shell
 RUN useradd app -m -s /bin/bash
 USER app
+SHELL ["/bin/bash", "-c"]
 
 WORKDIR /home/app/series_scanner
-COPY --chown=app pyproject.toml poetry.lock src ./
 
+# See .dockerignore for files whitelist
+COPY --chown=app . . 
+
+# install app dependencies
 RUN poetry install --no-interaction --no-ansi --no-cache --quiet
 
+# set default settings
 ENV HOURLY_JOB="TRUE"
 ENV HOURS_BEFORE_AIR="4"
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOGURU_LEVEL="INFO"
 
-ENTRYPOINT poetry run python src/main.py
+# activate venv
+RUN source $(poetry env info --path)/bin/activate
+
+ENTRYPOINT [ "poetry", "run", "python", "src/main.py"]
