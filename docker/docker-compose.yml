@@ -1,5 +1,3 @@
-# This has not been tested, but should work
-# No ARM64 support unfortunately
 services:
   series_scanner:
     container_name: series_scanner
