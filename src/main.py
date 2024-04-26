@@ -36,19 +36,14 @@ def series_scanner():
         air_date_utc = parser.parse(episode['airDateUtc']).astimezone(timezone.utc)
         hour_delta = (datetime.now(timezone.utc) - air_date_utc).total_seconds()/3600
         
-        if -4 <= hour_delta < 0:
-          logger.info(f'{show.title} - Found episode airing in the next 4 hours, with TBA title')
-          logger.info(f'{show.title} - Rescanning series')
-
+        hours_before_air = -min(int(environ['HOURS_BEFORE_AIR']) or 4, 12)
+        
+        # Check if episode is airing within x hours. -- max of 12 OR aired already
+        if hours_before_air <= hour_delta or hour_delta >= 0:
+          logger.info(f'{show.title} - Found episode aired/airing with TBA title')
           sonarr_cli.refresh_serie(show.id)
+          logger.info(f'{show.title} - Series rescan triggered')
           break
-        elif hour_delta >= 0:
-          logger.info(f'{show.title} - Found aired episode, with TBA title')
-          logger.info(f'{show.title} - Rescanning series')
-
-          sonarr_cli.refresh_serie(show.id)
-          break
-          
 
 if __name__ == '__main__':
   if environ.get('SONARR_URL') is None:
