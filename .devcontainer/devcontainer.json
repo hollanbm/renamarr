@@ -18,13 +18,17 @@
         "ghcr.io/devcontainers/features/github-cli:1": {}
     },
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/poetry/.ssh,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.ssh,target=/home/poetry/.ssh,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/.zsh_history,target=/home/poetry/.zsh_history,type=bind,consistency=cached"
     ],
+    "postCreateCommand": "zsh -c 'poetry install --no-interaction --no-ansi --quiet && source $(poetry env info --path)/bin/activate'",
     "customizations": {
         "vscode": {
             "settings": {
+                "files.eol": "\n",
                 "editor.formatOnSave": true,
                 "editor.defaultFormatter": "ms-python.black-formatter",
+                "python.venvPath": "${workspaceFolder}/.venv",
                 "terminal.integrated.defaultProfile.linux": "zsh",
                 "terminal.integrated.profiles.linux": {
                     "zsh": {

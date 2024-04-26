@@ -15,3 +15,4 @@ RUN pipx --global install poetry black
 # setup user, zsh default shell
 RUN useradd poetry -m -s /bin/zsh
 USER poetry
+SHELL ["/bin/zsh", "-c"]
