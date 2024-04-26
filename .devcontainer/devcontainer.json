@@ -23,13 +23,24 @@
     "customizations": {
         "vscode": {
             "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "ms-python.black-formatter",
                 "terminal.integrated.defaultProfile.linux": "zsh",
                 "terminal.integrated.profiles.linux": {
                     "zsh": {
                         "path": "/usr/bin/zsh"
                     }
                 }
-            }
+            },
+            "extensions": [
+                "KevinRose.vsc-python-indent",
+                "ms-python.black-formatter",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "njpwerner.autodocstring",
+                "VisualStudioExptTeam.vscodeintellicode"
+            ]
         }
     }
 }

@@ -1,3 +1,6 @@
+[project]
+requires-python = ">= 3.12"
+
 [tool.poetry]
 name = "sonarr-series-scanner"
 version = "0.1.0"
@@ -12,8 +15,10 @@ pycliarr = "^1.0.25"
 python-dotenv = "^1.0.1"
 loguru = "^0.7.2"
 python-dateutil = "^2.9.0.post0"
+scheduler = "^0.8.5"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
 
 [build-system]
 requires = ["poetry-core"]
