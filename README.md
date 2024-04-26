@@ -1,5 +1,13 @@
 # sonarr-series-scanner
 
+## Quick Start
+
+### docker
+Please see [docker-compose.yml](https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/docker-compose.yml)
+
+### helm
+coming soon
+
 ## Requirements
 
 * [Python 3.12](https://www.python.org/downloads/release/python-3123/)
@@ -22,14 +30,20 @@ To solve this, I created this app
 This app uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
 * Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
-  * If a series has grabbed an episode, with TBA title
+  * If a series has an episode airing within `ENV['HOURS_BEFORE_AIR']`
+    * default value of 4, max value of 12
+  * OR
+  * An episode that has aired previously
+  * With a title of TBA (excluding specials)
     * will trigger a series refresh, to hopefully pull new info from The TVDB
 
 This should prevent too many API calls to the TVDB, refreshing individual series, hourly
 
 ### Usage
 
-The app will immediately exit upon completion. You will need to use cron or similar to handle scheduling. The recommended interval is one hour.
+The application run immediately on startup, and then continue to schedule jobs every hour after the first execution.
+  
+You can disable by setting the env var `ENV['HOURLY_JOB']=FALSE`
 
 ### Local Setup
 

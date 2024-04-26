@@ -18,6 +18,7 @@ def job():
 
 if __name__ == "__main__":
     load_dotenv()
+    environ["LOGURU_LEVEL"] = environ["LOG_LEVEL"]
 
     if environ.get("SONARR_URL") is None:
         logger.error("SONARR_URL not set")
