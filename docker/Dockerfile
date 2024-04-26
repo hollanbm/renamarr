@@ -29,7 +29,7 @@ RUN poetry install --no-interaction --no-ansi --no-cache --quiet
 ENV HOURLY_JOB="TRUE"
 ENV HOURS_BEFORE_AIR="4"
 ENV LOGURU_DIAGNOSE="NO"
-ENV LOGURU_LEVEL="INFO"
+ENV LOG_LEVEL="INFO"
 
 # activate venv
 RUN source $(poetry env info --path)/bin/activate
