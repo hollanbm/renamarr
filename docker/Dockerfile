@@ -28,7 +28,7 @@ COPY --chown=app . .
 RUN poetry install --no-interaction --no-ansi --no-cache --quiet
 
 ENV LOGURU_DIAGNOSE="NO"
-ENV LOG_LEVEL="INFO"
+ENV LOGURU_LEVEL="INFO"
 
 # activate venv
 RUN source $(poetry env info --path)/bin/activate
