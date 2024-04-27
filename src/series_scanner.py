@@ -44,7 +44,14 @@ class SeriesScanner:
 
                             if self.__is_episode_airing_soon(episode_air_date_utc):
                                 logger.info(
-                                    f"Found episode aired/airing with TBA title"
+                                    f"Found TBA episode, airing within the next {self.hours_before_air} hours"
+                                )
+                                sonarr_cli.refresh_serie(show.id)
+                                logger.info(f"Series rescan triggered")
+                                break
+                            elif self.__has_episode_already_aired(episode_air_date_utc):
+                                logger.info(
+                                    f"Found previously aired episode with TBA title"
                                 )
                                 sonarr_cli.refresh_serie(show.id)
                                 logger.info(f"Series rescan triggered")
@@ -78,8 +85,22 @@ class SeriesScanner:
         episode_air_date_utc (datetime):The episode air date with utc timezone
 
         Returns:
-        bool True if episode is airing within config.sonarr[].series_scanner.hours_before_air, or True if episode has already aired
+        bool True if episode is airing within config.sonarr[].series_scanner.hours_before_air
         """
-        return (
-            datetime.now(timezone.utc) - episode_air_date_utc
-        ).total_seconds() / 3600 >= self.hours_before_air
+
+        hours_till_airing = (
+            episode_air_date_utc - datetime.now(timezone.utc)
+        ).total_seconds() / 3600
+
+        return hours_till_airing <= self.hours_before_air
+
+    def __has_episode_already_aired(self, episode_air_date_utc):
+        """
+        Parameters:
+        episode_air_date_utc (datetime):The episode air date with utc timezone
+
+        Returns:
+        bool True if episode has already aired
+        """
+
+        return (datetime.now(timezone.utc) - episode_air_date_utc).total_seconds() > 0
