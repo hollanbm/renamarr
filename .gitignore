@@ -1,5 +1,6 @@
 
 .zsh_history
+config.yml
 
 # Ignore dynaconf secret files
 .secrets.*

@@ -3,7 +3,12 @@
 ## Quick Start
 
 ### docker
-Please see [docker-compose.yml](https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/docker-compose.yml)
+
+1) Copy/Rename [config.yml.example](docker/config.yml.example) to `config.yml`
+2) Update `config.yml` as needed.
+    * See [Configuration](#configuration) for further explanation
+3) Bring up app using provided [docker-compose.yml](docker/docker-compose.yml)  
+
 
 ### helm
 coming soon
@@ -19,9 +24,9 @@ coming soon
 
 ### The problem
 
-It is relatively common for the TVDB to be updated the day of, or even after airing. Sonarr refreshes its TVDB cache every 24 hours.
+It is relatively common for the TVDB to be updated the day of, or even after airing. Sonarr refreshes its TVDB cache every 12 hours.
 
-Unfortunately, this can prevent import for up to 24 hours in extreme circumstances.
+Unfortunately, this can prevent import for up to 12 hours in extreme circumstances.
 
 To solve this, I created this app
 
@@ -30,7 +35,7 @@ To solve this, I created this app
 This app uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
 * Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
-  * If a series has an episode airing within `ENV['HOURS_BEFORE_AIR']`
+  * If a series has an episode airing within `config.sonarr[].series_scanner.hours_before_air`
     * default value of 4, max value of 12
   * OR
   * An episode that has aired previously
@@ -41,9 +46,20 @@ This should prevent too many API calls to the TVDB, refreshing individual series
 
 ### Usage
 
-The application run immediately on startup, and then continue to schedule jobs every hour after the first execution.
+The application run immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
   
-You can disable by setting the env var `ENV['HOURLY_JOB']=FALSE`
+
+### Configuration
+
+| Name                                       | Type    | Required | Default Value | Description                                                                            |
+|--------------------------------------------|---------|----------|---------------|----------------------------------------------------------------------------------------|
+| `sonarr`                                   | Array   | Yes      | []            | One or more sonarr instances                                                           |
+| `sonarr[].name`                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                      |
+| `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                |
+| `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                            |
+| `sonarr[].series_scanner.enabled`          | boolean | Yes      | N/A           | completely disables series_scanner functionality (currently this is the only feature)  |
+| `sonarr[].series_scanner.hourly_job`       | boolean | Yes      | N/A           | disables hourly job. App will exit after first execution                               |
+| `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA |
 
 ### Local Setup
 
