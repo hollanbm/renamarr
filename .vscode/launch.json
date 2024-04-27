@@ -5,13 +5,29 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Main",
+      "name": "Main (INFO)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/main.py",
       "console": "integratedTerminal",
       "autoReload": {
         "enable": true
+      },
+      "env": {
+        "LOGURU_LEVEL": "INFO"
+      }
+    },
+    {
+      "name": "Main (DEBUG)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.py",
+      "console": "integratedTerminal",
+      "autoReload": {
+        "enable": true
+      },
+      "env": {
+        "LOGURU_LEVEL": "DEBUG"
       }
     }
   ]

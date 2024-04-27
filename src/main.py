@@ -32,8 +32,6 @@ def schedule_series_scanner(sonarr_config):
 
 
 def loguru_config():
-    environ["LOGURU_LEVEL"] = environ.get("LOG_LEVEL") or "INFO"
-
     logger_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level}</level> | "

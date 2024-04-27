@@ -18,7 +18,7 @@
         "ghcr.io/devcontainers/features/github-cli:1": {}
     },
     "containerEnv": {
-        "LOG_LEVEL": "INFO"
+        "LOGURU_LEVEL": "DEBUG"
     },
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/home/poetry/.ssh,type=bind,consistency=cached",
