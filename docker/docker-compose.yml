@@ -3,11 +3,5 @@ services:
     container_name: series_scanner
     image: ghcr.io/hollanbm/sonarr-series-scanner:latest
     restart: unless-stopped
-    environment:
-      # don't forget to change these, or the app will exit on startup
-      SONARR_URL: ""
-      SONARR_API_KEY: ""
-      # config defaults
-      # LOG_LEVEL: INFO
-      # HOURS_BEFORE_AIR: 4
-      # HOURLY_JOB: TRUE
+    volumes:
+      - ./config.yml:/config/config.yml:ro

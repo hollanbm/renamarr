@@ -1,0 +1,14 @@
+sonarr:
+  - name: tv
+    url: https://sonarr.tld:8989
+    api_key: not-a-real-api-key
+    series_scanner:
+      enabled: True
+      hourly_job: True
+  - name: anime
+    url: https://sonarr-anime.tld:8989
+    api_key: not-a-real-api-key
+    series_scanner:
+      enabled: True
+      hourly_job: True
+      hours_before_air: 1 # optional, defaults to 4
