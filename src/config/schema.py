@@ -1,4 +1,4 @@
-from schema import Use, And, Optional
+from schema import And, Optional, Use
 
 CONFIG_SCHEMA = {
     "sonarr": And(
@@ -28,7 +28,10 @@ CONFIG_SCHEMA = {
                     "hourly_job": bool,
                     Optional("hours_before_air", default=4): int,
                 },
-                "tba_renamer": {"enabled": bool, "hourly_job": bool},
+                "existing_renamer": {
+                    "enabled": bool,
+                    "hourly_job": bool,
+                },
             }
         ],
     ),
