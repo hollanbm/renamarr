@@ -1,18 +1,11 @@
-FROM python:3.12-slim-bookworm
+FROM mcr.microsoft.com/devcontainers/python:3.12
 
 # update base
 RUN apt-get update -y -qq
 RUN apt-get dist-upgrade -y -qq
-RUN apt-get install -y -qq zsh
 RUN apt-get autoremove -y -qq
 
 # install pipx
 RUN pip install pipx
 RUN pipx ensurepath
-
-RUN pipx --global install poetry black
-
-# setup user, zsh default shell
-RUN useradd poetry -m -s /bin/zsh
-USER poetry
-SHELL ["/bin/zsh", "-c"]
+RUN pipx install poetry ruff pre-commit

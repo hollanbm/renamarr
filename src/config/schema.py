@@ -6,19 +6,19 @@ CONFIG_SCHEMA = {
         [
             {
                 "name": And(
-                    lambda s: s != None,
+                    lambda s: s is not None,
                     Use(str),
                     lambda s: len(s) > 0,
                     error="sonarr[].name is a required field",
                 ),
                 "url": And(
-                    lambda s: s != None,
+                    lambda s: s is not None,
                     Use(str),
                     lambda s: len(s) > 0,
                     error="sonarr[].url is a required field",
                 ),
                 "api_key": And(
-                    lambda s: s != None,
+                    lambda s: s is not None,
                     Use(str),
                     lambda s: len(s) > 0,
                     error="sonarr[].api_key is a required field",

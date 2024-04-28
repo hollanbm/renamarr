@@ -1,5 +1,4 @@
-from os import environ
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from dateutil import parser
 from pycliarr.api import SonarrCli
 from loguru import logger
@@ -14,8 +13,7 @@ class SeriesScanner:
 
     def scan(self):
         with logger.contextualize(instance=self.name):
-
-            logger.info(f"Starting Series Scan")
+            logger.info("Starting Series Scan")
 
             sonarr_cli = SonarrCli(self.url, self.api_key)
 
@@ -32,10 +30,10 @@ class SeriesScanner:
                         episode_list = sonarr_cli.get_episode(show.id)
 
                         if episode_list is []:
-                            logger.error(f"Error fetching episode list")
+                            logger.error("Error fetching episode list")
                             continue
                         else:
-                            logger.debug(f"Retrieved episode list")
+                            logger.debug("Retrieved episode list")
 
                         for episode in self.__filter_episode_list(episode_list):
                             episode_air_date_utc = parser.parse(
@@ -54,7 +52,7 @@ class SeriesScanner:
                                     f"Found previously aired episode with TBA title"
                                 )
                                 sonarr_cli.refresh_serie(show.id)
-                                logger.info(f"Series rescan triggered")
+                                logger.info("Series rescan triggered")
                                 break
                         logger.debug("Finished Processing")
 
@@ -76,7 +74,7 @@ class SeriesScanner:
             for e in episode_list
             if e.get("seasonNumber") > 0
             and e.get("title") == "TBA"
-            and e.get("airDateUtc") != None
+            and e.get("airDateUtc") is not None
         ]
 
     def __is_episode_airing_soon(self, episode_air_date_utc):

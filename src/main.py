@@ -1,7 +1,6 @@
 from series_scanner import SeriesScanner
 from config.schema import CONFIG_SCHEMA
 from loguru import logger
-from os import environ
 from os import path
 from pycliarr.api import CliServerError
 from pyconfigparser import configparser, ConfigError, ConfigFileNotFoundError
