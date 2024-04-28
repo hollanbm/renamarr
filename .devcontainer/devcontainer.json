@@ -19,7 +19,7 @@
         "source=${localWorkspaceFolder}/.zsh_history,target=/home/poetry/.zsh_history,type=bind,consistency=cached",
         "source=${localWorkspaceFolder}/config.yml,target=/config/config.yml,type=bind,consistency=cached"
     ],
-    "postCreateCommand": "zsh -c 'poetry install --no-interaction --no-ansi --quiet && source $(poetry env info --path)/bin/activate'",
+    "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
     "customizations": {
         "vscode": {
             "settings": {
