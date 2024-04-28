@@ -1,27 +1,21 @@
 {
     "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.base.schema.json",
-    "name": "poetry DevContainer",
+    "name": "series_scanner devContainer",
     "build": {
         "dockerfile": "Dockerfile"
     },
-    "containerUser": "poetry",
     "features": {
-        "ghcr.io/devcontainers/features/common-utils:2": {
-            "configureZshAsDefaultShell": true,
-            "nonFreePackages": true,
-            "username": "poetry"
-        },
         "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
-            "plugins": "sudo git zsh-syntax-highlighting zsh-autosuggestions poetry poetry-env",
+            "plugins": "git zsh-syntax-highlighting zsh-autosuggestions poetry poetry-env gpg-agent",
             "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
         },
         "ghcr.io/devcontainers/features/github-cli:1": {}
     },
     "containerEnv": {
-        "LOGURU_LEVEL": "DEBUG"
+        "LOGURU_LEVEL": "DEBUG",
+        "GH_TOKEN": "${localEnv:GH_TOKEN}"
     },
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/poetry/.ssh,type=bind,consistency=cached",
         "source=${localWorkspaceFolder}/.zsh_history,target=/home/poetry/.zsh_history,type=bind,consistency=cached",
         "source=${localWorkspaceFolder}/config.yml,target=/config/config.yml,type=bind,consistency=cached"
     ],
@@ -31,23 +25,31 @@
             "settings": {
                 "files.eol": "\n",
                 "editor.formatOnSave": true,
-                "editor.defaultFormatter": "ms-python.black-formatter",
-                "python.venvPath": "${workspaceFolder}/.venv",
                 "terminal.integrated.defaultProfile.linux": "zsh",
                 "terminal.integrated.profiles.linux": {
                     "zsh": {
                         "path": "/usr/bin/zsh"
                     }
+                },
+                "git.enableCommitSigning": true,
+                "source.organizeImports": true,
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll": "explicit",
+                        "source.organizeImports": "explicit"
+                    },
+                    "editor.defaultFormatter": "charliermarsh.ruff"
                 }
             },
             "extensions": [
                 "KevinRose.vsc-python-indent",
-                "ms-python.black-formatter",
                 "ms-python.debugpy",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "njpwerner.autodocstring",
-                "VisualStudioExptTeam.vscodeintellicode"
+                "VisualStudioExptTeam.vscodeintellicode",
+                "charliermarsh.ruff"
             ]
         }
     }
