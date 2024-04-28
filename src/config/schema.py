@@ -28,6 +28,7 @@ CONFIG_SCHEMA = {
                     "hourly_job": bool,
                     Optional("hours_before_air", default=4): int,
                 },
+                "tba_renamer": {"enabled": bool, "hourly_job": bool},
             }
         ],
     ),

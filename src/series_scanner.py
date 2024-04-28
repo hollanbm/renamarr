@@ -45,11 +45,11 @@ class SeriesScanner:
                                     f"Found TBA episode, airing within the next {self.hours_before_air} hours"
                                 )
                                 sonarr_cli.refresh_serie(show.id)
-                                logger.info(f"Series rescan triggered")
+                                logger.info("Series rescan triggered")
                                 break
                             elif self.__has_episode_already_aired(episode_air_date_utc):
                                 logger.info(
-                                    f"Found previously aired episode with TBA title"
+                                    "Found previously aired episode with TBA title"
                                 )
                                 sonarr_cli.refresh_serie(show.id)
                                 logger.info("Series rescan triggered")
