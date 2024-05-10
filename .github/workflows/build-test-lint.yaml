@@ -68,4 +68,3 @@ jobs:
       - name: Lint with Ruff
         run: |
           ruff check --output-format=github .
-        fail_ci_if_error: true
