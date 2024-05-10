@@ -36,3 +36,6 @@ testpaths = [
     "./test",
     "./test/models"
 ]
+addopts = [
+    "--import-mode=importlib",
+]
