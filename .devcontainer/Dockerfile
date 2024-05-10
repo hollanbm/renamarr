@@ -8,4 +8,4 @@ RUN apt-get autoremove -y -qq
 # install pipx
 RUN pip install pipx
 RUN pipx ensurepath
-RUN pipx install poetry ruff pre-commit
+RUN pipx install poetry ruff pre-commit pytest

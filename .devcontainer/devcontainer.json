@@ -51,10 +51,25 @@
           },
           "editor.defaultFormatter": "charliermarsh.ruff"
         },
+        "python": {
+          "analysis": {
+            "autoFormatStrings": true,
+            "defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+            "extraPaths": [
+              "./src/models"
+            ]
+          },
+          "testing": {
+            "unittestEnabled": false,
+            "pytestEnabled": true,
+            "pytestArgs": [
+              "test"
+            ]
+          }
+        },
         "ruff.codeAction.disableRuleComment": {
           "enable": false
         },
-        "python.analysis.autoFormatStrings": true,
         "[jsonc]": {
           "editor.defaultFormatter": "vscode.json-language-features"
         },
@@ -65,15 +80,17 @@
           "editor.defaultFormatter": "yzhang.markdown-all-in-one"
         }
       },
-      "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
       "extensions": [
+        "charliermarsh.ruff",
         "KevinRose.vsc-python-indent",
         "ms-python.debugpy",
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "mutantdino.resourcemonitor",
         "njpwerner.autodocstring",
+        "njqdev.vscode-python-typehint",
+        "oderwat.indent-rainbow",
         "VisualStudioExptTeam.vscodeintellicode",
-        "charliermarsh.ruff",
         "yzhang.markdown-all-in-one"
       ]
     }

@@ -1,9 +1,12 @@
+from re import search as regex_search
 from os import path
 from typing import List
 
 from loguru import logger
 from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
+from batch_rename import BatchRename
+from rename import Rename
 
 
 class ExistingRenamer:
@@ -30,35 +33,31 @@ class ExistingRenamer:
                         continue
                     else:
                         logger.debug("Retrieved episode list")
-                    # generic dict, used to batch up files for renaming, as well as a user friendly output for logging
-                    files_to_rename: dict = {"episode_ids": [], "log_msg": []}
+
+                    batch_rename: BatchRename = BatchRename()
 
                     for episode in self.__aired_episode_list_with_titles(episode_list):
                         file_info = self.sonarr_cli.get_episode_file(
-                            episode_id=episode["id"]
+                            episode_id=episode["episodeFileId"]
                         )
+                        file_name = path.basename(file_info["path"])
                         season_episode_number = f'S{episode['seasonNumber']:02}E{episode['episodeNumber']:02}'
 
-                        # file on disk, doesn't contain episode name
-                        if episode["title"] not in path.basename(file_info["path"]):
-                            files_to_rename["episode_ids"].append(file_info["id"])
-                            files_to_rename["log_msg"].append(season_episode_number)
-                            logger.info(
-                                f"{season_episode_number} filename does not contain episode name"
+                        if regex_search(r"\bTBA\b", file_name) is not None:
+                            batch_rename.append(
+                                Rename(file_info["id"], season_episode_number)
                             )
                             logger.info(f"{season_episode_number} Queing for rename")
 
-                    # TODO: Submit PR to original repo updating rename payload for episode rename method to work
-                    self.sonarr_cli._sendCommand(
-                        {
-                            "name": "RenameFiles",
-                            "files": files_to_rename["episode_ids"],
-                            "seriesId": show.id,
-                        }
-                    )
+                    if batch_rename.has_files_to_rename():
+                        self.sonarr_cli.rename_files(
+                            batch_rename.get_file_ids(), show.id
+                        )
+                        logger.info(f"Renaming {batch_rename.get_log_message()}")
+                    else:
+                        logger.debug("No rename needed")
 
-                    logger.info(f'Renaming {', '.join(files_to_rename["log_msg"])}')
-                logger.info("Finished Existing Renamer")
+            logger.info("Finished Existing Renamer")
 
     def __aired_episode_list_with_titles(self, episode_list: List[json_data]):
         """
