@@ -1,16 +1,17 @@
-from series_scanner import SeriesScanner
-from config.schema import CONFIG_SCHEMA
-from loguru import logger
 from os import path
-from pycliarr.api import CliServerError
-from pyconfigparser import configparser, ConfigError, ConfigFileNotFoundError
+from sys import stdout
+from time import sleep
 
 import schedule
-from time import sleep
-from sys import stdout
+from config.schema import CONFIG_SCHEMA
+from existing_renamer import ExistingRenamer
+from loguru import logger
+from pycliarr.api import CliServerError
+from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
+from series_scanner import SeriesScanner
 
 
-def job(sonarr_config):
+def series_scanner_job(sonarr_config):
     try:
         SeriesScanner(
             name=sonarr_config.name,
@@ -23,11 +24,34 @@ def job(sonarr_config):
 
 
 def schedule_series_scanner(sonarr_config):
-    job(sonarr_config)
+    series_scanner_job(sonarr_config)
 
     if sonarr_config.series_scanner.hourly_job:
         # Add a random delay of +-5 minutes between jobs
-        schedule.every(55).to(65).minutes.do(job, sonarr_config=sonarr_config)
+        schedule.every(55).to(65).minutes.do(
+            series_scanner_job, sonarr_config=sonarr_config
+        )
+
+
+def existing_renamer_job(sonarr_config):
+    try:
+        ExistingRenamer(
+            name=sonarr_config.name,
+            url=sonarr_config.url,
+            api_key=sonarr_config.api_key,
+        ).scan()
+    except CliServerError as exc:
+        logger.error(exc)
+
+
+def schedule_existing_renamer(sonarr_config):
+    existing_renamer_job(sonarr_config)
+
+    if sonarr_config.existing_renamer.hourly_job:
+        # Add a random delay of +-5 minutes between jobs
+        schedule.every(55).to(65).minutes.do(
+            existing_renamer_job, sonarr_config=sonarr_config
+        )
 
 
 def loguru_config():
@@ -60,6 +84,8 @@ if __name__ == "__main__":
     for sonarr_config in config.sonarr:
         if sonarr_config.series_scanner.enabled:
             schedule_series_scanner(sonarr_config)
+        if sonarr_config.existing_renamer.enabled:
+            schedule_existing_renamer(sonarr_config)
 
     if schedule.get_jobs():
         while True:

@@ -1,23 +1,21 @@
 from datetime import datetime, timezone
+
 from dateutil import parser
-from pycliarr.api import SonarrCli
 from loguru import logger
+from pycliarr.api import SonarrCli
 
 
 class SeriesScanner:
     def __init__(self, name, url, api_key, hours_before_air):
         self.name = name
-        self.url = url
-        self.api_key = api_key
+        self.sonarr_cli = SonarrCli(url, api_key)
         self.hours_before_air = min(hours_before_air, 12)
 
     def scan(self):
         with logger.contextualize(instance=self.name):
             logger.info("Starting Series Scan")
 
-            sonarr_cli = SonarrCli(self.url, self.api_key)
-
-            series = sonarr_cli.get_serie()
+            series = self.sonarr_cli.get_serie()
 
             if series is []:
                 logger.error("Sonarr returned empty series list")
@@ -27,7 +25,7 @@ class SeriesScanner:
             for show in sorted(series, key=lambda s: s.title):
                 with logger.contextualize(series=show.title):
                     if show.status.lower() == "continuing":
-                        episode_list = sonarr_cli.get_episode(show.id)
+                        episode_list = self.sonarr_cli.get_episode(show.id)
 
                         if episode_list is []:
                             logger.error("Error fetching episode list")
@@ -44,14 +42,14 @@ class SeriesScanner:
                                 logger.info(
                                     f"Found TBA episode, airing within the next {self.hours_before_air} hours"
                                 )
-                                sonarr_cli.refresh_serie(show.id)
-                                logger.info(f"Series rescan triggered")
+                                self.sonarr_cli.refresh_serie(show.id)
+                                logger.info("Series rescan triggered")
                                 break
                             elif self.__has_episode_already_aired(episode_air_date_utc):
                                 logger.info(
-                                    f"Found previously aired episode with TBA title"
+                                    "Found previously aired episode with TBA title"
                                 )
-                                sonarr_cli.refresh_serie(show.id)
+                                self.sonarr_cli.refresh_serie(show.id)
                                 logger.info("Series rescan triggered")
                                 break
                         logger.debug("Finished Processing")
@@ -64,10 +62,10 @@ class SeriesScanner:
         Filters episode list, removing all episodes that have a title, or no airDate
 
         Parameters:
-        episode_list (List[SonarrSerieItem]):The episode list to be filered.
+        episode_list (List[json_data]):The episode list to be filered.
 
         Returns:
-        List[SonarrSerieItem]
+        List[json_data]
         """
         return [
             e
