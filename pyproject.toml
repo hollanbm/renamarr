@@ -20,7 +20,10 @@ schedule = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.4.4"
+
+[tool.poetry.group.test.dependencies]
 pytest = "^8.2.0"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]
