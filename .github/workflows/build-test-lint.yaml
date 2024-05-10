@@ -4,9 +4,7 @@ on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
       #----------------------------------------------
       #       check-out repo and set-up python
@@ -29,29 +27,32 @@ jobs:
           installer-parallel: true
 
       #----------------------------------------------
-      #       load cached venv if cache exists
-      #----------------------------------------------
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v3
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-
-      #----------------------------------------------
       # install dependencies if cache does not exist
       #----------------------------------------------
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
+
+      #----------------------------------------------
+      #    Permanent venv activation
+      #----------------------------------------------
+      - name: Activate virtualenv
+        run: |
+          source .venv/bin/activate
+          echo PATH=$PATH >> $GITHUB_ENV
 
       #----------------------------------------------
       #    run test suite and output coverage file
       #----------------------------------------------
       - name: Test with pytest
         run: |
-          source .venv/bin/activate
           pytest --cov=src --cov-report=xml
+
+      #----------------------------------------------
+      #              lint and formatting
+      #----------------------------------------------
+      - name: Lint with Ruff
+        run: |
+          ruff check --output-format=github .
 
       #----------------------------------------------
       #             upload coverage stats
@@ -62,10 +63,3 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           fail_ci_if_error: true
-
-      #----------------------------------------------
-      #              lint and formatting
-      #----------------------------------------------
-      - name: Lint with Ruff
-        run: |
-          ruff check --output-format=github .
