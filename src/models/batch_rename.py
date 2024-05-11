@@ -1,5 +1,6 @@
 from typing import List
-from rename import Rename
+
+from models.rename import Rename
 
 
 class BatchRename:
