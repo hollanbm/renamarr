@@ -16,7 +16,6 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/.zsh_history,target=/home/poetry/.zsh_history,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/config.yml,target=/config/config.yml,type=bind,consistency=cached"
   ],
   "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
@@ -63,7 +62,7 @@
             "unittestEnabled": false,
             "pytestEnabled": true,
             "pytestArgs": [
-              "test"
+              "tests"
             ]
           }
         },

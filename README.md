@@ -85,6 +85,8 @@ There is a [devcontainer](https://containers.dev/) provided; it is optional but 
 
 ####
 
+You will need to create `config.yml` in the root of the repo, to mount your config within the devcontainer
+
 ```shell
 $ poetry install
 

@@ -24,6 +24,8 @@ ruff = "^0.4.4"
 [tool.poetry.group.test.dependencies]
 pytest = "^8.2.0"
 pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
+mock = "^5.1.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -32,13 +34,13 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 pythonpath = [
     "./src",
-    "./src/config",
     "./src/models"
 ]
 testpaths = [
-    "./test",
-    "./test/models"
+    "./tests",
+    "./tests/models"
 ]
 addopts = [
     "--import-mode=importlib",
 ]
+mock_use_standalone_module = "True"
