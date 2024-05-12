@@ -1,6 +1,8 @@
 #!/bin/zsh
 
 # create venv
+poetry config virtualenvs.in-project true --local
+
 poetry install --no-interaction --no-ansi --quiet
 
 # activate venv
