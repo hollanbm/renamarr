@@ -358,6 +358,23 @@ pytest = ">=4.6"
 testing = ["fields", "hunter", "process-tests", "pytest-xdist", "virtualenv"]
 
 [[package]]
+name = "pytest-loguru"
+version = "0.4.0"
+description = "Pytest Loguru"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pytest_loguru-0.4.0-py3-none-any.whl", hash = "sha256:3cc7b9c6b22cb158209ccbabf0d678dacd3f3c7497d6f46f1c338c13bee1ac77"},
+    {file = "pytest_loguru-0.4.0.tar.gz", hash = "sha256:0d9e4e72ae9bfd92f774c666e7353766af11b0b78edd59c290e89be116050f03"},
+]
+
+[package.dependencies]
+loguru = "*"
+
+[package.extras]
+test = ["pytest", "pytest-cov"]
+
+[[package]]
 name = "pytest-mock"
 version = "3.14.0"
 description = "Thin-wrapper around the mock package for easier use with pytest"
@@ -591,4 +608,4 @@ dev = ["black (>=19.3b0)", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "6f635e021b9cfd15dbdd86ea364f794154c1c0534fa9426af8f8d764edbd7b56"
+content-hash = "acd17767d395ee17f77074171ba0cea1e1bb9df05d46d374b003853efddf004e"
