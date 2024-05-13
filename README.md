@@ -95,5 +95,5 @@ $ poetry run python src/main.py
 
 #### Unit Tests
 ```shell
-$ pytest
+$ pytest --cov=src --cov-report=html tests --cov-branch
 ```
