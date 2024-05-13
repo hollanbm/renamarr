@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from dateutil import parser
 from loguru import logger
 from pycliarr.api import SonarrCli
+from pycliarr.api.base_api import json_data
 
 
 class SeriesScanner:
@@ -13,6 +14,15 @@ class SeriesScanner:
 
     def scan(self) -> None:
         with logger.contextualize(instance=self.name):
+            mediamanagement: json_data = self.sonarr_cli.request_get(
+                path="/api/v3/config/mediamanagement"
+            )
+
+            if not mediamanagement["episodeTitleRequired"]:
+                logger.error("Episode Title Required is not set to always")
+                logger.error("Exiting Series Scan")
+                return
+
             logger.info("Starting Series Scan")
 
             series = self.sonarr_cli.get_serie()
