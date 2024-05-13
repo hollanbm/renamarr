@@ -5,10 +5,12 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
       "plugins": "git zsh-syntax-highlighting zsh-autosuggestions poetry poetry-env gpg-agent",
       "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
     },
+    "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "containerEnv": {
@@ -16,7 +18,6 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/.zsh_history,target=/home/poetry/.zsh_history,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/config.yml,target=/config/config.yml,type=bind,consistency=cached"
   ],
   "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
@@ -63,7 +64,7 @@
             "unittestEnabled": false,
             "pytestEnabled": true,
             "pytestArgs": [
-              "test"
+              "tests"
             ]
           }
         },

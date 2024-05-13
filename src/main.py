@@ -3,7 +3,7 @@ from sys import stdout
 from time import sleep
 
 import schedule
-from config.schema import CONFIG_SCHEMA
+from config_schema import CONFIG_SCHEMA
 from existing_renamer import ExistingRenamer
 from loguru import logger
 from pycliarr.api import CliServerError
@@ -11,83 +11,81 @@ from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from series_scanner import SeriesScanner
 
 
-def series_scanner_job(sonarr_config):
-    try:
-        SeriesScanner(
-            name=sonarr_config.name,
-            url=sonarr_config.url,
-            api_key=sonarr_config.api_key,
-            hours_before_air=sonarr_config.series_scanner.hours_before_air,
-        ).scan()
-    except CliServerError as exc:
-        logger.error(exc)
-
-
-def schedule_series_scanner(sonarr_config):
-    series_scanner_job(sonarr_config)
-
-    if sonarr_config.series_scanner.hourly_job:
-        # Add a random delay of +-5 minutes between jobs
-        schedule.every(55).to(65).minutes.do(
-            series_scanner_job, sonarr_config=sonarr_config
+class Main:
+    def __init__(self):
+        logger_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+            "<level>{level}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+            "{extra[instance]} | "
+            "{extra[series]} | "
+            "<level>{message}</level>"
         )
+        logger.configure(extra={"instance": "", "series": ""})  # Default values
+        logger.remove()
+        logger.add(stdout, format=logger_format)
 
+    def __series_scanner_job(self, sonarr_config):
+        try:
+            SeriesScanner(
+                name=sonarr_config.name,
+                url=sonarr_config.url,
+                api_key=sonarr_config.api_key,
+                hours_before_air=sonarr_config.series_scanner.hours_before_air,
+            ).scan()
+        except CliServerError as exc:
+            logger.error(exc)
 
-def existing_renamer_job(sonarr_config):
-    try:
-        ExistingRenamer(
-            name=sonarr_config.name,
-            url=sonarr_config.url,
-            api_key=sonarr_config.api_key,
-        ).scan()
-    except CliServerError as exc:
-        logger.error(exc)
+    def __schedule_series_scanner(self, sonarr_config):
+        self.__series_scanner_job(sonarr_config)
 
+        if sonarr_config.series_scanner.hourly_job:
+            # Add a random delay of +-5 minutes between jobs
+            schedule.every(55).to(65).minutes.do(
+                self.__series_scanner_job, sonarr_config=sonarr_config
+            )
 
-def schedule_existing_renamer(sonarr_config):
-    existing_renamer_job(sonarr_config)
+    def __existing_renamer_job(self, sonarr_config):
+        try:
+            ExistingRenamer(
+                name=sonarr_config.name,
+                url=sonarr_config.url,
+                api_key=sonarr_config.api_key,
+            ).scan()
+        except CliServerError as exc:
+            logger.error(exc)
 
-    if sonarr_config.existing_renamer.hourly_job:
-        # Add a random delay of +-5 minutes between jobs
-        schedule.every(55).to(65).minutes.do(
-            existing_renamer_job, sonarr_config=sonarr_config
-        )
+    def __schedule_existing_renamer(self, sonarr_config):
+        self.__existing_renamer_job(sonarr_config)
 
+        if sonarr_config.existing_renamer.hourly_job:
+            # Add a random delay of +-5 minutes between jobs
+            schedule.every(55).to(65).minutes.do(
+                self.__existing_renamer_job, sonarr_config=sonarr_config
+            )
 
-def loguru_config():
-    logger_format = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        "{extra[instance]} | "
-        "{extra[series]} | "
-        "<level>{message}</level>"
-    )
-    logger.configure(extra={"instance": "", "series": ""})  # Default values
-    logger.remove()
-    logger.add(stdout, format=logger_format)
+    def start(self) -> None:
+        try:
+            config = configparser.get_config(
+                CONFIG_SCHEMA,
+                config_dir=path.relpath("/config"),
+                file_name="config.yml",
+            )
+        except (ConfigError, ConfigFileNotFoundError) as exc:
+            logger.error(exc)
+            exit(1)
+
+        for sonarr_config in config.sonarr:
+            if sonarr_config.series_scanner.enabled:
+                self.__schedule_series_scanner(sonarr_config)
+            if sonarr_config.existing_renamer.enabled:
+                self.__schedule_existing_renamer(sonarr_config)
+
+        if schedule.get_jobs():
+            while True:
+                schedule.run_pending()
+                sleep(1)
 
 
 if __name__ == "__main__":
-    loguru_config()
-
-    try:
-        config = configparser.get_config(
-            CONFIG_SCHEMA,
-            config_dir=path.relpath("/config"),
-            file_name="config.yml",
-        )
-    except (ConfigError, ConfigFileNotFoundError) as exc:
-        logger.error(exc)
-        exit(1)
-
-    for sonarr_config in config.sonarr:
-        if sonarr_config.series_scanner.enabled:
-            schedule_series_scanner(sonarr_config)
-        if sonarr_config.existing_renamer.enabled:
-            schedule_existing_renamer(sonarr_config)
-
-    if schedule.get_jobs():
-        while True:
-            schedule.run_pending()
-            sleep(1)
+    Main().start()

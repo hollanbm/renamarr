@@ -6,18 +6,18 @@ from pycliarr.api import SonarrCli
 
 
 class SeriesScanner:
-    def __init__(self, name, url, api_key, hours_before_air):
+    def __init__(self, name: str, url: str, api_key: str, hours_before_air: int):
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)
         self.hours_before_air = min(hours_before_air, 12)
 
-    def scan(self):
+    def scan(self) -> None:
         with logger.contextualize(instance=self.name):
             logger.info("Starting Series Scan")
 
             series = self.sonarr_cli.get_serie()
 
-            if series is []:
+            if len(series) == 0:
                 logger.error("Sonarr returned empty series list")
             else:
                 logger.debug("Retrieved series list")
@@ -27,7 +27,7 @@ class SeriesScanner:
                     if show.status.lower() == "continuing":
                         episode_list = self.sonarr_cli.get_episode(show.id)
 
-                        if episode_list is []:
+                        if len(episode_list) == 0:
                             logger.error("Error fetching episode list")
                             continue
                         else:
@@ -54,7 +54,7 @@ class SeriesScanner:
                                 break
                         logger.debug("Finished Processing")
 
-            logger.info("Finished Series Scam")
+            logger.info("Finished Series Scan")
 
     # Filter episode list, so it only contains episodes with TBA title
     def __filter_episode_list(self, episode_list):
@@ -88,7 +88,7 @@ class SeriesScanner:
             episode_air_date_utc - datetime.now(timezone.utc)
         ).total_seconds() / 3600
 
-        return hours_till_airing <= self.hours_before_air
+        return 0 < hours_till_airing <= self.hours_before_air
 
     def __has_episode_already_aired(self, episode_air_date_utc):
         """

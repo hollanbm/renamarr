@@ -1,6 +1,13 @@
 name: Python package
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - feat/**
+      - main
 
 jobs:
   build:
@@ -45,7 +52,7 @@ jobs:
       #----------------------------------------------
       - name: Test with pytest
         run: |
-          pytest --cov=src --cov-report=xml
+          pytest --cov-branch --cov=src --cov-report=xml tests
 
       #----------------------------------------------
       #              lint and formatting
