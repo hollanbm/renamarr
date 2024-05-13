@@ -1,31 +1,15 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import List
 
-import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 from series_scanner import SeriesScanner
 
+from tests.conftest import episode_data
+
 
 class TestSeriesScanner:
-    @pytest.fixture
-    def get_serie(self, mocker) -> None:
-        series: List[SonarrSerieItem] = [
-            SonarrSerieItem(id=1, title="test title", status="continuing")
-        ]
-        mocker.patch.object(SonarrCli, "get_serie").return_value = series
-
-    def episode_data(
-        self, id: int, title: str, airDateDelta: timedelta, seasonNumber: str
-    ) -> dict:
-        return dict(
-            id=id,
-            title=title,
-            airDateUtc=(datetime.now(timezone.utc) + airDateDelta).isoformat(),
-            seasonNumber=seasonNumber,
-        )
-
     def test_no_series_returned(self, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "get_serie").return_value = []
         with caplog.at_level(logging.DEBUG):
@@ -71,19 +55,17 @@ class TestSeriesScanner:
 
     def test_when_episodes_filtered_out(self, get_serie, caplog, mocker) -> None:
         episodes: List[json_data] = [
-            self.episode_data(
+            episode_data(
                 id=1,
                 title="TBA",
                 airDateDelta=timedelta(hours=8),
-                seasonNumber=1,
             ),
-            self.episode_data(
+            episode_data(
                 id=2,
                 title="title",
                 airDateDelta=timedelta(hours=-2),
-                seasonNumber=1,
             ),
-            self.episode_data(
+            episode_data(
                 id=3,
                 title="TBA",
                 airDateDelta=timedelta(hours=2),
@@ -108,7 +90,7 @@ class TestSeriesScanner:
 
     def test_when_tba_episode_is_airing_soon(self, get_serie, caplog, mocker) -> None:
         episodes: List[json_data] = [
-            self.episode_data(
+            episode_data(
                 id=1,
                 title="TBA",
                 airDateDelta=timedelta(hours=2),
@@ -130,7 +112,7 @@ class TestSeriesScanner:
         self, get_serie, caplog, mocker
     ) -> None:
         episodes: List[json_data] = [
-            self.episode_data(
+            episode_data(
                 id=1,
                 title="TBA",
                 airDateDelta=timedelta(days=-1),
