@@ -88,7 +88,7 @@ class SeriesScanner:
             episode_air_date_utc - datetime.now(timezone.utc)
         ).total_seconds() / 3600
 
-        return hours_till_airing <= self.hours_before_air
+        return 0 < hours_till_airing <= self.hours_before_air
 
     def __has_episode_already_aired(self, episode_air_date_utc):
         """

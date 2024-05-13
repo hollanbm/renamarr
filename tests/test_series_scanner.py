@@ -1,8 +1,10 @@
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
+from pycliarr.api.base_api import json_data
 from series_scanner import SeriesScanner
 
 
@@ -14,19 +16,15 @@ class TestSeriesScanner:
         ]
         mocker.patch.object(SonarrCli, "get_serie").return_value = series
 
-    @pytest.fixture
-    def get_ended_serie(self, mocker) -> None:
-        series: List[SonarrSerieItem] = [
-            SonarrSerieItem(id=1, title="test title", status="ended")
-        ]
-        mocker.patch.object(SonarrCli, "get_serie").return_value = series
-
-    @pytest.fixture
-    def get_episode(self, mocker) -> None:
-        series: List[SonarrSerieItem] = [
-            SonarrSerieItem(id=1, title="test title", status="continuing")
-        ]
-        mocker.patch.object(SonarrCli, "get_serie").return_value = series
+    def episode_data(
+        self, id: int, title: str, airDateDelta: timedelta, seasonNumber: str
+    ) -> dict:
+        return dict(
+            id=id,
+            title=title,
+            airDateUtc=(datetime.now(timezone.utc) + airDateDelta).isoformat(),
+            seasonNumber=seasonNumber,
+        )
 
     def test_no_series_returned(self, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "get_serie").return_value = []
@@ -42,9 +40,11 @@ class TestSeriesScanner:
         assert "Retrieved series list" in caplog.text
         assert "Error fetching episode list" in caplog.text
 
-    def test_when_show_status_not_continuuing(
-        self, get_ended_serie, caplog, mocker
-    ) -> None:
+    def test_when_show_status_not_continuuing(self, caplog, mocker) -> None:
+        series: List[SonarrSerieItem] = [
+            SonarrSerieItem(id=1, title="test title", status="ended")
+        ]
+        mocker.patch.object(SonarrCli, "get_serie").return_value = series
         get_episode = mocker.patch.object(SonarrCli, "get_episode")
         get_episode.return_value = []
 
@@ -66,6 +66,84 @@ class TestSeriesScanner:
 
         with caplog.at_level(logging.DEBUG):
             SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
-        # assert "Error fetching episode list" in caplog.text
 
         get_episode.assert_called_once_with(1)
+
+    def test_when_episodes_filtered_out(self, get_serie, caplog, mocker) -> None:
+        episodes: List[json_data] = [
+            self.episode_data(
+                id=1,
+                title="TBA",
+                airDateDelta=timedelta(hours=8),
+                seasonNumber=1,
+            ),
+            self.episode_data(
+                id=2,
+                title="title",
+                airDateDelta=timedelta(hours=-2),
+                seasonNumber=1,
+            ),
+            self.episode_data(
+                id=3,
+                title="TBA",
+                airDateDelta=timedelta(hours=2),
+                seasonNumber=0,
+            ),
+            dict(
+                id=4,
+                title="TBA",
+                airDateUtc=None,
+                seasonNumber=1,
+            ),
+        ]
+        mocker.patch.object(SonarrCli, "get_episode").return_value = episodes
+
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        with caplog.at_level(logging.DEBUG):
+            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        assert "Retrieved episode list" in caplog.text
+        assert not refresh_serie.called
+
+    def test_when_tba_episode_is_airing_soon(self, get_serie, caplog, mocker) -> None:
+        episodes: List[json_data] = [
+            self.episode_data(
+                id=1,
+                title="TBA",
+                airDateDelta=timedelta(hours=2),
+                seasonNumber=1,
+            )
+        ]
+        mocker.patch.object(SonarrCli, "get_episode").return_value = episodes
+
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        with caplog.at_level(logging.DEBUG):
+            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        assert refresh_serie.called
+        assert "Found TBA episode, airing within the next 4 hours" in caplog.text
+        assert "Series rescan triggered" in caplog.text
+
+    def test_when_tba_episode_has_already_aired(
+        self, get_serie, caplog, mocker
+    ) -> None:
+        episodes: List[json_data] = [
+            self.episode_data(
+                id=1,
+                title="TBA",
+                airDateDelta=timedelta(days=-1),
+                seasonNumber=1,
+            )
+        ]
+        mocker.patch.object(SonarrCli, "get_episode").return_value = episodes
+
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        with caplog.at_level(logging.DEBUG):
+            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        assert refresh_serie.called
+        assert "Found previously aired episode with TBA title" in caplog.text
+        assert "Series rescan triggered" in caplog.text

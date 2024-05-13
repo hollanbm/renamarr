@@ -52,7 +52,7 @@ jobs:
       #----------------------------------------------
       - name: Test with pytest
         run: |
-          pytest --cov=src --cov-report=xml tests
+          pytest --cov-branch --cov=src --cov-report=xml tests
 
       #----------------------------------------------
       #              lint and formatting
