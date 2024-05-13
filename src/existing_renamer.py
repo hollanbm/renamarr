@@ -20,15 +20,16 @@ class ExistingRenamer:
 
             series = self.sonarr_cli.get_serie()
 
-            if series is []:
+            if len(series) == 0:
                 logger.error("Sonarr returned empty series list")
             else:
                 logger.debug("Retrieved series list")
+
             for show in sorted(series, key=lambda s: s.title):
                 with logger.contextualize(series=show.title):
                     episode_list = self.sonarr_cli.get_episode(show.id)
 
-                    if episode_list is []:
+                    if len(episode_list) == 0:
                         logger.error("Error fetching episode list")
                         continue
                     else:
@@ -47,7 +48,7 @@ class ExistingRenamer:
                             batch_rename.append(
                                 Rename(file_info["id"], season_episode_number)
                             )
-                            logger.info(f"{season_episode_number} Queing for rename")
+                            logger.info(f"{season_episode_number} Queuing for rename")
 
                     if batch_rename.has_files_to_rename():
                         self.sonarr_cli.rename_files(

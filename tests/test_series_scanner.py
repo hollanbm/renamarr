@@ -59,13 +59,11 @@ class TestSeriesScanner:
                 id=1,
                 title="TBA",
                 airDateDelta=timedelta(hours=8),
-                seasonNumber=1,
             ),
             episode_data(
                 id=2,
                 title="title",
                 airDateDelta=timedelta(hours=-2),
-                seasonNumber=1,
             ),
             episode_data(
                 id=3,
