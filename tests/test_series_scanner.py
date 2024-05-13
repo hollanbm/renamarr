@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 from typing import List
 
+import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 from series_scanner import SeriesScanner
@@ -10,6 +11,23 @@ from tests.conftest import episode_data
 
 
 class TestSeriesScanner:
+    @pytest.fixture(autouse=True)
+    def mediamanagement_always(self, mocker) -> None:
+        mocker.patch.object(SonarrCli, "request_get").return_value = dict(
+            episodeTitleRequired=True
+        )
+
+    def test_when_episode_title_required_false(self, caplog, mocker) -> None:
+        mocker.patch.object(SonarrCli, "request_get").return_value = dict(
+            episodeTitleRequired=False
+        )
+
+        with caplog.at_level(logging.ERROR):
+            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        assert "Episode Title Required is not set to always" in caplog.text
+        assert "Exiting Series Scan" in caplog.text
+
     def test_no_series_returned(self, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "get_serie").return_value = []
         with caplog.at_level(logging.DEBUG):

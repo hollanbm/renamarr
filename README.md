@@ -33,7 +33,7 @@ To solve this, I created this app
 ## How it works
 
 ### Series Scanner
-This app uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
+This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
 * Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
   * If a series has an episode airing within `config.sonarr[].series_scanner.hours_before_air`
@@ -47,17 +47,11 @@ This should prevent too many API calls to the TVDB, refreshing individual series
 
 ### Existing Renamer
 
-This is basically the opposite functionality of the series scanner. This will check existing files for a `\bTBA\b` regex match, and if found, the file will be renamed
-
-This app uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
+This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
 * Iterate over all [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
-  * Ignores episodes that do not have files, or episodes that have TBA title
-* Renames are batched up, per series
-  * regex check on the episode filename
-    * if filename matches `\bTBA\b`
-    * then the file is added to current series batch rename
-  * Once all episodes of a series have been checked, then episodes that matched the regex will be renamed via Sonarr
+  * Checks if any episodes need to be [renamed](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
+  * Triggers a rename on any episodes that need be renamed (per series)
 
 ### Usage
 
