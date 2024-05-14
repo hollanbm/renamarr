@@ -76,6 +76,18 @@ class Main:
             exit(1)
 
         for sonarr_config in config.sonarr:
+            if (
+                not sonarr_config.series_scanner.enabled
+                and not sonarr_config.existing_renamer.enabled
+            ):
+                with logger.contextualize(instance=sonarr_config.name):
+                    logger.warning(
+                        "Possible config error? -- No jobs configured for current instance"
+                    )
+                    logger.warning(
+                        "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
+                    )
+                    continue
             if sonarr_config.series_scanner.enabled:
                 self.__schedule_series_scanner(sonarr_config)
             if sonarr_config.existing_renamer.enabled:

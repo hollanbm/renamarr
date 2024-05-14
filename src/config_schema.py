@@ -23,16 +23,29 @@ CONFIG_SCHEMA = {
                     lambda s: len(s) > 0,
                     error="sonarr[].api_key is a required field",
                 ),
-                "series_scanner": {
-                    "enabled": bool,
+                Optional(
+                    "series_scanner",
+                    default=dict(
+                        enabled=False,
+                        hourly_job=False,
+                        hours_before_air=4,
+                    ),
+                    ignore_extra_keys=True,
+                ): {
+                    Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                     Optional("hours_before_air", default=4): int,
                 },
-                "existing_renamer": {
-                    "enabled": bool,
+                Optional(
+                    "existing_renamer",
+                    default=dict(enabled=False, hourly_job=False),
+                    ignore_extra_keys=True,
+                ): {
+                    Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                 },
             }
         ],
+        ignore_extra_keys=True,
     ),
 }
