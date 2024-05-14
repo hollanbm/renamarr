@@ -25,12 +25,12 @@ CONFIG_SCHEMA = {
                 ),
                 "series_scanner": {
                     "enabled": bool,
-                    "hourly_job": bool,
+                    Optional("hourly_job", default=False): bool,
                     Optional("hours_before_air", default=4): int,
                 },
                 "existing_renamer": {
                     "enabled": bool,
-                    "hourly_job": bool,
+                    Optional("hourly_job", default=False): bool,
                 },
             }
         ],
