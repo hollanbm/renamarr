@@ -6,7 +6,7 @@ import schedule
 from config_schema import CONFIG_SCHEMA
 from existing_renamer import ExistingRenamer
 from loguru import logger
-from pycliarr.api import CliServerError
+from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from series_scanner import SeriesScanner
 
@@ -33,7 +33,7 @@ class Main:
                 api_key=sonarr_config.api_key,
                 hours_before_air=sonarr_config.series_scanner.hours_before_air,
             ).scan()
-        except CliServerError as exc:
+        except CliArrError as exc:
             logger.error(exc)
 
     def __schedule_series_scanner(self, sonarr_config):
@@ -52,7 +52,7 @@ class Main:
                 url=sonarr_config.url,
                 api_key=sonarr_config.api_key,
             ).scan()
-        except CliServerError as exc:
+        except CliArrError as exc:
             logger.error(exc)
 
     def __schedule_existing_renamer(self, sonarr_config):
