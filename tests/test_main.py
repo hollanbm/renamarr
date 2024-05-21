@@ -2,6 +2,7 @@ import pytest
 from config_schema import CONFIG_SCHEMA
 from existing_renamer import ExistingRenamer
 from main import Main
+from pycliarr.api import CliArrError
 from pyconfigparser import Config, configparser
 from schedule import Job
 from series_scanner import SeriesScanner
@@ -52,6 +53,22 @@ class TestMain:
         assert series_scanner.called
         assert job.called
 
+    def test_series_scanner_pycliarr_exception(
+        self, config, mock_loguru_error, mocker
+    ) -> None:
+        config.sonarr[0].series_scanner.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+
+        exception = CliArrError("BOOM!")
+
+        series_scanner = mocker.patch.object(SeriesScanner, "scan")
+        series_scanner.side_effect = exception
+
+        Main().start()
+
+        mock_loguru_error.assert_called_once_with(exception)
+
     def test_existing_renamer_scan(self, config, mocker) -> None:
         config.sonarr[0].existing_renamer.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -73,3 +90,19 @@ class TestMain:
         Main().start()
         assert existing_renamer.called
         assert job.called
+
+    def test_existing_renamer_pycliarr_exception(
+        self, config, mock_loguru_error, mocker
+    ) -> None:
+        config.sonarr[0].existing_renamer.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+
+        exception = CliArrError("BOOM!")
+
+        existing_renamer = mocker.patch.object(ExistingRenamer, "scan")
+        existing_renamer.side_effect = exception
+
+        Main().start()
+
+        mock_loguru_error.assert_called_once_with(exception)

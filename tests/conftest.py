@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 import pytest
+from loguru import logger
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 
@@ -12,6 +13,21 @@ def get_serie(mocker) -> None:
         SonarrSerieItem(id=1, title="test title", status="continuing")
     ]
     mocker.patch.object(SonarrCli, "get_serie").return_value = series
+
+
+@pytest.fixture
+def mock_loguru_error(mocker) -> None:
+    return mocker.patch.object(logger, "error")
+
+
+@pytest.fixture
+def mock_loguru_info(mocker) -> None:
+    return mocker.patch.object(logger, "info")
+
+
+@pytest.fixture
+def mock_loguru_debug(mocker) -> None:
+    return mocker.patch.object(logger, "debug")
 
 
 def episode_data(
