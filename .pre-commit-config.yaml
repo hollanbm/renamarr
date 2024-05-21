@@ -3,8 +3,15 @@ repos:
     # Ruff version.
     rev: v0.4.2
     hooks:
-      # Run the linter.
       - id: ruff
         args: [ --fix ]
-      # Run the formatter.
       - id: ruff-format
+  - repo: local
+    hooks:
+    - id: pytest
+      name: pytest
+      entry: poetry run pytest --cov=src --cov-branch tests
+      language: system
+      types: [python]
+      pass_filenames: false
+      always_run: true
