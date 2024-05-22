@@ -38,11 +38,12 @@ CONFIG_SCHEMA = {
                 },
                 Optional(
                     "existing_renamer",
-                    default=dict(enabled=False, hourly_job=False),
+                    default=dict(enabled=False, hourly_job=False, analyze_files=False),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
+                    Optional("analyze_files", default=False): bool,
                 },
             }
         ],

@@ -8,6 +8,7 @@ sonarr:
     existing_renamer:
       enabled: False
       hourly_job: False
+      analyze_files: False
   - name: anime
     url: https://sonarr-anime.tld:8989
     api_key: not-a-real-api-key
@@ -18,4 +19,3 @@ sonarr:
     existing_renamer:
       enabled: True
       hourly_job: True
-

@@ -306,13 +306,13 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "pycliarr"
-version = "1.0.26"
+version = "1.0.27"
 description = "Python client for radarr and sonarr"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "pycliarr-1.0.26-py3-none-any.whl", hash = "sha256:9c2d2794bc5b1dffc26a7bf006a2046d44beb948ca19fe87807081b94323830b"},
-    {file = "pycliarr-1.0.26.tar.gz", hash = "sha256:05d8cb77ceaf62efbf7e5c2e3e6e59961086c5c2cad11ebf15046aa5d0bb39a4"},
+    {file = "pycliarr-1.0.27-py3-none-any.whl", hash = "sha256:f7cb1d2d9469ebaf9a329128bb0181f3bb363a1a85fe2baeada6c9dd49674194"},
+    {file = "pycliarr-1.0.27.tar.gz", hash = "sha256:cbf2daec0bf02cc37ba0f3f6c560147532a71b658dc48221bda97ea0e625c4a8"},
 ]
 
 [package.dependencies]

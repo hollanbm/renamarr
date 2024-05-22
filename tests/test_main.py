@@ -3,7 +3,7 @@ from config_schema import CONFIG_SCHEMA
 from existing_renamer import ExistingRenamer
 from main import Main
 from pycliarr.api import CliArrError
-from pyconfigparser import Config, configparser
+from pyconfigparser import Config, ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job
 from series_scanner import SeriesScanner
 
@@ -106,3 +106,25 @@ class TestMain:
         Main().start()
 
         mock_loguru_error.assert_called_once_with(exception)
+
+    def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
+        exception = ConfigError("BOOM!")
+        mocker.patch("pyconfigparser.configparser.get_config").side_effect = exception
+
+        with pytest.raises(SystemExit) as excinfo:
+            Main().start()
+
+        mock_loguru_error.assert_called_once_with(exception)
+        assert excinfo.value.code == 1
+
+    def test_config_file_not_found_error(
+        self, mock_loguru_error, capsys, mocker
+    ) -> None:
+        exception = ConfigFileNotFoundError("BOOM!")
+        mocker.patch("pyconfigparser.configparser.get_config").side_effect = exception
+
+        with pytest.raises(SystemExit) as excinfo:
+            Main().start()
+
+        mock_loguru_error.assert_called_once_with(exception)
+        assert excinfo.value.code == 1

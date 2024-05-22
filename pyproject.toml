@@ -42,6 +42,12 @@ testpaths = [
     "./tests/models"
 ]
 addopts = [
+    "--cov=src",
+    "tests",
+    "--cov-branch",
+    "--capture=sys",
+    "--cov-report=xml",
+    "--cov-report=html",
     "--import-mode=importlib",
 ]
 mock_use_standalone_module = "True"
