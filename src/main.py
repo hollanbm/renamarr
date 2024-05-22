@@ -51,6 +51,7 @@ class Main:
                 name=sonarr_config.name,
                 url=sonarr_config.url,
                 api_key=sonarr_config.api_key,
+                analyze_files=sonarr_config.existing_renamer.analyze_files,
             ).scan()
         except CliArrError as exc:
             logger.error(exc)
@@ -99,5 +100,5 @@ class Main:
                 sleep(1)
 
 
-if __name__ == "__main__":
-    Main().start()
+if __name__ == "__main__":  # pragma nocover
+    Main().start()  # pragma: no cover

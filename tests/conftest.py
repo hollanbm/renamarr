@@ -16,6 +16,11 @@ def get_serie(mocker) -> None:
 
 
 @pytest.fixture
+def get_serie_empty(mocker) -> None:
+    mocker.patch.object(SonarrCli, "get_serie").return_value = []
+
+
+@pytest.fixture
 def mock_loguru_error(mocker) -> None:
     return mocker.patch.object(logger, "error")
 
@@ -28,6 +33,11 @@ def mock_loguru_info(mocker) -> None:
 @pytest.fixture
 def mock_loguru_debug(mocker) -> None:
     return mocker.patch.object(logger, "debug")
+
+
+@pytest.fixture
+def mock_loguru_warning(mocker) -> None:
+    return mocker.patch.object(logger, "warning")
 
 
 def episode_data(

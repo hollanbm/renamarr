@@ -53,23 +53,27 @@ This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
   * Checks if any episodes need to be [renamed](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
   * Triggers a rename on any episodes that need be renamed (per series)
 
+#### Analyze Files
+This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import to sonarr. This will initiate a rescan of the files in your library, so that the mediainfo will be udpated. Then the renamer will come through and detect changes, and rename the files
+
 ### Usage
 
 The application run immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
 
 ### Configuration
 
-| Name                                       | Type    | Required | Default Value | Description                                                                            |
-| ------------------------------------------ | ------- | -------- | ------------- | -------------------------------------------------------------------------------------- |
-| `sonarr`                                   | Array   | Yes      | []            | One or more sonarr instances                                                           |
-| `sonarr[].name`                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                      |
-| `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                |
-| `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                            |
-| `sonarr[].series_scanner.enabled`          | boolean | Yes      | N/A           | enables/disables series_scanner functionality                                          |
-| `sonarr[].series_scanner.hourly_job`       | boolean | Yes      | N/A           | disables hourly job. App will exit after first execution                               |
-| `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA |
-| `sonarr[].existing_renamer.enabled`        | boolean | Yes      | N/A           | enables/disables existing_renamer functionality                                        |
-| `sonarr[].existing_renamer.hourly_job`     | boolean | Yes      | N/A           | disables hourly job. App will exit after first execution                               |
+| Name                                       | Type    | Required | Default Value | Description                                                                                                                                      |
+| ------------------------------------------ | ------- | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sonarr`                                   | Array   | Yes      | []            | One or more sonarr instances                                                                                                                     |
+| `sonarr[].name`                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
+| `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
+| `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
+| `sonarr[].series_scanner.enabled`          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
+| `sonarr[].series_scanner.hourly_job`       | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
+| `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
+| `sonarr[].existing_renamer.enabled`        | boolean | No       | False         | enables/disables existing_renamer functionality                                                                                                  |
+| `sonarr[].existing_renamer.hourly_job`     | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
+| `sonarr[].existing_renamer.analyze_files`  | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 ### Local Setup
 
 #### devcontainer
@@ -89,5 +93,5 @@ $ poetry run python src/main.py
 
 #### Unit Tests
 ```shell
-$ pytest --cov=src --cov-report=html tests --cov-branch
+$ pytest
 ```
