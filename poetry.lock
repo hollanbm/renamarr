@@ -543,14 +543,16 @@ files = [
 
 [[package]]
 name = "schedule"
-version = "1.2.1"
+version = "1.2.2"
 description = "Job scheduling for humans."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "schedule-1.2.1-py2.py3-none-any.whl", hash = "sha256:14cdeb083a596aa1de6dc77639a1b2ac8bf6eaafa82b1c9279d3612823063d01"},
-    {file = "schedule-1.2.1.tar.gz", hash = "sha256:843bc0538b99c93f02b8b50e3e39886c06f2d003b24f48e1aa4cadfa3f341279"},
+    {file = "schedule-1.2.2-py3-none-any.whl", hash = "sha256:5bef4a2a0183abf44046ae0d164cadcac21b1db011bdd8102e4a0c1e91e06a7d"},
 ]
+
+[package.extras]
+timezone = ["pytz"]
 
 [[package]]
 name = "schema"
@@ -608,4 +610,4 @@ dev = ["black (>=19.3b0)", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "acd17767d395ee17f77074171ba0cea1e1bb9df05d46d374b003853efddf004e"
+content-hash = "9349a863493967ce43114a0b413a2518ceccf1cba431e87f8c610b894452bba8"
