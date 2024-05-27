@@ -35,11 +35,15 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 pythonpath = [
     "./src",
-    "./src/models"
+    "./src/models",
+    "./src/sonarr",
+    "./src/radarr",
 ]
 testpaths = [
     "./tests",
-    "./tests/models"
+    "./tests/models",
+    "./tests/sonarr",
+    "./tests/radarr",
 ]
 addopts = [
     "--cov=src",

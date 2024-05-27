@@ -33,7 +33,7 @@ class SeriesScanner:
                 logger.debug("Retrieved series list")
 
             for show in sorted(series, key=lambda s: s.title):
-                with logger.contextualize(series=show.title):
+                with logger.contextualize(item=show.title):
                     if show.status.lower() == "continuing":
                         episode_list = self.sonarr_cli.get_episode(show.id)
 

@@ -37,7 +37,7 @@ class ExistingRenamer:
                 logger.debug("Retrieved series list")
 
             for show in sorted(series, key=lambda s: s.title):
-                with logger.contextualize(series=show.title):
+                with logger.contextualize(item=show.title):
                     episodes_to_rename: List[json_data] = self.sonarr_cli.request_get(
                         path="/api/v3/rename",
                         url_params=dict(seriesId=show.id),

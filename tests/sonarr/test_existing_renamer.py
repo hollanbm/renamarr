@@ -1,8 +1,8 @@
 import logging
 from unittest.mock import call
 
-from existing_renamer import ExistingRenamer
 from pycliarr.api import SonarrCli
+from sonarr.existing_renamer import ExistingRenamer
 
 
 class TestExistingRenamer:
@@ -80,7 +80,7 @@ class TestExistingRenamer:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="successful"
         )
-        mocker.patch("existing_renamer.sleep").return_value = None
+        mocker.patch("sonarr.existing_renamer.sleep").return_value = None
 
         ExistingRenamer("test", "test.tld", "test-api-key", True).scan()
 
@@ -99,7 +99,7 @@ class TestExistingRenamer:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="failed"
         )
-        mocker.patch("existing_renamer.sleep").return_value = None
+        mocker.patch("sonarr.existing_renamer.sleep").return_value = None
 
         ExistingRenamer("test", "test.tld", "test-api-key", True).scan()
 
