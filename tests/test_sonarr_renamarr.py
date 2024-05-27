@@ -2,19 +2,19 @@ import logging
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli
-from sonarr.existing_renamer import ExistingRenamer
+from sonarr_renamarr import SonarrRenamarr
 
 
-class TestExistingRenamer:
+class TestSonarrRenamarr:
     def test_no_series_returned(self, get_serie_empty, caplog, mocker) -> None:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
         with caplog.at_level(logging.DEBUG):
-            ExistingRenamer("test", "test.tld", "test-api-key").scan()
+            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
-        assert "Starting Existing Renamer" in caplog.text
+        assert "Starting Renamarr" in caplog.text
         assert "Sonarr returned empty series list" in caplog.text
-        assert "Finished Existing Renamer" in caplog.text
+        assert "Finished Renamarr" in caplog.text
         assert not rename_files.called
 
     def test_when_series_returned_no_episodes(self, get_serie, caplog, mocker) -> None:
@@ -22,7 +22,7 @@ class TestExistingRenamer:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
         with caplog.at_level(logging.DEBUG):
-            ExistingRenamer("test", "test.tld", "test-api-key").scan()
+            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
         assert "Retrieved series list" in caplog.text
         assert "No episodes to rename" in caplog.text
@@ -35,7 +35,7 @@ class TestExistingRenamer:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
         with caplog.at_level(logging.DEBUG):
-            ExistingRenamer("test", "test.tld", "test-api-key").scan()
+            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
         assert "Found episodes to be renamed" in caplog.text
         assert "Renaming S01E01" in caplog.text
@@ -51,7 +51,7 @@ class TestExistingRenamer:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
         with caplog.at_level(logging.DEBUG):
-            ExistingRenamer("test", "test.tld", "test-api-key").scan()
+            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
         assert "Found episodes to be renamed" in caplog.text
         assert "Renaming S01E01, S01E02" in caplog.text
@@ -64,7 +64,7 @@ class TestExistingRenamer:
             enableMediaInfo=False
         )
 
-        ExistingRenamer("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
 
         mock_loguru_warning.assert_called_once_with(
             "Analyse video files is not enabled, please enable setting, in order to use the reanalyze_files feature"
@@ -80,9 +80,9 @@ class TestExistingRenamer:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="successful"
         )
-        mocker.patch("sonarr.existing_renamer.sleep").return_value = None
+        mocker.patch("sonarr_renamarr.sleep").return_value = None
 
-        ExistingRenamer("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
 
         assert call("Initiated disk scan of library") in mock_loguru_info.call_args_list
         assert (
@@ -99,8 +99,8 @@ class TestExistingRenamer:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="failed"
         )
-        mocker.patch("sonarr.existing_renamer.sleep").return_value = None
+        mocker.patch("sonarr_renamarr.sleep").return_value = None
 
-        ExistingRenamer("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
 
         assert call("disk scan failed") in mock_loguru_info.call_args_list

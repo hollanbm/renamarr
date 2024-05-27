@@ -11,7 +11,6 @@ CONFIG_SCHEMA = {
                 series_scanner=dict(
                     enabled=False, hourly_job=False, hours_before_air=4
                 ),
-                # keeping for backwards compatibility between v0.6 and v0.5
                 existing_renamer=dict(
                     enabled=False, hourly_job=False, analyze_files=False
                 ),
@@ -56,7 +55,7 @@ CONFIG_SCHEMA = {
                 },
                 # keeping for backwards compatibility between v0.6 and v0.5
                 Optional(
-                    "existing_renamer",
+                    "renamarr",
                     default=dict(enabled=False, hourly_job=False, analyze_files=False),
                     ignore_extra_keys=True,
                 ): {

@@ -6,7 +6,7 @@ sonarr:
       enabled: False
       hourly_job: False
       hours_before_air: 2
-    existing_renamer:
+    renamarr:
       enabled: True
       hourly_job: False
   - name: sonarr1
@@ -16,6 +16,6 @@ sonarr:
       enabled: False
       hourly_job: False
       hours_before_air: 4
-    existing_renamer:
+    renamarr:
       enabled: False
       hourly_job: False

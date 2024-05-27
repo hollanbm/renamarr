@@ -5,7 +5,7 @@ from typing import List
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
-from sonarr.series_scanner import SeriesScanner
+from sonarr_series_scanner import SonarrSeriesScanner
 
 from tests.conftest import episode_data
 
@@ -23,7 +23,7 @@ class TestSeriesScanner:
         )
 
         with caplog.at_level(logging.ERROR):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
         assert "Episode Title Required is not set to always" in caplog.text
         assert "Exiting Series Scan" in caplog.text
@@ -31,14 +31,14 @@ class TestSeriesScanner:
     def test_no_series_returned(self, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "get_serie").return_value = []
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
         assert "Sonarr returned empty series list" in caplog.text
         assert "Finished Series Scan" in caplog.text
 
     def test_when_series_returned_no_episodes(self, get_serie, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "get_episode").return_value = []
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
         assert "Retrieved series list" in caplog.text
         assert "Error fetching episode list" in caplog.text
 
@@ -51,7 +51,7 @@ class TestSeriesScanner:
         get_episode.return_value = []
 
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
         # assert "Error fetching episode list" in caplog.text
 
         assert not get_episode.called
@@ -67,7 +67,7 @@ class TestSeriesScanner:
         get_episode.return_value = []
 
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
         get_episode.assert_called_once_with(1)
 
@@ -101,7 +101,7 @@ class TestSeriesScanner:
         refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
 
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
         assert "Retrieved episode list" in caplog.text
         assert not refresh_serie.called
@@ -120,7 +120,7 @@ class TestSeriesScanner:
         refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
 
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
         assert refresh_serie.called
         assert "Found TBA episode, airing within the next 4 hours" in caplog.text
@@ -142,7 +142,7 @@ class TestSeriesScanner:
         refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
 
         with caplog.at_level(logging.DEBUG):
-            SeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+            SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
         assert refresh_serie.called
         assert "Found previously aired episode with TBA title" in caplog.text

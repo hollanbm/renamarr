@@ -6,7 +6,7 @@ from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
 
 
-class SeriesScanner:
+class SonarrSeriesScanner:
     def __init__(self, name: str, url: str, api_key: str, hours_before_air: int):
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)

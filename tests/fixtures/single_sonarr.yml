@@ -6,6 +6,6 @@ sonarr:
       enabled: False
       hourly_job: False
       hours_before_air: 2
-    existing_renamer:
+    renamarr:
       enabled: False
       hourly_job: False

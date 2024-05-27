@@ -1,11 +1,11 @@
 import pytest
 from config_schema import CONFIG_SCHEMA
-from existing_renamer import ExistingRenamer
 from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import Config, ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job
-from series_scanner import SeriesScanner
+from sonarr_renamarr import SonarrRenamarr
+from sonarr_series_scanner import SonarrSeriesScanner
 
 # disable config caching
 configparser.hold_an_instance = False
@@ -23,20 +23,20 @@ class TestMain:
     def test_all_disabled(self, config, mocker) -> None:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
 
-        series_scanner = mocker.patch.object(SeriesScanner, "scan")
-        existing_renamer = mocker.patch.object(ExistingRenamer, "scan")
+        series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
+        renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
         Main().start()
 
         assert not series_scanner.called
-        assert not existing_renamer.called
+        assert not renamarr.called
 
     def test_series_scanner_scan(self, config, mocker) -> None:
         config.sonarr[0].series_scanner.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
-        series_scanner = mocker.patch.object(SeriesScanner, "scan")
+        series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
 
         Main().start()
         assert series_scanner.called
@@ -47,7 +47,7 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         job = mocker.patch.object(Job, "do")
 
-        series_scanner = mocker.patch.object(SeriesScanner, "scan")
+        series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
 
         Main().start()
         assert series_scanner.called
@@ -62,46 +62,46 @@ class TestMain:
 
         exception = CliArrError("BOOM!")
 
-        series_scanner = mocker.patch.object(SeriesScanner, "scan")
+        series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
         series_scanner.side_effect = exception
 
         Main().start()
 
         mock_loguru_error.assert_called_once_with(exception)
 
-    def test_existing_renamer_scan(self, config, mocker) -> None:
-        config.sonarr[0].existing_renamer.enabled = True
+    def test_renamarr_scan(self, config, mocker) -> None:
+        config.sonarr[0].renamarr.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
-        existing_renamer = mocker.patch.object(ExistingRenamer, "scan")
+        renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
         Main().start()
-        assert existing_renamer.called
+        assert renamarr.called
 
-    def test_existing_renamer_hourly_job(self, config, mocker) -> None:
-        config.sonarr[0].existing_renamer.enabled = True
-        config.sonarr[0].existing_renamer.hourly_job = True
+    def test_renamarr_hourly_job(self, config, mocker) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         job = mocker.patch.object(Job, "do")
 
-        existing_renamer = mocker.patch.object(ExistingRenamer, "scan")
+        renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
         Main().start()
-        assert existing_renamer.called
+        assert renamarr.called
         assert job.called
 
-    def test_existing_renamer_pycliarr_exception(
+    def test_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
     ) -> None:
-        config.sonarr[0].existing_renamer.enabled = True
+        config.sonarr[0].renamarr.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
         exception = CliArrError("BOOM!")
 
-        existing_renamer = mocker.patch.object(ExistingRenamer, "scan")
-        existing_renamer.side_effect = exception
+        renamarr = mocker.patch.object(SonarrRenamarr, "scan")
+        renamarr.side_effect = exception
 
         Main().start()
 
