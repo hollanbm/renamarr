@@ -1,4 +1,5 @@
-from os import path
+import os
+from contextlib import contextmanager
 from sys import stdout
 from time import sleep
 
@@ -92,12 +93,20 @@ class Main:
 
     def start(self) -> None:
         try:
-            config = configparser.get_config(
-                CONFIG_SCHEMA,
-                config_dir=path.relpath("/config"),
-                file_name="config.yml",
+            # configparser uses cwd, for file opens.
+            # Change to root directory, to look for config in /config/config.yml
+            with set_directory("/"):
+                config = configparser.get_config(CONFIG_SCHEMA)
+        except ConfigFileNotFoundError as exc:
+            logger.error(
+                "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
             )
-        except (ConfigError, ConfigFileNotFoundError) as exc:
+            logger.error(exc)
+            exit(1)
+        except ConfigError as exc:
+            logger.error(
+                "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+            )
             logger.error(exc)
             exit(1)
 
@@ -142,6 +151,16 @@ class Main:
             while True:
                 schedule.run_pending()
                 sleep(1)
+
+
+@contextmanager
+def set_directory(path):
+    oldpwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 
 if __name__ == "__main__":  # pragma nocover
