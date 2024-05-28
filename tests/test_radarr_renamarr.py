@@ -28,6 +28,7 @@ class TestRadarrRenamarr:
         RadarrRenamarr("test", "test.tld", "test-api-key").scan()
 
         mock_loguru_debug.assert_any_call("Nothing to rename")
+        _sendCommand.assert_not_called()
 
     def test_when_movie_need_renamed(self, get_movie, mocker) -> None:
         mocker.patch.object(RadarrCli, "request_get").return_value = [

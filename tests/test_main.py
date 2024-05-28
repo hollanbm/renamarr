@@ -37,12 +37,14 @@ class TestMain:
         series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
         radarr_renamarr = mocker.patch.object(RadarrRenamarr, "scan")
+        job = mocker.patch.object(Job, "do")
 
         Main().start()
 
-        assert not series_scanner.called
-        assert not sonarr_renamarr.called
-        assert not radarr_renamarr.called
+        series_scanner.assert_not_called()
+        sonarr_renamarr.assert_not_called()
+        radarr_renamarr.assert_not_called()
+        job.assert_not_called()
 
     def test_sonarr_series_scanner_scan(self, config, mocker) -> None:
         config.sonarr[0].series_scanner.enabled = True
@@ -52,7 +54,8 @@ class TestMain:
         sonarr_series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
 
         Main().start()
-        assert sonarr_series_scanner.called
+
+        sonarr_series_scanner.assert_called()
 
     def test_sonarr_series_scanner_hourly_job(self, config, mocker) -> None:
         config.sonarr[0].series_scanner.enabled = True
@@ -63,8 +66,9 @@ class TestMain:
         sonarr_series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
 
         Main().start()
-        assert sonarr_series_scanner.called
-        assert job.called
+
+        sonarr_series_scanner.assert_called()
+        job.assert_called()
 
     def test_sonarr_series_scanner_pycliarr_exception(
         self, config, mock_loguru_error, mocker
@@ -90,7 +94,7 @@ class TestMain:
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
         Main().start()
-        assert sonarr_renamarr.called
+        sonarr_renamarr.assert_called()
 
     def test_sonarr_renamarr_hourly_job(self, config, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
@@ -101,8 +105,9 @@ class TestMain:
         renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
         Main().start()
-        assert renamarr.called
-        assert job.called
+
+        renamarr.assert_called()
+        job.assert_called()
 
     def test_sonarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
@@ -157,18 +162,16 @@ class TestMain:
 
         Main().start()
 
-        assert sonarr_renamarr.called
-        assert (
-            call(
-                "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
-            )
-            in mock_loguru_warning.call_args_list
-        )
-        assert (
-            call(
-                "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
-            )
-            in mock_loguru_warning.call_args_list
+        sonarr_renamarr.assert_called()
+        mock_loguru_warning.assert_has_calls(
+            [
+                call(
+                    "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
+                ),
+                call(
+                    "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
+                ),
+            ]
         )
 
     def test_legacy_config_existing_renamer_exception(
@@ -193,13 +196,15 @@ class TestMain:
 
     def test_radarr_renamarr_scan(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
+
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
         radarr_renamarr = mocker.patch.object(RadarrRenamarr, "scan")
 
         Main().start()
-        assert radarr_renamarr.called
+
+        radarr_renamarr.assert_called()
 
     def test_radarr_renamarr_hourly_job(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
@@ -210,8 +215,9 @@ class TestMain:
         radarr_renamarr = mocker.patch.object(RadarrRenamarr, "scan")
 
         Main().start()
-        assert radarr_renamarr.called
-        assert job.called
+
+        radarr_renamarr.assert_called
+        job.assert_called
 
     def test_radarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker

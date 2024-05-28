@@ -61,7 +61,7 @@ class Main:
         except CliArrError as exc:
             logger.error(exc)
 
-    def __radarr_schedule_renamarr(self, radarr_config):
+    def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
 
         if radarr_config.renamarr.hourly_job:
@@ -81,7 +81,7 @@ class Main:
         except CliArrError as exc:
             logger.error(exc)
 
-    def __sonarr_schedule_renamarr(self, sonarr_config):
+    def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
 
         if sonarr_config.renamarr.hourly_job:
@@ -116,7 +116,7 @@ class Main:
             if sonarr_config.series_scanner.enabled:
                 self.__schedule_sonarr_series_scanner(sonarr_config)
             if sonarr_config.renamarr.enabled:
-                self.__sonarr_schedule_renamarr(sonarr_config)
+                self.__schedule_sonarr_renamarr(sonarr_config)
             elif sonarr_config.existing_renamer.enabled:
                 logger.warning(
                     "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
@@ -124,10 +124,12 @@ class Main:
                 logger.warning(
                     "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
                 )
-                self.__sonarr_schedule_renamarr(sonarr_config)
+                self.__schedule_sonarr_renamarr(sonarr_config)
 
         for radarr_config in config.radarr:
-            if not radarr_config.renamarr.enabled:
+            if radarr_config.renamarr.enabled:
+                self.__schedule_radarr_renamarr(radarr_config)
+            else:
                 with logger.contextualize(instance=radarr_config.name):
                     logger.warning(
                         "Possible config error? -- No jobs configured for current instance"
@@ -135,9 +137,6 @@ class Main:
                     logger.warning(
                         "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
                     )
-                    continue
-            if radarr_config.renamarr.enabled:
-                self.__radarr_schedule_renamarr(radarr_config)
 
         if schedule.get_jobs():
             while True:
