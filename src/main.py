@@ -110,7 +110,7 @@ class Main:
                         "Possible config error? -- No jobs configured for current instance"
                     )
                     logger.warning(
-                        "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
+                        "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
                     )
                     continue
             if sonarr_config.series_scanner.enabled:
@@ -122,7 +122,7 @@ class Main:
                     "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
                 )
                 logger.warning(
-                    "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
+                    "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
                 )
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
@@ -135,7 +135,7 @@ class Main:
                         "Possible config error? -- No jobs configured for current instance"
                     )
                     logger.warning(
-                        "Please see example config for comparison -- https://github.com/hollanbm/sonarr-series-scanner/blob/main/docker/config.yml.example"
+                        "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
                     )
 
         if schedule.get_jobs():
