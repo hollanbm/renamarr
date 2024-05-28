@@ -2,30 +2,31 @@ sonarr:
   - name: tv
     url: https://sonarr.tld:8989
     api_key: not-a-real-api-key
-    series_scanner:
+    renamarr:
       enabled: True
       hourly_job: True
+      analyze_files: True
+    series_scanner:
+      enabled: False
+      hourly_job: False
+  - name: anime
+    url: https://sonarr-anime.tld:8989
+    api_key: not-a-real-api-key
     renamarr:
       enabled: False
       hourly_job: False
       analyze_files: False
-  - name: anime
-    url: https://sonarr-anime.tld:8989
-    api_key: not-a-real-api-key
     series_scanner:
-      enabled: False
-      hourly_job: True
-      hours_before_air: 1 # optional, defaults to 4
-    renamarr:
       enabled: True
       hourly_job: True
+      hours_before_air: 1 # optional, defaults to 4
 radarr:
   - name: radarr
     url: https://radarr.tld:7878
     api_key: not-a-real-api-key
     renamarr:
       enabled: True
-      hourly_job: False
+      hourly_job: True
       analyze_files: False
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
