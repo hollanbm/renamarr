@@ -6,8 +6,8 @@ sonarr:
       enabled: False
       hourly_job: False
       hours_before_air: 2
-    existing_renamer:
-      enabled: True
+    renamarr:
+      enabled: False
       hourly_job: False
   - name: sonarr1
     url: https://sonarr1.tld
@@ -16,6 +16,19 @@ sonarr:
       enabled: False
       hourly_job: False
       hours_before_air: 4
-    existing_renamer:
+    renamarr:
+      enabled: False
+      hourly_job: False
+radarr:
+  - name: radarr
+    url: https://radarr.tld
+    api_key: radarr-api-key
+    renamarr:
+      enabled: False
+      hourly_job: False
+  - name: radarr1
+    url: https://radarr1.tld
+    api_key: radarr1-api-key
+    renamarr:
       enabled: False
       hourly_job: False

@@ -6,7 +6,7 @@ from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
 
 
-class SeriesScanner:
+class SonarrSeriesScanner:
     def __init__(self, name: str, url: str, api_key: str, hours_before_air: int):
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)
@@ -33,7 +33,7 @@ class SeriesScanner:
                 logger.debug("Retrieved series list")
 
             for show in sorted(series, key=lambda s: s.title):
-                with logger.contextualize(series=show.title):
+                with logger.contextualize(item=show.title):
                     if show.status.lower() == "continuing":
                         episode_list = self.sonarr_cli.get_episode(show.id)
 

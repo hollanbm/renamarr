@@ -7,7 +7,7 @@ from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
 
 
-class ExistingRenamer:
+class SonarrRenamarr:
     def __init__(self, name: str, url: str, api_key: str, analyze_files: bool = False):
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)
@@ -15,7 +15,7 @@ class ExistingRenamer:
 
     def scan(self):
         with logger.contextualize(instance=self.name):
-            logger.info("Starting Existing Renamer")
+            logger.info("Starting Renamarr")
 
             if self.analyze_files:
                 if not self.__analyze_files_enabled():
@@ -37,7 +37,7 @@ class ExistingRenamer:
                 logger.debug("Retrieved series list")
 
             for show in sorted(series, key=lambda s: s.title):
-                with logger.contextualize(series=show.title):
+                with logger.contextualize(item=show.title):
                     episodes_to_rename: List[json_data] = self.sonarr_cli.request_get(
                         path="/api/v3/rename",
                         url_params=dict(seriesId=show.id),
@@ -63,7 +63,7 @@ class ExistingRenamer:
                             batch_rename.get_file_ids(), show.id
                         )
 
-            logger.info("Finished Existing Renamer")
+            logger.info("Finished Renamarr")
 
     def __analyze_files(self) -> bool:
         """_summary_

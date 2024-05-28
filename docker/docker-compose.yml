@@ -1,7 +1,7 @@
 services:
-  series_scanner:
-    container_name: series_scanner
-    image: ghcr.io/hollanbm/sonarr-series-scanner:latest
+  renamarr:
+    container_name: renamarr
+    image: ghcr.io/hollanbm/renamarr:latest
     restart: unless-stopped
     volumes:
       - ./config.yml:/config/config.yml:ro
