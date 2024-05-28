@@ -2,7 +2,7 @@
 requires-python = ">= 3.12"
 
 [tool.poetry]
-name = "sonarr-series-scanner"
+name = "renamarr"
 version = "0.1.0"
 description = ""
 authors = ["Brad Holland <hollanbm@gmail.com>"]
