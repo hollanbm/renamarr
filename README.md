@@ -20,7 +20,7 @@ coming soon
 
 ### Renamarr
 
-This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
+This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https://radarr.video/docs/api/) to do the following
 
 * Iterate over all items (Movies or Series)
   * Checks if any items need to be renamed
