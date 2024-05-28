@@ -2,10 +2,6 @@ sonarr:
   - name: sonarr
     url: https://sonarr.tld
     api_key: sonarr-api-key
-    series_scanner:
-      enabled: False
-      hourly_job: False
-      hours_before_air: 2
-    renamarr:
+    existing_renamer:
       enabled: False
       hourly_job: False

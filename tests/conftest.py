@@ -3,7 +3,7 @@ from typing import List
 
 import pytest
 from loguru import logger
-from pycliarr.api import SonarrCli, SonarrSerieItem
+from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 
 
@@ -18,6 +18,17 @@ def get_serie(mocker) -> None:
 @pytest.fixture
 def get_serie_empty(mocker) -> None:
     mocker.patch.object(SonarrCli, "get_serie").return_value = []
+
+
+@pytest.fixture
+def get_movie(mocker) -> None:
+    movies: List[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
+    mocker.patch.object(RadarrCli, "get_movie").return_value = movies
+
+
+@pytest.fixture
+def get_movie_empty(mocker) -> None:
+    mocker.patch.object(RadarrCli, "get_movie").return_value = []
 
 
 @pytest.fixture

@@ -37,25 +37,22 @@ class RadarrRenamarr:
 
             for movie in sorted(movies, key=lambda m: m.title):
                 with logger.contextualize(item=movie.title):
-                    movie_to_rename: List[json_data] = self.radarr_cli.request_get(
+                    files_to_rename: List[json_data] = self.radarr_cli.request_get(
                         path="/api/v3/rename",
                         url_params=dict(movieId=movie.id),
                     )
 
-                    if len(movie_to_rename) == 0:
+                    if len(files_to_rename) == 0:
                         logger.debug("Nothing to rename")
                     else:
                         logger.debug("Initiating rename")
 
-                        for movie in movie_to_rename:
+                        for file in files_to_rename:
                             self.radarr_cli._sendCommand(
                                 dict(
                                     name="RenameFiles",
-                                    files=[
-                                        file.get("movieFileId")
-                                        for file in movie_to_rename
-                                    ],
-                                    movieId=movie.get("movieId"),
+                                    files=[file.get("movieFileId")],
+                                    movieId=file.get("movieId"),
                                 )
                             )
 

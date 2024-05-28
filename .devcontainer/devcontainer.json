@@ -53,6 +53,9 @@
           "editor.defaultFormatter": "charliermarsh.ruff"
         },
         "python": {
+          "terminal": {
+            "activateEnvironment": false
+          },
           "analysis": {
             "autoFormatStrings": true,
             "defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
@@ -64,7 +67,7 @@
             "unittestEnabled": false,
             "pytestEnabled": true,
             "pytestArgs": [
-              "tests"
+              "--no-cov"
             ]
           }
         },
