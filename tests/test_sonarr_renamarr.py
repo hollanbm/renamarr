@@ -1,4 +1,3 @@
-import logging
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli
@@ -6,43 +5,64 @@ from sonarr_renamarr import SonarrRenamarr
 
 
 class TestSonarrRenamarr:
-    def test_no_series_returned(self, get_serie_empty, caplog, mocker) -> None:
+    def test_no_series_returned(
+        self, get_serie_empty, mock_loguru_info, mock_loguru_error, mocker
+    ) -> None:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        with caplog.at_level(logging.DEBUG):
-            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
-        assert "Starting Renamarr" in caplog.text
-        assert "Sonarr returned empty series list" in caplog.text
-        assert "Finished Renamarr" in caplog.text
-        assert not rename_files.called
+        mock_loguru_error.assert_any_call("Sonarr returned empty series list")
 
-    def test_when_series_returned_no_episodes(self, get_serie, caplog, mocker) -> None:
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Starting Renamarr"),
+                call("Finished Renamarr"),
+            ]
+        )
+        rename_files.assert_not_called()
+
+    def test_when_series_returned_no_episodes(
+        self, get_serie, mock_loguru_debug, mocker
+    ) -> None:
         mocker.patch.object(SonarrCli, "request_get").return_value = []
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        with caplog.at_level(logging.DEBUG):
-            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
-        assert "Retrieved series list" in caplog.text
-        assert "No episodes to rename" in caplog.text
-        assert not rename_files.called
+        mock_loguru_debug.assert_has_calls(
+            [
+                call("Retrieved series list"),
+                call("No episodes to rename"),
+            ]
+        )
 
-    def test_when_episode_need_renamed(self, get_serie, caplog, mocker) -> None:
+        rename_files.assert_not_called
+
+    def test_when_episode_need_renamed(
+        self, get_serie, mock_loguru_info, mock_loguru_debug, mocker
+    ) -> None:
         mocker.patch.object(SonarrCli, "request_get").return_value = [
             dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=1)
         ]
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        with caplog.at_level(logging.DEBUG):
-            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
-        assert "Found episodes to be renamed" in caplog.text
-        assert "Renaming S01E01" in caplog.text
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Starting Renamarr"),
+                call("Renaming S01E01"),
+                call("Finished Renamarr"),
+            ]
+        )
+
+        mock_loguru_debug.assert_any_call("Found episodes to be renamed")
+
         rename_files.assert_called_once_with([1], 1)
 
     def test_when_multiple_episodes_need_renamed(
-        self, get_serie, caplog, mocker
+        self, get_serie, mock_loguru_info, mock_loguru_debug, mocker
     ) -> None:
         mocker.patch.object(SonarrCli, "request_get").return_value = [
             dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=1),
@@ -50,11 +70,17 @@ class TestSonarrRenamarr:
         ]
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        with caplog.at_level(logging.DEBUG):
-            SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
 
-        assert "Found episodes to be renamed" in caplog.text
-        assert "Renaming S01E01, S01E02" in caplog.text
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Starting Renamarr"),
+                call("Renaming S01E01, S01E02"),
+                call("Finished Renamarr"),
+            ]
+        )
+        mock_loguru_debug.assert_any_call("Found episodes to be renamed")
+
         rename_files.assert_called_once_with([1, 2], 1)
 
     def test_when_disk_scan_enabled_and_analyze_files_is_not(
@@ -84,9 +110,11 @@ class TestSonarrRenamarr:
 
         SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
 
-        assert call("Initiated disk scan of library") in mock_loguru_info.call_args_list
-        assert (
-            call("disk scan finished successfully") in mock_loguru_info.call_args_list
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Initiated disk scan of library"),
+                call("disk scan finished successfully"),
+            ]
         )
 
     def test_when_disk_scan_enabled_and_fails(
@@ -103,4 +131,4 @@ class TestSonarrRenamarr:
 
         SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
 
-        assert call("disk scan failed") in mock_loguru_info.call_args_list
+        mock_loguru_info.assert_any_call("disk scan failed")
