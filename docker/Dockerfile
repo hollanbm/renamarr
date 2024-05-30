@@ -19,10 +19,10 @@ RUN mkdir -p /config && chown -R app /config
 USER app
 SHELL ["/bin/bash", "-c"]
 
-WORKDIR /home/app/series_scanner
+WORKDIR /home/app/renamarr
 
 # See .dockerignore for files whitelist
-COPY --chown=app . . 
+COPY --chown=app . .
 
 # install app dependencies
 RUN poetry install --no-interaction --no-ansi --no-cache --quiet

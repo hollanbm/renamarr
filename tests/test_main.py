@@ -1,5 +1,3 @@
-from unittest.mock import call
-
 import pytest
 from config_schema import CONFIG_SCHEMA
 from main import Main
@@ -132,8 +130,12 @@ class TestMain:
         with pytest.raises(SystemExit) as excinfo:
             Main().start()
 
-        mock_loguru_error.assert_called_once_with(exception)
+        mock_loguru_error.assert_called_with(exception)
         assert excinfo.value.code == 1
+
+        mock_loguru_error.assert_any_call(
+            "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+        )
 
     def test_config_file_not_found_error(
         self, mock_loguru_error, capsys, mocker
@@ -144,8 +146,12 @@ class TestMain:
         with pytest.raises(SystemExit) as excinfo:
             Main().start()
 
-        mock_loguru_error.assert_called_once_with(exception)
+        mock_loguru_error.assert_called_with(exception)
         assert excinfo.value.code == 1
+
+        mock_loguru_error.assert_any_call(
+            "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
+        )
 
     def test_legacy_config_existing_renamer_enabled(
         self, mocker, legacy_sonarr_config, mock_loguru_warning
@@ -158,20 +164,20 @@ class TestMain:
 
         mocker.patch.object(Job, "do")
 
+        mocker.patch.object(SonarrSeriesScanner, "scan")
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
+        mocker.patch.object(RadarrRenamarr, "scan")
 
         Main().start()
 
         sonarr_renamarr.assert_called()
-        mock_loguru_warning.assert_has_calls(
-            [
-                call(
-                    "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
-                ),
-                call(
-                    "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
-                ),
-            ]
+
+        mock_loguru_warning.assert_any_call(
+            "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
+        )
+
+        mock_loguru_warning.assert_any_call(
+            "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
         )
 
     def test_legacy_config_existing_renamer_exception(
