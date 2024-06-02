@@ -16,5 +16,8 @@
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true
   }
 }
