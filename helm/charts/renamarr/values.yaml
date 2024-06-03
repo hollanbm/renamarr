@@ -1,0 +1,31 @@
+image:
+  registry: ghcr.io
+  repository: hollanbm/renamarr
+  tag: latest
+  digest:
+  pullPolicy: Always
+
+cronjob:
+  concurrencyPolicy: Forbid
+  schedule: "* */1 * * *"
+  failedJobsHistoryLimit: 2
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+
+envVars:
+  - name: LOGURU_LEVEL
+    value: "INFO"
+
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+containerSecurityContext:
+
+podSecurityContext:
+
+config:

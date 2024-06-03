@@ -18,6 +18,8 @@ class Main:
     This class handles config parsing, and job scheduling
     """
 
+    RUN_SCHEDULER = True
+
     def __init__(self):
         logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -30,6 +32,9 @@ class Main:
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()
         logger.add(stdout, format=logger_format)
+
+    def __external_cron(self) -> bool:
+        return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
 
     def __sonarr_series_scanner_job(self, sonarr_config):
         try:
@@ -45,7 +50,7 @@ class Main:
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
 
-        if sonarr_config.series_scanner.hourly_job:
+        if sonarr_config.series_scanner.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
@@ -65,7 +70,7 @@ class Main:
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
 
-        if radarr_config.renamarr.hourly_job:
+        if radarr_config.renamarr.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__radarr_renamarr_job, radarr_config=radarr_config
@@ -85,7 +90,7 @@ class Main:
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
 
-        if sonarr_config.renamarr.hourly_job:
+        if sonarr_config.renamarr.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__sonarr_renamarr_job, sonarr_config=sonarr_config
@@ -148,7 +153,7 @@ class Main:
                     )
 
         if schedule.get_jobs():
-            while True:
+            while self.RUN_SCHEDULER:
                 schedule.run_pending()
                 sleep(1)
 

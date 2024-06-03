@@ -1,34 +1,39 @@
 {
   "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.base.schema.json",
-  "name": "series_scanner devContainer",
+  "name": "renamarr devContainer",
   "build": {
     "dockerfile": "Dockerfile"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
-      "plugins": "git zsh-syntax-highlighting zsh-autosuggestions poetry poetry-env gpg-agent",
+      "plugins": "git gpg-agent helm kind kubectl poetry poetry-env zsh-autosuggestions zsh-syntax-highlighting",
       "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
     },
     "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "minikube": "none" // use kind instead
+    },
+    "ghcr.io/devcontainers-contrib/features/kubectx-kubens:1": {},
+    "ghcr.io/mpriscella/features/kind:1": {},
+    "ghcr.io/mpriscella/features/helm-chart-testing:1": {}
   },
   "containerEnv": {
     "LOGURU_LEVEL": "DEBUG",
-    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
   },
-  "mounts": [
-    "source=${localWorkspaceFolder}/config.yml,target=/config/config.yml,type=bind,consistency=cached"
-  ],
+  "mounts": [],
   "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
   "customizations": {
     "vscode": {
       "settings": {
         "editor.formatOnSave": true,
+        "editor.tabSize": 2,
         "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.profiles.linux": {
           "zsh": {
-            "path": "/usr/bin/zsh"
+            "path": "/bin/zsh"
           }
         },
         "files": {
@@ -36,16 +41,19 @@
           "trimFinalNewlines": true,
           "trimTrailingWhitespace": true,
           "trimTrailingWhitespaceInRegexAndStrings": true,
-          "insertFinalNewline": true
+          "insertFinalNewline": true,
+          "associations": {
+            "**/templates/*.yaml": "jinja-yaml",
+            "*.tpl": "jinja-yaml"
+          }
         },
-        "vscode-yaml-sort.sortArrays": true,
         "git": {
           "enableCommitSigning": true,
           "autofetch": true
         },
-        "source.organizeImports": true,
         "[python]": {
           "editor.formatOnSave": true,
+          "editor.tabSize": 4,
           "editor.codeActionsOnSave": {
             "source.fixAll": "explicit",
             "source.organizeImports": "explicit"
@@ -71,8 +79,16 @@
             ]
           }
         },
+        "gitlens": {
+          "plusFeatures.enabled": "false",
+          "showWelcomeOnInstall": "false",
+          "showWhatsNewAfterUpgrades": "false"
+        },
         "ruff.codeAction.disableRuleComment": {
           "enable": false
+        },
+        "yaml.schemas": {
+          "https://json.schemastore.org/yamllint.json": "*.y(a)?ml"
         },
         "[jsonc]": {
           "editor.defaultFormatter": "vscode.json-language-features"
@@ -86,6 +102,8 @@
       },
       "extensions": [
         "charliermarsh.ruff",
+        "eamodio.gitlens",
+        "elagil.pre-commit-helper",
         "KevinRose.vsc-python-indent",
         "ms-python.debugpy",
         "ms-python.python",
@@ -94,6 +112,9 @@
         "njpwerner.autodocstring",
         "njqdev.vscode-python-typehint",
         "oderwat.indent-rainbow",
+        "redhat.vscode-yaml",
+        "samuelcolvin.jinjahtml",
+        "Tim-Koehler.helm-intellisense",
         "VisualStudioExptTeam.vscodeintellicode",
         "yzhang.markdown-all-in-one"
       ]
