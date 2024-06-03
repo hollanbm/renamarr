@@ -88,7 +88,7 @@ class Main:
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
 
-        if sonarr_config.renamarr.hourly_job:
+        if sonarr_config.renamarr.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__sonarr_renamarr_job, sonarr_config=sonarr_config
@@ -150,7 +150,7 @@ class Main:
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
                     )
 
-        if not self.__external_cron() and schedule.get_jobs():
+        if schedule.get_jobs():
             while True:
                 schedule.run_pending()
                 sleep(1)
