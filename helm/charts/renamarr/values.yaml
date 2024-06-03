@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: hollanbm/renamarr
-  tag:
+  tag: latest
   digest:
   pullPolicy: Always
 

@@ -24,7 +24,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: {{ include "common.names.name" . }}
-              image: {{ include "common.images.version" ( dict "imageRoot" .Values.image "chart" .Chart ) }}
+              image: {{ include "common.images.image" ( dict "imageRoot" .Values.image "global" .Values.global ) }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               {{- with .Values.containerSecurityContext }}
               securityContext: {{ toYaml . | nindent 16 -}}
