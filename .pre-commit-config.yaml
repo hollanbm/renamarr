@@ -4,7 +4,7 @@ repos:
     rev: v0.4.2
     hooks:
       - id: ruff
-        args: [ --fix ]
+        args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -14,10 +14,19 @@ repos:
       - id: end-of-file-fixer
   - repo: local
     hooks:
-    - id: pytest
-      name: pytest
-      entry: poetry run pytest --cov=src --cov-branch tests
-      language: system
-      types: [python]
-      pass_filenames: false
-      always_run: true
+      - id: pytest
+        name: pytest
+        entry: poetry run pytest --cov=src --cov-branch tests
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+  - repo: local
+    hooks:
+      - id: chart-testing
+        name: chart-testing
+        entry: ct lint
+        language: system
+        require_serial: true
+        fail_fast: false
+        verbose: true

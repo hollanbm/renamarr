@@ -1,0 +1,8 @@
+# See https://github.com/helm/chart-testing#configuration
+remote: origin
+target-branch: main
+helm-extra-args: --timeout 600s
+charts: helm/charts/renamarr
+chart-yaml-schema: chart_schema.yaml
+lint-conf: lintconf.yaml
+validate-maintainers: false
