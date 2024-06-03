@@ -1,10 +1,10 @@
 name: Release Charts
 
 on:
-  release:
-    types:
-      - published
-
+  push:
+    branches:
+      - main
+      - helm/**
 jobs:
   build-and-push-helm:
     # depending on default permission settings for your org (contents being read-only or read-write for workloads), you will have to add permissions
