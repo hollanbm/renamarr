@@ -18,6 +18,8 @@ class Main:
     This class handles config parsing, and job scheduling
     """
 
+    RUN_SCHEDULER = True
+
     def __init__(self):
         logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -151,7 +153,7 @@ class Main:
                     )
 
         if schedule.get_jobs():
-            while True:
+            while self.RUN_SCHEDULER:
                 schedule.run_pending()
                 sleep(1)
 

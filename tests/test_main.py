@@ -1,5 +1,6 @@
 import os
 from typing import Generator
+from unittest.mock import PropertyMock
 
 import pytest
 from config_schema import CONFIG_SCHEMA
@@ -17,6 +18,16 @@ configparser.hold_an_instance = False
 
 class TestMain:
     @pytest.fixture
+    def enable_scheduler(self, mocker) -> Generator:
+        """
+        Allows scheduler loop to enter, exactly one time, and then exit
+        """
+        mocker.patch("main.sleep").return_value = None
+        Main.RUN_SCHEDULER = PropertyMock(side_effect=[True, False])
+        yield
+        Main.RUN_SCHEDULER = True
+
+    @pytest.fixture
     def external_cron(self, mocker) -> Generator:
         os.environ["EXTERNAL_CRON"] = "TRUE"
         yield
@@ -24,6 +35,10 @@ class TestMain:
 
     @pytest.fixture
     def config(self) -> Generator:
+        """
+        Disable scheduler loop for the majority of tests
+        """
+        Main.RUN_SCHEDULER = False
         yield configparser.get_config(
             CONFIG_SCHEMA,
             config_dir="tests/fixtures",
@@ -64,11 +79,15 @@ class TestMain:
 
         sonarr_series_scanner.assert_called()
 
-    def test_sonarr_series_scanner_hourly_job(self, config, mocker) -> None:
+    def test_sonarr_series_scanner_hourly_job(
+        self, config, enable_scheduler, mocker
+    ) -> None:
         config.sonarr[0].series_scanner.enabled = True
         config.sonarr[0].series_scanner.hourly_job = True
+
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
+        job = mocker.spy(Job, "do")
+        run_pending = mocker.spy(Scheduler, "run_pending")
 
         sonarr_series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
 
@@ -76,6 +95,7 @@ class TestMain:
 
         sonarr_series_scanner.assert_called()
         job.assert_called()
+        run_pending.assert_called_once()
 
     def test_sonarr_series_scanner_pycliarr_exception(
         self, config, mock_loguru_error, mocker
@@ -103,11 +123,12 @@ class TestMain:
         Main().start()
         sonarr_renamarr.assert_called()
 
-    def test_sonarr_renamarr_hourly_job(self, config, mocker) -> None:
+    def test_sonarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
         config.sonarr[0].renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         job = mocker.patch.object(Job, "do")
+        run_pending = mocker.spy(Scheduler, "run_pending")
 
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
 
@@ -115,6 +136,7 @@ class TestMain:
 
         sonarr_renamarr.assert_called()
         job.assert_called()
+        run_pending.assert_called_once()
 
     def test_sonarr_renamarr_hourly_job_external_cron(
         self, config, external_cron, mocker
@@ -122,16 +144,14 @@ class TestMain:
         config.sonarr[0].renamarr.enabled = True
         config.sonarr[0].renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
+        job = mocker.spy(Job, "do")
 
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
-        run_pending = mocker.spy(Scheduler, "run_pending")
 
         Main().start()
 
         sonarr_renamarr.assert_called()
         job.assert_not_called()
-        run_pending.assert_not_called()
 
     def test_sonarr_series_scanner_hourly_job_external_cron(
         self, config, external_cron, mocker
@@ -139,16 +159,14 @@ class TestMain:
         config.sonarr[0].series_scanner.enabled = True
         config.sonarr[0].series_scanner.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
+        job = mocker.spy(Job, "do")
 
         series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
-        run_pending = mocker.spy(Scheduler, "run_pending")
 
         Main().start()
 
         series_scanner.assert_called()
         job.assert_not_called()
-        run_pending.assert_not_called()
 
     def test_sonarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
@@ -255,18 +273,20 @@ class TestMain:
 
         radarr_renamarr.assert_called()
 
-    def test_radarr_renamarr_hourly_job(self, config, mocker) -> None:
+    def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
+        job = mocker.spy(Job, "do")
+        run_pending = mocker.spy(Scheduler, "run_pending")
 
         radarr_renamarr = mocker.patch.object(RadarrRenamarr, "scan")
 
         Main().start()
 
-        radarr_renamarr.assert_called
-        job.assert_called
+        radarr_renamarr.assert_called()
+        job.assert_called()
+        run_pending.assert_called_once()
 
     def test_radarr_renamarr_hourly_job_external_cron(
         self, config, external_cron, mocker
@@ -277,13 +297,11 @@ class TestMain:
         job = mocker.patch.object(Job, "do")
 
         radarr_renamarr = mocker.patch.object(RadarrRenamarr, "scan")
-        run_pending = mocker.spy(Scheduler, "run_pending")
 
         Main().start()
 
         radarr_renamarr.assert_called()
         job.assert_not_called()
-        run_pending.assert_not_called()
 
     def test_radarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
