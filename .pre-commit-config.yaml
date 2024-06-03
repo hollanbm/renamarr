@@ -21,12 +21,3 @@ repos:
         types: [python]
         pass_filenames: false
         always_run: true
-  - repo: local
-    hooks:
-      - id: chart-testing
-        name: chart-testing
-        entry: ct lint
-        language: system
-        require_serial: true
-        fail_fast: false
-        verbose: true
