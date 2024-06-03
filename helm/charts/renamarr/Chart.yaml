@@ -1,9 +1,23 @@
 apiVersion: v2
 name: renamarr
-version: 0.1.0
+version: 1.0.2
+appVersion: 1.0.2
 description: Renamarr Helm Chart
 type: "application"
+annotations:
+  licenses: MIT
+  images: |
+    - name: renmarr
+      image: ghcr.io/hollanbm/renamarr:1.0.2
 maintainers:
   - name: Brad Holland
     email: hollanbm@gmail.com
     url: https://www.github.com/hollanbm
+dependencies:
+  - name: common
+    repository: oci://registry-1.docker.io/bitnamicharts
+    tags:
+      - bitnami-common
+    version: 2.x.x
+sources:
+  - https://github.com/hollanbm/renamarr/helm/charts/renamarr

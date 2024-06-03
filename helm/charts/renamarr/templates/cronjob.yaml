@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  namespace: {{ include "common.names.namespace" . }}
+  labels: {{ include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+spec:
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  startingDeadlineSeconds: {{ .Values.cronjob.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit }}
+  metadata:
+    labels: {{- include "common.labels.standard" . | nindent 6 }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          metadata:
+            labels: {{- include "common.labels.standard" . | nindent 14 }}
+          {{- with .Values.podSecurityContext }}
+          securityContext: {{ toYaml . | nindent 8 -}}
+          {{ end }}
+          restartPolicy: Never
+          containers:
+            - name: {{ include "common.names.name" . }}
+              image: {{ include "common.images.version" ( dict "imageRoot" .Values.image "chart" .Chart ) }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- with .Values.containerSecurityContext }}
+              securityContext: {{ toYaml . | nindent 16 -}}
+              {{ end }}
+              env:
+                - name: EXTERNAL_CRON
+                  value: "TRUE"
+              {{- with .Values.envVars }}
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{ with .Values.resources -}}
+              resources: {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - mountPath: /config/config.yml
+                  name: {{ include "common.names.fullname" . }}
+                  subPath: config.yml
+          volumes:
+            - configMap:
+                defaultMode: 0777
+                name: {{ include "common.names.fullname" . }}
+              name: {{ include "common.names.fullname" . }}

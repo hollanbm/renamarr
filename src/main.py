@@ -31,6 +31,9 @@ class Main:
         logger.remove()
         logger.add(stdout, format=logger_format)
 
+    def __external_cron(self) -> bool:
+        return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
+
     def __sonarr_series_scanner_job(self, sonarr_config):
         try:
             SonarrSeriesScanner(
@@ -45,7 +48,7 @@ class Main:
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
 
-        if sonarr_config.series_scanner.hourly_job:
+        if sonarr_config.series_scanner.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
@@ -65,7 +68,7 @@ class Main:
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
 
-        if radarr_config.renamarr.hourly_job:
+        if radarr_config.renamarr.hourly_job and not self.__external_cron():
             # Add a random delay of +-5 minutes between jobs
             schedule.every(55).to(65).minutes.do(
                 self.__radarr_renamarr_job, radarr_config=radarr_config
@@ -147,7 +150,7 @@ class Main:
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
                     )
 
-        if schedule.get_jobs():
+        if not self.__external_cron() and schedule.get_jobs():
             while True:
                 schedule.run_pending()
                 sleep(1)

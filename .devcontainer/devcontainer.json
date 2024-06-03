@@ -22,7 +22,6 @@
   "containerEnv": {
     "LOGURU_LEVEL": "DEBUG",
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
-    "SHELL": "/bin/zsh"
   },
   "mounts": [],
   "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
