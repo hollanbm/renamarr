@@ -1,7 +1,7 @@
 apiVersion: v2
 type: "application"
 name: renamarr
-version: 1.0.0 # replaced with release version during build
+version: 1.0.1
 description: Renamarr Helm Chart
 annotations:
   licenses: MIT
