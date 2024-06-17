@@ -9,7 +9,10 @@
         "minor",
         "patch"
       ],
-      "automerge": true
+      "automerge": true,
+    },
+    {
+      "minimumReleaseAge": "14 days"
     }
   ],
   "lockFileMaintenance": {
