@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "minimumReleaseAge": "14 days",
   "packageRules": [
     {
       "matchUpdateTypes": [
@@ -10,9 +11,6 @@
         "patch"
       ],
       "automerge": true,
-    },
-    {
-      "minimumReleaseAge": "14 days"
     }
   ],
   "lockFileMaintenance": {
