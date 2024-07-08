@@ -4,22 +4,15 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "14 days",
-  "ignorePaths": [
-    "helm/charts/renamarr/Chart.lock"
-  ],
   "packageRules": [
     {
       "matchUpdateTypes": [
         "minor",
         "patch"
       ],
-      "automerge": true,
+      "automerge": true
     }
   ],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "automerge": true
-  },
   "vulnerabilityAlerts": {
     "enabled": true
   }
