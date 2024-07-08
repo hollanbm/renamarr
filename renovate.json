@@ -4,6 +4,9 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "14 days",
+  "ignorePaths": [
+    "helm/charts/renamarr/Chart.lock"
+  ],
   "packageRules": [
     {
       "matchUpdateTypes": [
