@@ -47,5 +47,4 @@ ENV LOGURU_LEVEL="INFO"
 # "activate" venv
 ENV PATH="/home/app/renamarr/.venv/bin:$PATH"
 
-ENTRYPOINT ["/bin/bash", "-c"]
-CMD [ "python", "src/main.py"]
+ENTRYPOINT [ "python", "src/main.py"]
