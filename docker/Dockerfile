@@ -19,7 +19,6 @@ ENV POETRY_NO_INTERACTION=1 \
 RUN --mount=type=cache,target=/tmp/poetry_cache poetry install --only main --no-root
 RUN poetry install
 
-# switch to fresh layer, without poetry
 FROM python:3.12-slim-bookworm AS app
 
 # update base os
@@ -29,11 +28,10 @@ RUN apt-get update -y -qq && \
 
 WORKDIR /home/app/renamarr
 
-# venv from builder
-COPY --from=builder /home/app/renamarr/.venv /home/app/renamarr/.venv
+# venv
+COPY --from=builder /home/app/renamarr/.venv .venv
 
-# app src
-COPY src /home/app/renamarr/src
+COPY src src
 
 # setup user, bash default shell
 RUN useradd app -m -s /bin/bash
@@ -47,7 +45,8 @@ USER app
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOGURU_LEVEL="INFO"
 
-# activate venv
-RUN source /home/app/renamarr/.venv/bin/activate
+# "activate" venv
+ENV PATH="/home/app/renamarr/.venv/bin:$PATH"
 
-ENTRYPOINT [ "python", "src/main.py"]
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD [ "python", "src/main.py"]
