@@ -6,8 +6,7 @@ WORKDIR /home/app/renamarr
 # install poetry
 RUN pip install poetry==1.8.3
 
-WORKDIR /home/app/renamarr
-COPY pyproject.toml poetry.lock /home/app/renamarr/
+COPY pyproject.toml poetry.lock ./
 
 # poetry settings
 ENV POETRY_NO_INTERACTION=1 \
