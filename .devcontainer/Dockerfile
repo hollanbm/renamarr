@@ -21,6 +21,6 @@ RUN chmod 0755 /config
 
 RUN pip install pipx
 RUN pipx --global ensurepath
-RUN pipx --global install poetry ruff pre-commit pytest yamale yamllint
+RUN pipx --global install poetry==1.8.3 ruff pre-commit pytest yamale yamllint
 
 USER vscode
