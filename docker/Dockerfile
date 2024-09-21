@@ -1,36 +1,50 @@
-FROM python:3.12-slim-bookworm
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 
-# update base
-RUN apt-get update -y -qq
-RUN apt-get dist-upgrade -y -qq
-RUN apt-get autoremove -y -qq
-
-# install pipx
-RUN pip install pipx
-RUN pipx ensurepath
+WORKDIR /home/app/renamarr
 
 # install poetry
-RUN pipx --global install poetry
+RUN pip install poetry==1.8.3
+
+COPY pyproject.toml poetry.lock ./
+
+# poetry settings
+ENV POETRY_NO_INTERACTION=1 \
+  POETRY_VIRTUALENVS_IN_PROJECT=1 \
+  POETRY_VIRTUALENVS_CREATE=true \
+  POETRY_CACHE_DIR=/tmp/poetry_cache
+
+# build venv
+RUN --mount=type=cache,target=/tmp/poetry_cache poetry install --only main --no-root
+RUN poetry install
+
+FROM python:3.12-slim-bookworm AS app
+
+# update base os
+RUN apt-get update -y -qq && \
+  apt-get dist-upgrade -y -qq && \
+  apt-get autoremove -y -qq
+
+WORKDIR /home/app/renamarr
+
+# venv
+COPY --from=builder /home/app/renamarr/.venv .venv
+
+COPY src src
 
 # setup user, bash default shell
 RUN useradd app -m -s /bin/bash
 RUN mkdir -p /config && chown -R app /config
-
-USER app
 SHELL ["/bin/bash", "-c"]
 
-WORKDIR /home/app/renamarr
+# switch to app user to prevent root usage
+USER app
 
-# See .dockerignore for files whitelist
-COPY --chown=app . .
-
-# install app dependencies
-RUN poetry install --no-interaction --no-ansi --no-cache --quiet
-
+# default logging settings
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOGURU_LEVEL="INFO"
 
-# activate venv
-RUN source $(poetry env info --path)/bin/activate
+# "activate" venv
+ENV PATH="/home/app/renamarr/.venv/bin:$PATH"
 
-ENTRYPOINT [ "poetry", "run", "python", "src/main.py"]
+ENTRYPOINT [ "python", "src/main.py"]
