@@ -50,4 +50,4 @@ ENV LOGURU_LEVEL="INFO"
 # activate venv
 RUN source /home/app/renamarr/.venv/bin/activate
 
-ENTRYPOINT [ "poetry", "run", "python", "src/main.py"]
+ENTRYPOINT [ "python", "src/main.py"]
