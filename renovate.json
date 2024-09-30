@@ -4,9 +4,6 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "14 days",
-  "ignorePaths": [
-    "helm/**/*"
-  ],
   "packageRules": [
     {
       "matchUpdateTypes": [
@@ -21,9 +18,6 @@
     }
   ],
   "vulnerabilityAlerts": {
-    "enabled": true
-  },
-  "lockFileMaintenance": {
     "enabled": true
   }
 }
