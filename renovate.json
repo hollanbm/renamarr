@@ -8,6 +8,15 @@
     {
       "matchPackageNames": "python-dateutil",
       "allowedVersions": ">2.9.0"
+    },
+    {
+      "matchPackageNames": "python",
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true
     }
   ]
 }
