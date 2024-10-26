@@ -3,7 +3,7 @@ FROM python:3.13-slim-bookworm AS builder
 WORKDIR /home/app/renamarr
 
 # install poetry
-RUN pip install poetry==1.8.3
+RUN pip install poetry==1.8.4
 
 COPY pyproject.toml poetry.lock ./
 
