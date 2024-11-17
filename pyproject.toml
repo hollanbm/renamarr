@@ -23,7 +23,7 @@ ruff = "^0.7.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.2.1"
-pytest-cov = "^5.0.0"
+pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 mock = "^5.1.0"
 pytest-loguru = "^0.4.0"
