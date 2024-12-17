@@ -1,5 +1,5 @@
 [project]
-requires-python = ">= 3.12"
+requires-python = ">= 3.13"
 
 [tool.poetry]
 name = "renamarr"
@@ -10,7 +10,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.13"
 pycliarr = "^1.0.26"
 python-dotenv = "^1.0.1"
 loguru = "^0.7.2"
