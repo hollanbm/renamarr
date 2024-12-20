@@ -1,10 +1,9 @@
-ARG PYTHON_VERSION=3.12
-FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm AS builder
 
 WORKDIR /home/app/renamarr
 
 # install poetry
-RUN pip install poetry==1.8.3
+RUN pip install poetry==1.8.4
 
 COPY pyproject.toml poetry.lock ./
 
@@ -18,7 +17,7 @@ ENV POETRY_NO_INTERACTION=1 \
 RUN --mount=type=cache,target=/tmp/poetry_cache poetry install --only main --no-root
 RUN poetry install
 
-FROM python:3.12-slim-bookworm AS app
+FROM python:3.13-slim-bookworm AS app
 
 # update base os
 RUN apt-get update -y -qq && \
