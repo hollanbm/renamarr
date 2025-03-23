@@ -7,7 +7,7 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
-      "plugins": "git gpg-agent helm kind kubectl poetry poetry-env zsh-autosuggestions zsh-syntax-highlighting",
+      "plugins": "git gpg-agent ssh-agent helm kind kubectl poetry poetry-env zsh-autosuggestions zsh-syntax-highlighting",
       "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
     },
     "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
@@ -21,9 +21,11 @@
   },
   "containerEnv": {
     "LOGURU_LEVEL": "DEBUG",
-    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
-  "mounts": [],
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ],
   "postCreateCommand": "zsh .devcontainer/postCreateCommand.sh",
   "customizations": {
     "vscode": {
