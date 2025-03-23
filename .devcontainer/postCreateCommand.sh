@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-ln -s $PWD/config.yml /config/config.yml
+ln -sf $PWD/config.yml /config/config.yml
 
 # create venv
 poetry config virtualenvs.in-project true --local

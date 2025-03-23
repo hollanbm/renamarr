@@ -7,8 +7,8 @@ version = "1"
 dynamic = ["dependencies"]
 
 [tool.poetry]
+requires-poetry = ">=2.0"
 package-mode = false
-requires-poetry = ">=2.1.1"
 
 [tool.poetry.dependencies]
 python = "^3.13"
