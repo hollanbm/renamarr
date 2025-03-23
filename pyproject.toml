@@ -1,13 +1,14 @@
 [project]
 requires-python = ">= 3.13"
+name = "renamarr"
+description = "continual rename tool for *arr apps"
+authors = [{ name = "Brad Holland", email = "hollanbm@gmail.com" }]
+version = "1"
+dynamic = ["dependencies"]
 
 [tool.poetry]
-name = "renamarr"
-version = "0.1.0"
-description = ""
-authors = ["Brad Holland <hollanbm@gmail.com>"]
-readme = "README.md"
 package-mode = false
+requires-poetry = ">=2.1.1"
 
 [tool.poetry.dependencies]
 python = "^3.13"
@@ -33,21 +34,15 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
-pythonpath = [
-    "./src",
-    "./src/models",
-]
-testpaths = [
-    "./tests",
-    "./tests/models",
-]
+pythonpath = ["./src", "./src/models"]
+testpaths = ["./tests", "./tests/models"]
 addopts = [
-    "--cov=src",
-    "tests",
-    "--cov-branch",
-    "--capture=sys",
-    "--cov-report=xml",
-    "--cov-report=html",
-    "--import-mode=importlib",
+  "--cov=src",
+  "tests",
+  "--cov-branch",
+  "--capture=sys",
+  "--cov-report=xml",
+  "--cov-report=html",
+  "--import-mode=importlib",
 ]
 mock_use_standalone_module = "True"
