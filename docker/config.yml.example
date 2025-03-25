@@ -6,6 +6,7 @@ sonarr:
       enabled: true
       hourly_job: true
       analyze_files: true
+      rename_folders: false
     series_scanner:
       enabled: false
       hourly_job: false
@@ -16,6 +17,7 @@ sonarr:
       enabled: false
       hourly_job: false
       analyze_files: false
+      rename_folders: false
     series_scanner:
       enabled: true
       hourly_job: true

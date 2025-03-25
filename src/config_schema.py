@@ -52,12 +52,18 @@ CONFIG_SCHEMA = {
                 },
                 Optional(
                     "renamarr",
-                    default=dict(enabled=False, hourly_job=False, analyze_files=False),
+                    default=dict(
+                        enabled=False,
+                        hourly_job=False,
+                        analyze_files=False,
+                        rename_folders=False,
+                    ),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                     Optional("analyze_files", default=False): bool,
+                    Optional("rename_folders", default=False): bool,
                 },
             }
         ],

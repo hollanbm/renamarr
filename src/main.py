@@ -4,10 +4,11 @@ from sys import stdout
 from time import sleep
 
 import schedule
-from config_schema import CONFIG_SCHEMA
 from loguru import logger
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
+
+from config_schema import CONFIG_SCHEMA
 from radarr_renamarr import RadarrRenamarr
 from sonarr_renamarr import SonarrRenamarr
 from sonarr_series_scanner import SonarrSeriesScanner as SonarrSeriesScanner
@@ -63,6 +64,7 @@ class Main:
                 url=sonarr_config.url,
                 api_key=sonarr_config.api_key,
                 analyze_files=sonarr_config.renamarr.analyze_files,
+                rename_folders=sonarr_config.renamarr.rename_folders,
             ).scan()
         except CliArrError as exc:
             logger.error(exc)
