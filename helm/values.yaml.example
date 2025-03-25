@@ -1,0 +1,50 @@
+resources:
+  limits:
+    memory: 145Mi
+  requests:
+    cpu: 100m
+    memory: 145Mi
+image:
+  registry: ghcr.io
+  repository: hollanbm/renamarr
+  tag: "1.0.6"
+config:
+  sonarr:
+    - name: tv
+      url: https://sonarr.tld:8989
+      api_key: not-a-real-api-key
+      renamarr:
+        enabled: true
+        hourly_job: true
+        analyze_files: true
+        rename_folders: false
+      series_scanner:
+        enabled: false
+        hourly_job: false
+    - name: anime
+      url: https://sonarr-anime.tld:8989
+      api_key: not-a-real-api-key
+      renamarr:
+        enabled: false
+        hourly_job: false
+        analyze_files: false
+        rename_folders: false
+      series_scanner:
+        enabled: true
+        hourly_job: true
+        hours_before_air: 1 # optional, defaults to 4
+  radarr:
+    - name: radarr
+      url: https://radarr.tld:7878
+      api_key: not-a-real-api-key
+      renamarr:
+        enabled: true
+        hourly_job: true
+        analyze_files: false
+    - name: radarr-4k
+      url: https://radarr-4k.tld:7878
+      api_key: not-a-real-api-key
+      renamarr:
+        enabled: true
+        hourly_job: true
+        analyze_files: true
