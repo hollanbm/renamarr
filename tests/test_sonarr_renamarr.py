@@ -1,6 +1,7 @@
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli
+
 from sonarr_renamarr import SonarrRenamarr
 
 
@@ -10,7 +11,13 @@ class TestSonarrRenamarr:
     ) -> None:
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_error.assert_any_call("Sonarr returned empty series list")
 
@@ -28,7 +35,13 @@ class TestSonarrRenamarr:
         mocker.patch.object(SonarrCli, "request_get").return_value = []
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_debug.assert_has_calls(
             [
@@ -47,7 +60,13 @@ class TestSonarrRenamarr:
         ]
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_info.assert_has_calls(
             [
@@ -70,7 +89,13 @@ class TestSonarrRenamarr:
         ]
         rename_files = mocker.patch.object(SonarrCli, "rename_files")
 
-        SonarrRenamarr("test", "test.tld", "test-api-key").scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_info.assert_has_calls(
             [
@@ -90,7 +115,13 @@ class TestSonarrRenamarr:
             enableMediaInfo=False
         )
 
-        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_warning.assert_called_once_with(
             "Analyse video files is not enabled, please enable setting, in order to use the reanalyze_files feature"
@@ -108,7 +139,13 @@ class TestSonarrRenamarr:
         )
         mocker.patch("sonarr_renamarr.sleep").return_value = None
 
-        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_info.assert_has_calls(
             [
@@ -129,6 +166,12 @@ class TestSonarrRenamarr:
         )
         mocker.patch("sonarr_renamarr.sleep").return_value = None
 
-        SonarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=False,
+        ).scan()
 
         mock_loguru_info.assert_any_call("disk scan failed")
