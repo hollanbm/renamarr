@@ -445,14 +445,14 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "python-config-parser"
-version = "3.1.3"
+version = "3.1.6"
 description = "Project created to given the possibility of create dynamics config files"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "python-config-parser-3.1.3.tar.gz", hash = "sha256:2039f87a4f6261ba0ed0d65492b5c870f08dc87a6ea7347600db4d647ed19d6e"},
-    {file = "python_config_parser-3.1.3-py3-none-any.whl", hash = "sha256:231a1490f8db69aa8ca4c9661ba3ac0f8bc841bbc8683ae60f26fbef6e58c235"},
+    {file = "python_config_parser-3.1.6-py3-none-any.whl", hash = "sha256:e5801cf0bf7c425584e4c465a853f66c8f94c8cbb27697ca5bdb22689f532c8d"},
+    {file = "python_config_parser-3.1.6.tar.gz", hash = "sha256:ab92817179804c8e1d4b30b4c76d1f9e9a974d39de64a9e10a4d44f834355ff3"},
 ]
 
 [package.dependencies]
