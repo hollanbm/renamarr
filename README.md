@@ -13,8 +13,15 @@ With the addition of radarr support, I've decided to rename this project to Rena
 
 ### helm
 
-coming soon
+```shell
+helm repo add renamarr https://hollanbm.github.io/renamarr/
+helm repo update
+```
 
+1) Copy/Rename [values.yaml.example](helm/values.yaml.example) to `values.yaml`
+2) Update `values.yaml` as needed.
+    * See [Configuration](#configuration) for further explanation
+3) `helm install my-renamarr renamarr/renamarr -f values.yaml`
 
 ## How it works
 
@@ -34,6 +41,12 @@ This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https:/
 #### Analyze Files
 This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import. This will initiate a rescan of the files in your library, so that the mediainfo will be udpated. Then renamarr will come through and detect changes, and rename the files
 
+#### Rename Folders (Sonarr Only)
+This config option will rename series folders, when they no longer match your configured MediaFormat
+  * uses [/api/v3/series/{id}/folder](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to determine if the series folder requires an update
+  * uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to update series rootFolderPath to it's current value
+    * moving the folder in place
+  * Series are processed in bulk at the end of the run, **per root folder**
 
 ### Series Scanner (Sonarr Only)
 This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
@@ -66,6 +79,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 | `sonarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `sonarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `sonarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
+| `sonarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
