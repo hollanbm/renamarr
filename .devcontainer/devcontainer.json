@@ -6,7 +6,7 @@
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
+    "ghcr.io/devcontainers-extra/features/zsh-plugins:0": {
       "plugins": "git gpg-agent ssh-agent helm kind kubectl poetry poetry-env zsh-autosuggestions zsh-syntax-highlighting",
       "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
     },
@@ -15,7 +15,7 @@
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "minikube": "none" // use kind instead
     },
-    "ghcr.io/devcontainers-contrib/features/kubectx-kubens:1": {},
+    "ghcr.io/devcontainers-extra/features/kubectx-kubens:1": {},
     "ghcr.io/mpriscella/features/kind:1": {},
     "ghcr.io/mpriscella/features/helm-chart-testing:1": {}
   },
