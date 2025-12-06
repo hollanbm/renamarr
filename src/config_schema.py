@@ -3,21 +3,7 @@ from schema import And, Optional, Use
 CONFIG_SCHEMA = {
     Optional(
         "sonarr",
-        default=[
-            dict(
-                name="",
-                url="",
-                api_key="",
-                series_scanner=dict(
-                    enabled=False, hourly_job=False, hours_before_air=4
-                ),
-                # keeping for backwards compatibility between v1.0.0 and v0.5
-                existing_renamer=dict(
-                    enabled=False, hourly_job=False, analyze_files=False
-                ),
-                renamarr=dict(enabled=False, hourly_job=False, analyze_files=False),
-            )
-        ],
+        default=[],
         ignore_extra_keys=True,
     ): And(
         lambda n: len(n),
@@ -79,14 +65,7 @@ CONFIG_SCHEMA = {
     ),
     Optional(
         "radarr",
-        default=[
-            dict(
-                name="",
-                url="",
-                api_key="",
-                renamarr=dict(enabled=False, hourly_job=False, analyze_files=False),
-            )
-        ],
+        default=[],
         ignore_extra_keys=True,
     ): And(
         lambda n: len(n),
