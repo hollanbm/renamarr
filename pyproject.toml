@@ -14,7 +14,7 @@ package-mode = false
 python = "^3.14"
 pycliarr = "^1.0.26"
 python-dotenv = "^1.0.1"
-loguru = "^0.7.2"
+loguru = "^0.7.3"
 python-dateutil = "^2.9.0-post.0"
 python-config-parser = "^3.1.3"
 schedule = "^1.2.2"
@@ -23,8 +23,8 @@ schedule = "^1.2.2"
 ruff = "^0.14.0"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^8.2.1"
-pytest-cov = "^6.0.0"
+pytest = "^9.0.1"
+pytest-cov = "^7.0.0"
 pytest-mock = "^3.14.0"
 mock = "^5.1.0"
 pytest-loguru = "^0.4.0"
@@ -33,7 +33,7 @@ pytest-loguru = "^0.4.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.pytest.ini_options]
+[tool.pytest]
 pythonpath = ["./src", "./src/models"]
 testpaths = ["./tests", "./tests/models"]
 addopts = [
