@@ -74,7 +74,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 
 #### Requirements
 
-* [Python 3.13](https://www.python.org/downloads/release/python-3130/)
+* [Python 3.14](https://www.python.org/downloads/release/python-3140/)
 * [pipx](https://pipx.pypa.io/stable/installation/)
 * [poetry](https://python-poetry.org/docs/#installation)
 

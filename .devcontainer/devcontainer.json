@@ -5,7 +5,9 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false // moby not supported in debian trixie
+    },
     "ghcr.io/devcontainers-extra/features/zsh-plugins:0": {
       "plugins": "git gpg-agent ssh-agent helm kind kubectl poetry poetry-env zsh-autosuggestions zsh-syntax-highlighting",
       "omzPlugins": "https://github.com/zsh-users/zsh-syntax-highlighting https://github.com/zsh-users/zsh-autosuggestions"
@@ -106,6 +108,7 @@
         "charliermarsh.ruff",
         "eamodio.gitlens",
         "elagil.pre-commit-helper",
+        "github.copilot-chat",
         "KevinRose.vsc-python-indent",
         "ms-python.debugpy",
         "ms-python.python",
