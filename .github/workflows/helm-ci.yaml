@@ -5,6 +5,10 @@ on: pull_request
 jobs:
   helm-ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI: true
     steps:
       - name: Checkout
         uses: actions/checkout@v6
