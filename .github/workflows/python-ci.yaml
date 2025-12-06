@@ -9,6 +9,10 @@ on:
 jobs:
   python-ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI: true
     steps:
       #----------------------------------------------
       #       check-out repo and set-up python
