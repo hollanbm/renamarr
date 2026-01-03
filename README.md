@@ -1,6 +1,6 @@
-# Renamarr (previously sonarr-series-scanner)
+# Renamarr
 
-With the addition of radarr support, I've decided to rename this project to Renamarr
+[![codecov](https://codecov.io/gh/hollanbm/renamarr/graph/badge.svg?token=8MJ61PXR4V)](https://codecov.io/gh/hollanbm/renamarr)
 
 ## Quick Start
 
