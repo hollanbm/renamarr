@@ -69,10 +69,3 @@ def episode_data(
         hasFile=hasFile,
         episodeFileId=episodeFileId,
     )
-
-
-def file_info(id: int, file_name: str) -> json_data:
-    return dict(
-        id=id,
-        path=f"/path/to/{file_name}",
-    )

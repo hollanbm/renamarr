@@ -106,6 +106,7 @@
       },
       "extensions": [
         "charliermarsh.ruff",
+        "Continue.continue",
         "eamodio.gitlens",
         "elagil.pre-commit-helper",
         "github.copilot-chat",
@@ -117,10 +118,10 @@
         "njpwerner.autodocstring",
         "njqdev.vscode-python-typehint",
         "oderwat.indent-rainbow",
+        "openai.chatgpt",
         "redhat.vscode-yaml",
         "samuelcolvin.jinjahtml",
         "Tim-Koehler.helm-intellisense",
-        "VisualStudioExptTeam.vscodeintellicode",
         "yzhang.markdown-all-in-one"
       ]
     }

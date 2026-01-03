@@ -1,6 +1,7 @@
 from unittest.mock import call
 
 from pycliarr.api import RadarrCli
+
 from radarr_renamarr import RadarrRenamarr
 
 
@@ -10,7 +11,7 @@ class TestRadarrRenamarr:
     ) -> None:
         rename_files = mocker.patch.object(RadarrCli, "rename_files")
 
-        RadarrRenamarr("test", "test.tld", "test-api-key").scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
 
         mock_loguru_info.assert_has_calls(
             [call("Starting Renamarr"), call("Finished Renamarr")]
@@ -25,7 +26,7 @@ class TestRadarrRenamarr:
         mocker.patch.object(RadarrCli, "request_get").return_value = []
         _sendCommand = mocker.patch.object(RadarrCli, "_sendCommand")
 
-        RadarrRenamarr("test", "test.tld", "test-api-key").scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
 
         mock_loguru_debug.assert_any_call("Nothing to rename")
         _sendCommand.assert_not_called()
@@ -42,7 +43,7 @@ class TestRadarrRenamarr:
             movieId=1,
         )
 
-        RadarrRenamarr("test", "test.tld", "test-api-key").scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
 
         _sendCommand.assert_called_once_with(rename_payload)
 
@@ -64,7 +65,7 @@ class TestRadarrRenamarr:
             movieId=1,
         )
 
-        RadarrRenamarr("test", "test.tld", "test-api-key").scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
 
         _sendCommand.assert_has_calls([call(rename_payload1), call(rename_payload2)])
 
@@ -75,7 +76,7 @@ class TestRadarrRenamarr:
             enableMediaInfo=False
         )
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
 
         mock_loguru_warning.assert_called_once_with(
             "Analyse video files is not enabled, please enable setting, in order to use the reanalyze_files feature"
@@ -93,7 +94,7 @@ class TestRadarrRenamarr:
         )
         mocker.patch("radarr_renamarr.sleep").return_value = None
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
 
         assert call("Initiated disk scan of library") in mock_loguru_info.call_args_list
         assert (
@@ -112,6 +113,6 @@ class TestRadarrRenamarr:
         )
         mocker.patch("radarr_renamarr.sleep").return_value = None
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", True).scan()
+        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
 
         assert call("disk scan failed") in mock_loguru_info.call_args_list
