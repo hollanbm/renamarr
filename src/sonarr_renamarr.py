@@ -22,7 +22,7 @@ class SonarrRenamarr:
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)
         self.analyze_files = analyze_files
-        self.rename_files = rename_folders
+        self.rename_folders = rename_folders
         self.bulk_move = BulkMove()
 
     def scan(self):
@@ -38,7 +38,7 @@ class SonarrRenamarr:
                     )
                 else:
                     logger.info("Initiated disk scan of library")
-                    if self.__analyze_files():
+                    if self.__rescan_series():
                         logger.info("disk scan finished successfully")
                     else:
                         logger.info("disk scan failed")
@@ -52,7 +52,7 @@ class SonarrRenamarr:
 
             for show in sorted(series, key=lambda s: s.title):
                 with logger.contextualize(item=show.title):
-                    if self.rename_files:
+                    if self.rename_folders:
                         root_folders: List[json_dict] = (
                             self.sonarr_cli.get_root_folder()
                         )
@@ -65,7 +65,7 @@ class SonarrRenamarr:
                             root_folder_path = root_folder["path"]
                             if (
                                 root_folder_path in show.path
-                                and f"{root_folder_path}/{series_folder}" == show.path
+                                and f"{root_folder_path}/{series_folder}" != show.path
                             ):
                                 bulk_move.add(root_folder_path, show.id)
                                 logger.debug(
@@ -97,19 +97,31 @@ class SonarrRenamarr:
                             batch_rename.get_file_ids(), show.id
                         )
 
-                        if bulk_move.has_pending_moves():
-                            logger.debug("Processing pending series folder renames")
-                            for move in bulk_move.pending_moves:
-                                logger.info(
-                                    f"Renaming Series folder for series IDs: {', '.join(str(series_id) for series_id in move.seriesIds)}"
-                                )
-                                self.sonarr_cli.request_put(
-                                    path="/api/v3/series/editor", json_data=asdict(move)
-                                )
+            if bulk_move.has_pending_moves():
+                logger.debug("Processing pending series folder renames")
+                for move in bulk_move.pending_moves:
+                    logger.info(
+                        f"Renaming Series folder for series IDs: {', '.join(str(series_id) for series_id in move.seriesIds)}"
+                    )
+                    self.sonarr_cli.request_put(
+                        path="/api/v3/series/editor",
+                        json_data=asdict(move),
+                    )
+
+                    logger.info(
+                        f"Series folder rename successful for series IDs: {', '.join(str(series_id) for series_id in move.seriesIds)}"
+                    )
+
+                    # After files are moved, its a good idea to rescan the library
+                    logger.info("Initiated disk scan of library")
+                    if self.__rescan_series():
+                        logger.info("disk scan finished successfully")
+                    else:
+                        logger.info("disk scan failed")
 
             logger.info("Finished Renamarr")
 
-    def __analyze_files(self) -> bool:
+    def __rescan_series(self) -> bool:
         """_summary_
 
         Returns:
