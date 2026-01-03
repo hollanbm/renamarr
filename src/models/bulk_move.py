@@ -43,11 +43,3 @@ class BulkMove:
             (str(move.series_ids)) for move in self.pending_moves
         ]
         return ", ".join(series_list2)
-
-    # def get_log_message(self) -> str:
-    #     episode_list: List[str] = [
-    #         f"S{str(rename.season_number).zfill(2)}E"
-    #         + "-".join([str(ep).zfill(2) for ep in rename.episode_numbers])
-    #         for rename in self.files_to_rename
-    #     ]
-    #     return ", ".join(episode_list)

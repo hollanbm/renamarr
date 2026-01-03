@@ -41,3 +41,14 @@ def test_get_log_message_returns_joined_series_ids_when_present() -> None:
     bulk_move.pending_moves[0].series_ids = bulk_move.pending_moves[0].seriesIds
 
     assert bulk_move.get_log_message() == "[1]"
+
+
+def test_add_creates_new_move_when_root_differs() -> None:
+    bulk_move = BulkMove()
+    bulk_move.add("/root", 1)
+
+    bulk_move.add("/other", 2)
+
+    assert len(bulk_move.pending_moves) == 2
+    assert bulk_move.pending_moves[0].rootFolderPath == "/root"
+    assert bulk_move.pending_moves[1].rootFolderPath == "/other"

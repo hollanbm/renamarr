@@ -217,3 +217,69 @@ class TestSonarrRenamarr:
                 call("Finished Renamarr"),
             ]
         )
+
+    def test_when_pending_bulk_moves_rescan_fails(
+        self, mock_loguru_info, mock_loguru_debug, mocker
+    ) -> None:
+        show = SimpleNamespace(id=1, title="Show", path="/root/OldName")
+        mocker.patch.object(SonarrCli, "get_serie").return_value = [show]
+        mocker.patch.object(SonarrCli, "get_root_folder").return_value = [
+            dict(path="/root")
+        ]
+        mocker.patch.object(SonarrCli, "request_get").side_effect = [
+            dict(folder="NewName"),
+            [],
+        ]
+        request_put = mocker.patch.object(SonarrCli, "request_put")
+        mocker.patch.object(
+            SonarrRenamarr, "_SonarrRenamarr__rescan_series", return_value=False
+        )
+
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=True,
+        ).scan()
+
+        mock_loguru_debug.assert_any_call("Processing pending series folder renames")
+        request_put.assert_called_once_with(
+            path="/api/v3/series/editor",
+            json_data=dict(rootFolderPath="/root", seriesIds=[1], moveFiles=True),
+        )
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Initiated disk scan of library"),
+                call("disk scan failed"),
+            ]
+        )
+
+    def test_when_series_folder_already_matches_no_bulk_move(
+        self, mock_loguru_debug, mocker
+    ) -> None:
+        show = SimpleNamespace(id=1, title="Show", path="/root/Show")
+        mocker.patch.object(SonarrCli, "get_serie").return_value = [show]
+        mocker.patch.object(SonarrCli, "get_root_folder").return_value = [
+            dict(path="/root")
+        ]
+        mocker.patch.object(SonarrCli, "request_get").side_effect = [
+            dict(folder="Show"),
+            [],
+        ]
+        request_put = mocker.patch.object(SonarrCli, "request_put")
+
+        SonarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=True,
+        ).scan()
+
+        request_put.assert_not_called()
+        # No pending moves, so processing message should never appear
+        assert (
+            call("Processing pending series folder renames")
+            not in mock_loguru_debug.mock_calls
+        )
