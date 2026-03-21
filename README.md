@@ -11,18 +11,6 @@
     * See [Configuration](#configuration) for further explanation
 3) Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
 
-### helm
-
-```shell
-helm repo add renamarr https://hollanbm.github.io/renamarr/
-helm repo update
-```
-
-1) Copy/Rename [values.yaml.example](helm/values.yaml.example) to `values.yaml`
-2) Update `values.yaml` as needed.
-    * See [Configuration](#configuration) for further explanation
-3) `helm install my-renamarr renamarr/renamarr -f values.yaml`
-
 ## How it works
 
 ### Renamarr
