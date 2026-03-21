@@ -8,7 +8,6 @@ Guidance on how to navigate and modify this codebase.
   `pyproject.toml` or `uv.lock` directly.
 - Whenever code is changed:
     * ensure all pre-commit checks pass (`pre-commit run --all-files`)
-    * ensure that all tests pass (`uv run --group test pytest`)
     * Newly added code must keep 100% line and branch coverage.
 - When running ad-hoc Python (inspecting objects, small scripts, etc.), use
   `uv run python` so the project venv and pinned dependencies are active.
@@ -68,7 +67,6 @@ Guidance on how to navigate and modify this codebase.
 
 ## Automated Tests
 
-- Always run `uv run --group test pytest --color=no` when fixing bugs or making incremental code changes.
 - Tests treat warnings as errors. Fix warnings raised by this repo.
 - Prefer the `pytest-mock` `mocker` fixture for patching and creating mocks in tests.
   Avoid using `pytest.MonkeyPatch` directly when `mocker` can cover the case.
