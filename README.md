@@ -10,7 +10,6 @@
 2) Update `config.yml` as needed.
     * See [Configuration](#configuration) for further explanation
 3) Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
-   * The repo's `.envrc` exports `BRANCH_NAME`, which the root `docker-compose.yaml` uses for the local image tag as `renamarr:${BRANCH_NAME:-local}`
 
 ### helm
 
