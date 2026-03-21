@@ -1,4 +1,5 @@
 config.yml
+.pre-commit/
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,linux,python,pycharm+all,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,linux,python,pycharm+all,visualstudiocode

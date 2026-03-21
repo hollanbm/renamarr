@@ -1,4 +1,4 @@
-# https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+# https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
 ---
 config:
   sonarr:

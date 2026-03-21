@@ -1,22 +1,28 @@
+# Use a repo-local cache when invoking pre-commit, for example:
+# PRE_COMMIT_HOME=.pre-commit-cache pre-commit run --all-files
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.4.2
+    rev: v0.15.7
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.10.12
+    hooks:
+      - id: uv-lock
   - repo: local
     hooks:
       - id: pytest
         name: pytest
-        entry: poetry run pytest --cov=src --cov-branch tests
+        entry: uv run --frozen --group test pytest --cov=src --cov-branch tests
         language: system
         types: [python]
         pass_filenames: false
