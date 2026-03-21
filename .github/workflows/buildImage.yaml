@@ -66,6 +66,10 @@ jobs:
             org.opencontainers.image.revision={{sha}}
             org.opencontainers.image.version={{version}}
             org.opencontainers.image.created={{commit_date 'YYYY-MM-DDTHH:mm:ss[Z]'}}
+          annotations: |
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
