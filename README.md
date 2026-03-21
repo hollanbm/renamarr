@@ -6,10 +6,11 @@
 
 ### docker
 
-1) Copy/Rename [config.yml.example](docker/config.yml.example) to `config.yml`
+1) Copy/Rename [config.yml.example](example/config.yml.example) to `config.yml`
 2) Update `config.yml` as needed.
     * See [Configuration](#configuration) for further explanation
-3) Bring up app using provided [docker-compose.yml](docker/docker-compose.yml)
+3) Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
+   * The repo's `.envrc` exports `BRANCH_NAME`, which the root `docker-compose.yaml` uses for the local image tag as `renamarr:${BRANCH_NAME:-local}`
 
 ### helm
 
@@ -89,25 +90,20 @@ The application run immediately on startup, and then continue to schedule jobs e
 #### Requirements
 
 * [Python 3.14](https://www.python.org/downloads/release/python-3140/)
-* [pipx](https://pipx.pypa.io/stable/installation/)
-* [poetry](https://python-poetry.org/docs/#installation)
-
-#### devcontainer
-
-There is a [devcontainer](https://containers.dev/) provided; it is optional but recommended.
-[DevContainer's in VS Code](https://code.visualstudio.com/docs/devcontainers/containers)
+* [uv](https://docs.astral.sh/uv/getting-started/installation/)
+* Dependency locking is configured for macOS and Linux environments only
 
 ####
 
-You will need to create `config.yml` in the root of the repo, to mount your config within the devcontainer
+You will need to create `config.yml` in the root of the repo
 
 ```shell
-$ poetry install
+$ uv sync --group dev --group test
 
-$ poetry run python src/main.py
+$ uv run python src/main.py
 ```
 
 #### Unit Tests
 ```shell
-$ pytest
+$ uv run pytest
 ```

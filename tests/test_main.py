@@ -195,7 +195,7 @@ class TestMain:
         assert excinfo.value.code == 1
 
         mock_loguru_error.assert_any_call(
-            "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+            "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
         )
 
     def test_config_file_not_found_error(
@@ -238,7 +238,7 @@ class TestMain:
         )
 
         mock_loguru_warning.assert_any_call(
-            "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+            "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
         )
 
     def test_legacy_config_existing_renamer_exception(

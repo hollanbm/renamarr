@@ -1,0 +1,12 @@
+services:
+  renamarr:
+    container_name: renamarr
+    image: renamarr:${BRANCH_NAME:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      LOGURU_LEVEL: DEBUG
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/config/config.yml:ro
