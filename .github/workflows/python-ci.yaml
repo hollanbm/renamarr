@@ -24,48 +24,20 @@ jobs:
           python-version: "3.14"
           architecture: "x64"
 
-      #----------------------------------------------
-      #         install & configure poetry
-      #----------------------------------------------
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
-          version: 2.1.1
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+          enable-cache: true
 
-      #----------------------------------------------
-      # install dependencies if cache does not exist
-      #----------------------------------------------
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: uv sync --frozen --group dev --group test
 
-      #----------------------------------------------
-      #    Permanent venv activation
-      #----------------------------------------------
-      - name: Activate virtualenv
-        run: |
-          source .venv/bin/activate
-          echo PATH=$PATH >> $GITHUB_ENV
-
-      #----------------------------------------------
-      #    run test suite and output coverage file
-      #----------------------------------------------
       - name: Test with pytest
-        run: |
-          pytest --cov-branch --cov=src --cov-report=xml tests
+        run: uv run pytest --cov-branch --cov=src --cov-report=xml tests
 
-      #----------------------------------------------
-      #              lint and formatting
-      #----------------------------------------------
       - name: Lint with Ruff
-        run: |
-          ruff check --output-format=github .
+        run: uv run ruff check --output-format=github .
 
-      #----------------------------------------------
-      #             upload coverage stats
-      #----------------------------------------------
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
