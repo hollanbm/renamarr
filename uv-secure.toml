@@ -1,0 +1,16 @@
+format = "columns"
+check_uv_tool = true
+check_uv_secure = true
+
+[ignore_packages]
+mistune = ["==0.8.4"]
+
+[vulnerability_criteria]
+show_severity = true
+
+[maintainability_criteria]
+# max_package_age takes numeric seconds or an ISO8601 duration string
+max_package_age = "P1000D"
+forbid_archived = true
+forbid_deprecated = true
+forbid_quarantined = true

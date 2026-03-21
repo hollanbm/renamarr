@@ -1,5 +1,3 @@
-# Use a repo-local cache when invoking pre-commit, for example:
-# PRE_COMMIT_HOME=.pre-commit-cache pre-commit run --all-files
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.

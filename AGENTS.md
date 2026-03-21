@@ -7,7 +7,7 @@ Guidance on how to navigate and modify this codebase.
 - Use the uv CLI for all dependency and project changes. Do not edit
   `pyproject.toml` or `uv.lock` directly.
 - Whenever code is changed:
-    * ensure all pre-commit checks pass (`pre-commit run --all-files`)
+    * ensure all prek checks pass (`prek run --all-files`)
     * Newly added code must keep 100% line and branch coverage.
 - When running ad-hoc Python (inspecting objects, small scripts, etc.), use
   `uv run python` so the project venv and pinned dependencies are active.

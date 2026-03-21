@@ -28,6 +28,10 @@ test = [
 # Treat this repo as an application, so uv installs dependencies without packaging renamarr itself.
 [tool.uv]
 package = false
+environments = [
+  "sys_platform == 'darwin'",
+  "sys_platform == 'linux'",
+]
 
 [tool.pytest]
 pythonpath = ["./src", "./src/models"]

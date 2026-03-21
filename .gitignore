@@ -1,4 +1,6 @@
 config.yml
+.pre-commit-cache
+.prek-home
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,linux,python,pycharm+all,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,linux,python,pycharm+all,visualstudiocode
@@ -182,6 +184,9 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
+.pre-commit-cache/
+.uv-cache/
+.uv-secure-cache/
 .coverage
 .coverage.*
 .cache

@@ -38,6 +38,9 @@ jobs:
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
 
+      - name: Scan dependencies with uv-secure
+        run: uv tool run uv-secure
+
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:

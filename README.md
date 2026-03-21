@@ -91,6 +91,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 
 * [Python 3.14](https://www.python.org/downloads/release/python-3140/)
 * [uv](https://docs.astral.sh/uv/getting-started/installation/)
+* Dependency locking is configured for macOS and Linux environments only
 
 #### devcontainer
 
