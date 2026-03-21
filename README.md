@@ -93,14 +93,9 @@ The application run immediately on startup, and then continue to schedule jobs e
 * [uv](https://docs.astral.sh/uv/getting-started/installation/)
 * Dependency locking is configured for macOS and Linux environments only
 
-#### devcontainer
-
-There is a [devcontainer](https://containers.dev/) provided; it is optional but recommended.
-[DevContainer's in VS Code](https://code.visualstudio.com/docs/devcontainers/containers)
-
 ####
 
-You will need to create `config.yml` in the root of the repo, to mount your config within the devcontainer
+You will need to create `config.yml` in the root of the repo
 
 ```shell
 $ uv sync --group dev --group test
