@@ -52,6 +52,16 @@ jobs:
           tags: |
             type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
             type=raw,value=pr-${{ github.event.pull_request.number }}-{{sha}},enable=${{ github.event_name == 'pull_request' }}
+          labels: |
+            org.opencontainers.image.title=${{ github.event.repository.name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.revision={{sha}}
+            org.opencontainers.image.version={{version}}
+            org.opencontainers.image.created={{commit_date 'YYYY-MM-DDTHH:mm:ss[Z]'}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
