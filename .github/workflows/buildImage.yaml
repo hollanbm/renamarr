@@ -12,6 +12,9 @@ on:
       - reopened
       - labeled
       - unlabeled
+  push:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -52,6 +55,7 @@ jobs:
           tags: |
             type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
             type=raw,value=pr-${{ github.event.pull_request.number }}-{{sha}},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value={{branch}},enable=${{ github.event_name == 'push' }}
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
