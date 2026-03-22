@@ -15,7 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ruff>=0.15.0,<0.16",
+  "ruff==0.15.7",
 ]
 test = [
   "pytest>=9.0.1,<10",
@@ -27,6 +27,7 @@ test = [
 
 # Treat this repo as an application, so uv installs dependencies without packaging renamarr itself.
 [tool.uv]
+required-version = "==0.10.11"
 package = false
 environments = [
   "sys_platform == 'darwin'",

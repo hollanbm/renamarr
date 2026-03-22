@@ -339,7 +339,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.15.0,<0.16" }]
+dev = [{ name = "ruff", specifier = "==0.15.7" }]
 test = [
     { name = "mock", specifier = ">=5.1.0,<6" },
     { name = "pytest", specifier = ">=9.0.1,<10" },
