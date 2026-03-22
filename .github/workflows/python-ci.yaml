@@ -33,7 +33,7 @@ jobs:
         run: uv sync --frozen --group dev --group test
 
       - name: Test with pytest
-        run: uv run pytest --cov-branch --cov=src --cov-report=xml tests
+        run: uv run pytest --cov-branch --cov=src --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests
 
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
@@ -42,12 +42,6 @@ jobs:
         run: uv tool run uv-secure
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          fail_ci_if_error: true
-      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
