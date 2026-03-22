@@ -43,7 +43,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          report_type: test_results
+          report_type: coverage
           disable_search: true
           files: ./coverage.xml
           fail_ci_if_error: true
