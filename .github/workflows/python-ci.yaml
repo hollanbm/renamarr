@@ -31,7 +31,7 @@ jobs:
         run: uv sync --frozen --group dev --group test
 
       - name: Test with pytest
-        run: uv run pytest --cov-branch --cov=src --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests
+        run: uv run pytest --cov-branch --cov=src --cov-report=xml:coverage.xml --junitxml=junit.xml -o junit_family=legacy tests
 
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
@@ -43,11 +43,17 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          disable_search: true
           files: ./coverage.xml
           fail_ci_if_error: true
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          disable_search: true
+          files: ./junit.xml
+          fail_ci_if_error: true

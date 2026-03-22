@@ -42,7 +42,7 @@ addopts = [
   "tests",
   "--cov-branch",
   "--capture=sys",
-  "--cov-report=xml",
+  "--cov-report=xml:coverage.xml",
   "--cov-report=html",
   "--import-mode=importlib",
 ]
