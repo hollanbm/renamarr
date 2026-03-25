@@ -28,7 +28,7 @@ This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https:/
 
 #### Analyze Files
 
-This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import. This will initiate a rescan of the files in your library, so that the mediainfo will be udpated. Then renamarr will come through and detect changes, and rename the files
+This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import. This will initiate a rescan of the files in your library, so that the mediainfo will be updated. Then renamarr will come through and detect changes, and rename the files
 
 #### Rename Folders (Sonarr Only)
 
@@ -131,7 +131,6 @@ uv tool install mdformat \
   --with mdformat-frontmatter \
   --with mdformat-gfm \
   --with mdformat-gfm-alerts \
-  --with mdformat-tables
 ```
 
 #### Usage
@@ -147,7 +146,7 @@ This repo includes an `.envrc` file for local development.
 If you use `direnv`, allow it from the repository root:
 
 ```shell
-$ direnv allow
+direnv allow
 ```
 
 The included `.envrc` currently sets:
@@ -164,11 +163,11 @@ This makes local file logging work without hardcoding an absolute path, regardle
 #### Unit Tests
 
 ```shell
-$ uv run pytest
+uv run pytest
 ```
 
 #### Dependency Security Scanning
 
 ```shell
-$ uv run uv-secure
+uv run uv-secure
 ```
