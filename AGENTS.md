@@ -12,6 +12,13 @@ Guidance on how to navigate and modify this codebase.
 - Update README.md whenever behaviour or feature changes are introduced.
 - Diagnose bugs before patching: avoid speculative “symptom” fixes. When behaviour is unclear, instrument or reproduce minimally to identify the exact cause before landing code changes; prefer root-cause fixes over defensive clean-ups.
 
+## UV
+
+If uv version is changed, verify that it is also changed in these files
+- Dockerfile
+- pyproject.toml
+- .pre-commit-config.yaml
+
 ## Project Structure
 
 - **src/** – All application code lives here.
