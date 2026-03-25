@@ -166,6 +166,10 @@ This makes local file logging work without hardcoding an absolute path, regardle
 uv run pytest
 ```
 
+#### GitHub Actions
+
+Pull requests only trigger the Docker image build workflow when the PR has the `build-image` label.
+
 #### Dependency Security Scanning
 
 ```shell

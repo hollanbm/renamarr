@@ -22,8 +22,8 @@ env:
 
 jobs:
   build-and-push-image:
-    # Skip PR builds for Renovate-authored updates and dependency-only changes.
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'renovate[bot]' && !contains(github.event.pull_request.labels.*.name, 'dependencies')) }}
+    # Only build PR images when explicitly requested via label.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'build-image') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
