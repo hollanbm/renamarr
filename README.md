@@ -70,6 +70,8 @@ When enabled, logs for that instance are written under `/logs` using one of thes
 
 _Don't forget to mount /logs outside the container to persist log files_
 
+_To avoid permission issues when creating log files, set the user option in docker-compose to match the desired runtime UID/GID._
+
 #### Logging Configuration and Defaults
 
 | Environment Variable | Description                                               | Default  |

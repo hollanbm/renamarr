@@ -2,6 +2,7 @@ services:
   renamarr:
     container_name: renamarr
     image: ghcr.io/hollanbm/renamarr:latest
+    # user: 1000:1000 # if using the log_to_file feature, recommended to set the container user to match the host user to avoid permission issues with log files.
     restart: unless-stopped
     volumes:
       - ./config.yml:/config/config.yml:ro
