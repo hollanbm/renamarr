@@ -338,6 +338,26 @@ class TestMain:
             "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
         )
 
+    def test_config_dir_not_found_error(
+        self, tmp_path, mock_loguru_error, mocker
+    ) -> None:
+        missing_config_dir = tmp_path / "missing-config-dir"
+        os.environ["CONFIG_DIR"] = str(missing_config_dir)
+        get_config = mocker.patch("pyconfigparser.configparser.get_config")
+
+        try:
+            with pytest.raises(SystemExit) as excinfo:
+                Main().start()
+        finally:
+            del os.environ["CONFIG_DIR"]
+
+        get_config.assert_not_called()
+        mock_loguru_error.assert_any_call(
+            f"Unable to access config directory {str(missing_config_dir)!r}; please check volume mount paths or set $CONFIG_DIR."
+        )
+        assert isinstance(mock_loguru_error.call_args_list[-1].args[0], OSError)
+        assert excinfo.value.code == 1
+
     def test_legacy_config_existing_renamer_enabled(
         self, mocker, legacy_sonarr_config, mock_loguru_warning
     ):

@@ -121,9 +121,16 @@ class Main:
             )
 
     def start(self) -> None:
+        config_dir = os.getenv("CONFIG_DIR", "/")
         try:
-            with set_directory(os.getenv("CONFIG_DIR", "/")):
+            with set_directory(config_dir):
                 config = configparser.get_config(CONFIG_SCHEMA)
+        except OSError as exc:
+            logger.error(
+                f"Unable to access config directory {config_dir!r}; please check volume mount paths or set $CONFIG_DIR."
+            )
+            logger.error(exc)
+            exit(1)
         except ConfigFileNotFoundError as exc:
             logger.error(
                 "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
