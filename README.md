@@ -166,3 +166,9 @@ This makes local file logging work without hardcoding an absolute path, regardle
 ```shell
 $ uv run pytest
 ```
+
+#### Dependency Security Scanning
+
+```shell
+$ uv run uv-secure
+```
