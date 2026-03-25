@@ -7,6 +7,7 @@
         "ms-python.vscode-pylance",
         "ms-python.vscode-python-envs",
         "oderwat.indent-rainbow",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "charliermarsh.ruff"
     ]
 }

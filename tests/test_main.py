@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Generator
 from unittest.mock import PropertyMock
 
@@ -53,6 +54,12 @@ class TestMain:
         del os.environ["LOG_ROTATION"]
 
     @pytest.fixture
+    def log_level(self) -> Generator:
+        os.environ["LOG_LEVEL"] = "DEBUG"
+        yield
+        del os.environ["LOG_LEVEL"]
+
+    @pytest.fixture
     def config_dir(self) -> Generator:
         os.environ["CONFIG_DIR"] = "tests/fixtures"
         yield
@@ -105,20 +112,45 @@ class TestMain:
         sonarr_series_scanner.assert_called()
 
     def test_start_uses_config_dir_env_var(self, config_dir, mocker) -> None:
-        get_config = mocker.patch("pyconfigparser.configparser.get_config")
-        get_config.return_value = configparser.get_config(
+        config = configparser.get_config(
             CONFIG_SCHEMA,
             config_dir="tests/fixtures",
             file_name="disabled.yml",
         )
+        set_directory = mocker.patch("main.set_directory")
+        get_config = mocker.patch("pyconfigparser.configparser.get_config")
+        get_config.return_value = config
         mocker.patch.object(Job, "do")
 
         Main().start()
 
-        assert get_config.call_args.kwargs["config_dir"] == "tests/fixtures"
+        set_directory.assert_called_once_with("tests/fixtures")
+        get_config.assert_called_once_with(CONFIG_SCHEMA)
+
+    def test_start_supports_absolute_config_dir(self, tmp_path, mocker):
+        config_directory = tmp_path / "config"
+        config_directory.mkdir()
+        config_path = config_directory / "config.yml"
+        config_path.write_text(
+            Path("tests/fixtures/disabled.yml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        os.environ["CONFIG_DIR"] = str(tmp_path)
+        mocker.patch.object(Job, "do")
+        try:
+            Main().start()
+        finally:
+            del os.environ["CONFIG_DIR"]
+
+    def test_init_uses_log_level_env_var(self, log_level, mocker) -> None:
+        logger_add = mocker.patch.object(logger, "add")
+
+        Main()
+
+        assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
 
     def test_sonarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, mocker
+        self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
         config.sonarr[0].log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -134,6 +166,7 @@ class TestMain:
             if call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log"
         )
         assert file_sink_call.kwargs["format"]
+        assert file_sink_call.kwargs["level"] == "DEBUG"
         assert file_sink_call.kwargs["rotation"] == "12:00"
         assert file_sink_call.kwargs["retention"] == "14 days"
 
@@ -337,7 +370,7 @@ class TestMain:
         radarr_renamarr.assert_called()
 
     def test_radarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, mocker
+        self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
         config.radarr[0].log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -353,6 +386,7 @@ class TestMain:
             if call.args and call.args[0] == "/tmp/renamarr-logs/radarr/radarr.log"
         )
         assert file_sink_call.kwargs["format"]
+        assert file_sink_call.kwargs["level"] == "DEBUG"
         assert file_sink_call.kwargs["rotation"] == "12:00"
         assert file_sink_call.kwargs["retention"] == "14 days"
 

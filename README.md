@@ -70,6 +70,7 @@ When enabled, logs for that instance are written under `$LOG_DIR` using one of t
 
 | Environment Variable | Description | Default |
 | ---- | ----------- | ------- |
+| `LOG_LEVEL` | Log level passed to Loguru for stdout and file sinks. | `INFO` |
 | `LOG_DIR` | Directory where log files will be stored. | `/config/logs` |
 | `LOG_ROTATION` | Rotation schedule passed to Loguru for file log rotation. | `00:00` |
 | `LOG_RETENTION` | Retention period passed to Loguru for rotated log files. | `7 days` |
@@ -130,6 +131,7 @@ The included `.envrc` currently sets:
 
 * `BRANCH_NAME` from the current git branch name
 * `CONFIG_DIR` to the repo root so local `config.yml` is discovered
+* `LOG_LEVEL` to `DEBUG`
 * `LOG_DIR` to the repo-local `logs/` directory
 * `LOG_ROTATION` to `00:00`
 * `LOG_RETENTION` to `7 days`

@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 from sys import stdout
 from time import sleep
 
@@ -21,6 +22,7 @@ class Main:
     RUN_SCHEDULER = True
 
     def __init__(self):
+        log_level = os.getenv("LOG_LEVEL", "INFO")
         self._logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level}</level> | "
@@ -31,7 +33,7 @@ class Main:
         )
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()
-        logger.add(stdout, format=self._logger_format)
+        logger.add(stdout, format=self._logger_format, level=log_level)
 
     def __configure_file_logging(self, service: str, instance_name: str) -> None:
         log_dir = os.getenv("LOG_DIR", "/config/logs")
@@ -41,6 +43,7 @@ class Main:
         logger.add(
             log_path,
             format=self._logger_format,
+            level=os.getenv("LOG_LEVEL", "INFO"),
             rotation=log_rotation,
             retention=log_retention,
             filter=lambda record, configured_name=instance_name: (
@@ -114,10 +117,8 @@ class Main:
 
     def start(self) -> None:
         try:
-            config = configparser.get_config(
-                CONFIG_SCHEMA,
-                config_dir=os.getenv("CONFIG_DIR", "/config/"),
-            )
+            with set_directory(os.getenv("CONFIG_DIR", "/")):
+                config = configparser.get_config(CONFIG_SCHEMA)
         except ConfigFileNotFoundError as exc:
             logger.error(
                 "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
@@ -176,6 +177,16 @@ class Main:
             while self.RUN_SCHEDULER:
                 schedule.run_pending()
                 sleep(1)
+
+
+@contextmanager
+def set_directory(path):
+    oldpwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 
 if __name__ == "__main__":  # pragma nocover
