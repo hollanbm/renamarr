@@ -14,7 +14,9 @@
         "enable": true
       },
       "env": {
-        "LOGURU_LEVEL": "INFO"
+        "CONFIG_DIR": "${workspaceFolder}",
+        "LOG_DIR": "${workspaceFolder}/logs",
+        "LOG_LEVEL": "INFO"
       }
     },
     {
@@ -27,7 +29,9 @@
         "enable": true
       },
       "env": {
-        "LOGURU_LEVEL": "DEBUG"
+        "CONFIG_DIR": "${workspaceFolder}",
+        "LOG_DIR": "${workspaceFolder}/logs",
+        "LOG_LEVEL": "DEBUG"
       }
     }
   ]

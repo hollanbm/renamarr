@@ -7,6 +7,7 @@ sonarr:
       hourly_job: true
       analyze_files: true
       rename_folders: false
+      log_to_file: true
     series_scanner:
       enabled: false
       hourly_job: false
@@ -18,6 +19,7 @@ sonarr:
       hourly_job: false
       analyze_files: false
       rename_folders: false
+      log_to_file: false
     series_scanner:
       enabled: true
       hourly_job: true
@@ -30,6 +32,7 @@ radarr:
       enabled: true
       hourly_job: true
       analyze_files: false
+      log_to_file: true
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
     api_key: not-a-real-api-key
@@ -37,3 +40,4 @@ radarr:
       enabled: true
       hourly_job: true
       analyze_files: true
+      log_to_file: false

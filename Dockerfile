@@ -1,4 +1,4 @@
-ARG UV_VERSION=0.10.12
+ARG UV_VERSION=0.11.1
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}-debian AS builder
 
@@ -24,8 +24,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # chainguard secure distroless base image
 FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 
-USER nonroot
-
 # Grab python from the builder
 COPY --from=builder --chown=nonroot:nonroot /python /python
 
@@ -34,11 +32,19 @@ WORKDIR /renamarr
 # Copy the application from the builder
 COPY --from=builder --chown=nonroot:nonroot /renamarr /renamarr
 
+# default settings
+ENV LOGURU_DIAGNOSE="NO"
+ENV LOG_LEVEL="INFO"
+ENV CONFIG_DIR="/"
+ENV LOG_DIR="/logs"
+
+# Prepare the default config and log directories for the nonroot runtime user.
+RUN mkdir -p /config /logs && \
+    chown -R nonroot:nonroot /config /logs
+
+USER nonroot
+
 # activate venv
 ENV PATH="/renamarr/.venv/bin:$PATH"
-
-# default logging settings
-ENV LOGURU_DIAGNOSE="NO"
-ENV LOGURU_LEVEL="INFO"
 
 ENTRYPOINT ["python", "src/main.py"]
