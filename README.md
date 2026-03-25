@@ -35,7 +35,7 @@ This config option is useful if you have audio/video codec information as part o
 This config option will rename series folders, when they no longer match your configured MediaFormat
 
 - uses [/api/v3/series/{id}/folder](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to determine if the series folder requires an update
-- uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to update series rootFolderPath to it's current value
+- uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#v3/tag/serieseditor/PUT/api/v3/series/editor) endpoint to update series rootFolderPath to it's current value
   - moving the folder in place
 - Series are processed in bulk at the end of the run, **per root folder**
 
