@@ -35,23 +35,32 @@ class Main:
         logger.remove()
         logger.add(stdout, format=self._logger_format, level=log_level)
 
-    def __configure_file_logging(self, service: str, instance_name: str) -> None:
-        log_dir = os.getenv("LOG_DIR", "/config/logs")
+    def __configure_file_logging(self, service: str, instance_name: str) -> bool:
+        log_dir = os.getenv("LOG_DIR", "/logs")
         log_rotation = os.getenv("LOG_ROTATION", "00:00")
         log_retention = os.getenv("LOG_RETENTION", "7 days")
         log_path = os.path.join(log_dir, service, f"{instance_name}.log")
-        logger.add(
-            log_path,
-            format=self._logger_format,
-            level=os.getenv("LOG_LEVEL", "INFO"),
-            rotation=log_rotation,
-            retention=log_retention,
-            # filter ensures that instance logs go to the correct file
-            filter=lambda record, configured_service=service, configured_name=instance_name: (
-                record["extra"].get("service") == configured_service
-                and record["extra"].get("instance") == configured_name
-            ),
-        )
+        try:
+            logger.add(
+                log_path,
+                format=self._logger_format,
+                level=os.getenv("LOG_LEVEL", "INFO"),
+                rotation=log_rotation,
+                retention=log_retention,
+                # filter ensures that instance logs go to the correct file
+                filter=lambda record, configured_service=service, configured_name=instance_name: (
+                    record["extra"].get("service") == configured_service
+                    and record["extra"].get("instance") == configured_name
+                ),
+            )
+        except OSError as exc:
+            with logger.contextualize(service=service, instance=instance_name):
+                logger.warning(
+                    f"Unable to write logs to {log_path!r}; continuing with stdout logging only."
+                )
+                logger.warning(exc)
+            return False
+        return True
 
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"

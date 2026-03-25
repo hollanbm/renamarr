@@ -6,7 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      LOGURU_LEVEL: DEBUG
-    restart: unless-stopped
+      LOG_LEVEL: DEBUG
+    restart: "no"
     volumes:
-      - ./config.yml:/config/config.yml:ro
+      - ./config/config.yml:/config/config.yml:ro
+      - ./logs:/logs:rw

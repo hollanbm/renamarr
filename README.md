@@ -57,27 +57,26 @@ This should prevent too many API calls to the TVDB, refreshing individual series
 
 The application runs immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
 
-The config file directory is controlled by `$CONFIG_DIR`. If `CONFIG_DIR` is not set, the default directory is `/config/`.
-
 Logs are always written to stdout.
 
 ### File Logging
 
-Set `sonarr[].renamarr.log_to_file` or `radarr[].renamarr.log_to_file` to `true` to enable per-instance log files.
+Set `sonarr[].renamarr.log_to_file` or `radarr[].renamarr.log_to_file` to `true` to enable per-instance log files. If the target log path is not writable, renamarr logs a warning to stdout and continues running without logging to file.
 
-When enabled, logs for that instance are written under `$LOG_DIR` using one of these paths:
+When enabled, logs for that instance are written under `/logs` using one of these paths:
 
 - `sonarr/<name>.log`
 - `radarr/<name>.log`
 
+_Don't forget to mount /logs outside the container to persist log files_
+
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description                                               | Default        |
-| -------------------- | --------------------------------------------------------- | -------------- |
-| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks.     | `INFO`         |
-| `LOG_DIR`            | Directory where log files will be stored.                 | `/config/logs` |
-| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation. | `00:00`        |
-| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.  | `7 days`       |
+| Environment Variable | Description                                               | Default  |
+| -------------------- | --------------------------------------------------------- | -------- |
+| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks.     | `INFO`   |
+| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation. | `00:00`  |
+| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.  | `7 days` |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
@@ -96,11 +95,11 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `sonarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `sonarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
-| `sonarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Sonarr instance to `$LOG_DIR/sonarr/<name>.log` with daily rotation                                                         |
+| `sonarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Sonarr instance to `/logs/sonarr/<name>.log` with daily rotation                                                            |
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
-| `radarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Radarr instance to `$LOG_DIR/radarr/<name>.log` with daily rotation                                                         |
+| `radarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Radarr instance to `/logs/radarr/<name>.log` with daily rotation                                                            |
 
 ### Local Setup
 
@@ -111,13 +110,34 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 - [direnv](https://direnv.net/) (optional, but recommended)
 - Dependency locking is configured for macOS and Linux environments only
 
-You will need to create `config.yml` in the root of the repo
+You will need to create `config.yml` in the [config](./config/) folder in the root of the repo
 
 ```shell
 $ uv sync --group dev --group test
 
 $ uv run python src/main.py
 ```
+
+#### direnv
+
+This repo includes an `.envrc` file for local development
+
+If you use `direnv`, allow it from the repository root:
+
+```shell
+direnv allow
+```
+
+The included `.envrc` currently sets:
+
+- `BRANCH_NAME` from the current git branch name
+- `CONFIG_DIR` to the repo root so local `config.yml` is discovered
+- `LOG_LEVEL` to `DEBUG`
+- `LOG_DIR` to the repo-local `logs/` directory
+- `LOG_ROTATION` to `00:00`
+- `LOG_RETENTION` to `7 days`
+
+This makes local file logging work without hardcoding an absolute path, regardless of where the repository is checked out.
 
 ### mdformat
 
@@ -138,27 +158,6 @@ uv tool install mdformat \
 ```shell
 mdformat .
 ```
-
-#### direnv
-
-This repo includes an `.envrc` file for local development.
-
-If you use `direnv`, allow it from the repository root:
-
-```shell
-direnv allow
-```
-
-The included `.envrc` currently sets:
-
-- `BRANCH_NAME` from the current git branch name
-- `CONFIG_DIR` to the repo root so local `config.yml` is discovered
-- `LOG_LEVEL` to `DEBUG`
-- `LOG_DIR` to the repo-local `logs/` directory
-- `LOG_ROTATION` to `00:00`
-- `LOG_RETENTION` to `7 days`
-
-This makes local file logging work without hardcoding an absolute path, regardless of where the repository is checked out.
 
 #### Unit Tests
 

@@ -195,6 +195,27 @@ class TestMain:
             for call in logger_add.call_args_list
         )
 
+    def test_sonarr_log_to_file_warns_when_sink_setup_fails(
+        self, log_dir, mock_loguru_warning, mocker
+    ) -> None:
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+        logger_add.side_effect = PermissionError("read-only file system")
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
+
+        configured = main._Main__configure_file_logging("sonarr", "sonarr")
+
+        assert not configured
+        contextualize.assert_called_once_with(service="sonarr", instance="sonarr")
+        mock_loguru_warning.assert_any_call(
+            "Unable to write logs to '/tmp/renamarr-logs/sonarr/sonarr.log'; continuing with stdout logging only."
+        )
+        assert isinstance(
+            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
+        )
+
     def test_sonarr_series_scanner_hourly_job(
         self, config, enable_scheduler, mocker
     ) -> None:
@@ -450,6 +471,27 @@ class TestMain:
         assert not filter_fn({"extra": {"service": "sonarr", "instance": "radarr"}})
         assert not filter_fn({"extra": {"service": "radarr", "instance": "radarr1"}})
         assert not filter_fn({"extra": {}})
+
+    def test_radarr_log_to_file_warns_when_sink_setup_fails(
+        self, log_dir, mock_loguru_warning, mocker
+    ) -> None:
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+        logger_add.side_effect = PermissionError("read-only file system")
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
+
+        configured = main._Main__configure_file_logging("radarr", "radarr")
+
+        assert not configured
+        contextualize.assert_called_once_with(service="radarr", instance="radarr")
+        mock_loguru_warning.assert_any_call(
+            "Unable to write logs to '/tmp/renamarr-logs/radarr/radarr.log'; continuing with stdout logging only."
+        )
+        assert isinstance(
+            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
+        )
 
     def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.radarr[0].renamarr.enabled = True

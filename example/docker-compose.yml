@@ -5,3 +5,4 @@ services:
     restart: unless-stopped
     volumes:
       - ./config.yml:/config/config.yml:ro
+      # - ./logs:/logs:rw # If using the log_to_file option, uncomment this line to persist logs to the host machine. **Don't forget to create logs folder first**

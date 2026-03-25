@@ -15,6 +15,7 @@ Guidance on how to navigate and modify this codebase.
 ## UV
 
 If uv version is changed, verify that it is also changed in these files
+
 - Dockerfile
 - pyproject.toml
 - .pre-commit-config.yaml
