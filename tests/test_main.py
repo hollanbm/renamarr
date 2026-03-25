@@ -1,4 +1,5 @@
 import os
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Generator
 from unittest.mock import PropertyMock
@@ -172,8 +173,9 @@ class TestMain:
         assert file_sink_call.kwargs["retention"] == "14 days"
 
         filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"instance": "sonarr"}})
-        assert not filter_fn({"extra": {"instance": "sonarr1"}})
+        assert filter_fn({"extra": {"service": "sonarr", "instance": "sonarr"}})
+        assert not filter_fn({"extra": {"service": "radarr", "instance": "sonarr"}})
+        assert not filter_fn({"extra": {"service": "sonarr", "instance": "sonarr1"}})
         assert not filter_fn({"extra": {}})
 
     def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
@@ -222,9 +224,13 @@ class TestMain:
 
         sonarr_series_scanner = mocker.patch.object(SonarrSeriesScanner, "scan")
         sonarr_series_scanner.side_effect = exception
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
 
         Main().start()
 
+        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
 
     def test_sonarr_renamarr_scan(self, config, mocker) -> None:
@@ -293,9 +299,13 @@ class TestMain:
 
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
         sonarr_renamarr.side_effect = exception
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
 
         Main().start()
 
+        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
 
     def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
@@ -370,9 +380,15 @@ class TestMain:
 
         sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
         sonarr_renamarr.side_effect = exception
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
 
         Main().start()
 
+        contextualize.assert_any_call(
+            service="sonarr", instance=legacy_sonarr_config.sonarr[0].name
+        )
         mock_loguru_error.assert_called_once_with(exception)
 
     def test_radarr_renamarr_scan(self, config, mocker) -> None:
@@ -410,8 +426,9 @@ class TestMain:
         assert file_sink_call.kwargs["retention"] == "14 days"
 
         filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"instance": "radarr"}})
-        assert not filter_fn({"extra": {"instance": "radarr1"}})
+        assert filter_fn({"extra": {"service": "radarr", "instance": "radarr"}})
+        assert not filter_fn({"extra": {"service": "sonarr", "instance": "radarr"}})
+        assert not filter_fn({"extra": {"service": "radarr", "instance": "radarr1"}})
         assert not filter_fn({"extra": {}})
 
     def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
@@ -455,7 +472,11 @@ class TestMain:
 
         renamarr = mocker.patch.object(RadarrRenamarr, "scan")
         renamarr.side_effect = exception
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
 
         Main().start()
 
+        contextualize.assert_any_call(service="radarr", instance=config.radarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
