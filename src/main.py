@@ -4,6 +4,7 @@ from sys import stdout
 from time import sleep
 
 import schedule
+from dotenv import load_dotenv
 from loguru import logger
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
@@ -22,6 +23,7 @@ class Main:
     RUN_SCHEDULER = True
 
     def __init__(self):
+        load_dotenv(".env.local")
         log_level = os.getenv("LOG_LEVEL", "INFO")
         self._logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "

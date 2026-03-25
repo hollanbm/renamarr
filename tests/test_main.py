@@ -150,6 +150,16 @@ class TestMain:
 
         assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
 
+    def test_init_loads_local_dotenv_file(self, mocker) -> None:
+        logger_add = mocker.patch.object(logger, "add")
+        load_dotenv = mocker.patch("main.load_dotenv")
+
+        Main()
+
+        load_dotenv.assert_called_once()
+        assert load_dotenv.call_args.args == (".env.local",)
+        assert logger_add.called
+
     def test_sonarr_log_to_file_configures_instance_sink(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
