@@ -51,7 +51,30 @@ This should prevent too many API calls to the TVDB, refreshing individual series
 
 ### Usage
 
-The application run immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
+The application runs immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
+
+The config file directory is controlled by `$CONFIG_DIR`. If `CONFIG_DIR` is not set, the default directory is `/config/`.
+
+Logs are always written to stdout.
+
+### File Logging
+
+Set `sonarr[].log_to_file` or `radarr[].log_to_file` to `true` to enable per-instance log files.
+
+When enabled, logs for that instance are written under `$LOG_DIR` using one of these paths:
+
+* `sonarr/<name>.log`
+* `radarr/<name>.log`
+
+#### Logging Configuration and Defaults
+
+| Environment Variable | Description | Default |
+| ---- | ----------- | ------- |
+| `LOG_DIR` | Directory where log files will be stored. | `/config/logs` |
+| `LOG_ROTATION` | Rotation schedule passed to Loguru for file log rotation. | `00:00` |
+| `LOG_RETENTION` | Retention period passed to Loguru for rotated log files. | `7 days` |
+
+_For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
 ### Configuration
 
@@ -61,6 +84,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 | `sonarr[].name`                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
 | `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
 | `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
+| `sonarr[].log_to_file`                     | boolean | No       | False         | writes logs for this Sonarr instance to `$LOG_DIR/sonarr/<name>.log` with daily rotation                                                        |
 | `sonarr[].series_scanner.enabled`          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
 | `sonarr[].series_scanner.hourly_job`       | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
@@ -71,6 +95,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
+| `radarr[].log_to_file`                     | boolean | No       | False         | writes logs for this Radarr instance to `$LOG_DIR/radarr/<name>.log` with daily rotation                                                        |
 
 ### Local Setup
 
@@ -78,6 +103,7 @@ The application run immediately on startup, and then continue to schedule jobs e
 
 * [Python 3.14](https://www.python.org/downloads/release/python-3140/)
 * [uv](https://docs.astral.sh/uv/getting-started/installation/)
+* [direnv](https://direnv.net/) (optional, but recommended)
 * Dependency locking is configured for macOS and Linux environments only
 
 ####
@@ -89,6 +115,26 @@ $ uv sync --group dev --group test
 
 $ uv run python src/main.py
 ```
+
+#### direnv
+
+This repo includes an `.envrc` file for local development.
+
+If you use `direnv`, allow it from the repository root:
+
+```shell
+$ direnv allow
+```
+
+The included `.envrc` currently sets:
+
+* `BRANCH_NAME` from the current git branch name
+* `CONFIG_DIR` to the repo root so local `config.yml` is discovered
+* `LOG_DIR` to the repo-local `logs/` directory
+* `LOG_ROTATION` to `00:00`
+* `LOG_RETENTION` to `7 days`
+
+This makes local file logging work without hardcoding an absolute path, regardless of where the repository is checked out.
 
 #### Unit Tests
 ```shell

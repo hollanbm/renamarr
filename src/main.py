@@ -1,5 +1,4 @@
 import os
-from contextlib import contextmanager
 from sys import stdout
 from time import sleep
 
@@ -22,7 +21,7 @@ class Main:
     RUN_SCHEDULER = True
 
     def __init__(self):
-        logger_format = (
+        self._logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level}</level> | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
@@ -32,7 +31,22 @@ class Main:
         )
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()
-        logger.add(stdout, format=logger_format)
+        logger.add(stdout, format=self._logger_format)
+
+    def __configure_file_logging(self, service: str, instance_name: str) -> None:
+        log_dir = os.getenv("LOG_DIR", "/config/logs")
+        log_rotation = os.getenv("LOG_ROTATION", "00:00")
+        log_retention = os.getenv("LOG_RETENTION", "7 days")
+        log_path = os.path.join(log_dir, service, f"{instance_name}.log")
+        logger.add(
+            log_path,
+            format=self._logger_format,
+            rotation=log_rotation,
+            retention=log_retention,
+            filter=lambda record, configured_name=instance_name: (
+                record["extra"].get("instance") == configured_name
+            ),
+        )
 
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
@@ -100,13 +114,13 @@ class Main:
 
     def start(self) -> None:
         try:
-            # configparser uses cwd, for file opens.
-            # Change to root directory, to look for config in /config/config.yml
-            with set_directory("/"):
-                config = configparser.get_config(CONFIG_SCHEMA)
+            config = configparser.get_config(
+                CONFIG_SCHEMA,
+                config_dir=os.getenv("CONFIG_DIR", "/config/"),
+            )
         except ConfigFileNotFoundError as exc:
             logger.error(
-                "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
+                "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
             )
             logger.error(exc)
             exit(1)
@@ -118,6 +132,8 @@ class Main:
             exit(1)
 
         for sonarr_config in config.sonarr:
+            if sonarr_config.log_to_file:
+                self.__configure_file_logging("sonarr", sonarr_config.name)
             if not sonarr_config.series_scanner.enabled and not (
                 sonarr_config.renamarr.enabled or sonarr_config.existing_renamer.enabled
             ):
@@ -143,6 +159,8 @@ class Main:
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
         for radarr_config in config.radarr:
+            if radarr_config.log_to_file:
+                self.__configure_file_logging("radarr", radarr_config.name)
             if radarr_config.renamarr.enabled:
                 self.__schedule_radarr_renamarr(radarr_config)
             else:
@@ -158,16 +176,6 @@ class Main:
             while self.RUN_SCHEDULER:
                 schedule.run_pending()
                 sleep(1)
-
-
-@contextmanager
-def set_directory(path):
-    oldpwd = os.getcwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(oldpwd)
 
 
 if __name__ == "__main__":  # pragma nocover

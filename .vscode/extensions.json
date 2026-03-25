@@ -1,0 +1,12 @@
+{
+    "recommendations": [
+        "eamodio.gitlens",
+        "github.vscode-github-actions",
+        "ms-python.debugpy",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.vscode-python-envs",
+        "oderwat.indent-rainbow",
+        "redhat.vscode-yaml"
+    ]
+}

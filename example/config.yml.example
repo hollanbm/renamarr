@@ -2,6 +2,7 @@ sonarr:
   - name: tv
     url: https://sonarr.tld:8989
     api_key: not-a-real-api-key
+    log_to_file: true
     renamarr:
       enabled: true
       hourly_job: true
@@ -13,6 +14,7 @@ sonarr:
   - name: anime
     url: https://sonarr-anime.tld:8989
     api_key: not-a-real-api-key
+    log_to_file: false
     renamarr:
       enabled: false
       hourly_job: false
@@ -26,6 +28,7 @@ radarr:
   - name: radarr
     url: https://radarr.tld:7878
     api_key: not-a-real-api-key
+    log_to_file: true
     renamarr:
       enabled: true
       hourly_job: true
@@ -33,6 +36,7 @@ radarr:
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
     api_key: not-a-real-api-key
+    log_to_file: false
     renamarr:
       enabled: true
       hourly_job: true

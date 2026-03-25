@@ -27,6 +27,7 @@ CONFIG_SCHEMA = {
                     lambda s: len(s) > 0,
                     error="sonarr[].api_key is a required field",
                 ),
+                Optional("log_to_file", default=False): bool,
                 Optional(
                     "series_scanner",
                     default=dict(
@@ -95,6 +96,7 @@ CONFIG_SCHEMA = {
                     lambda s: len(s) > 0,
                     error="radarr[].api_key is a required field",
                 ),
+                Optional("log_to_file", default=False): bool,
                 Optional(
                     "renamarr",
                     default=dict(enabled=False, hourly_job=False, analyze_files=False),

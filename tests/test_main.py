@@ -3,6 +3,7 @@ from typing import Generator
 from unittest.mock import PropertyMock
 
 import pytest
+from loguru import logger
 from config_schema import CONFIG_SCHEMA
 from main import Main
 from pycliarr.api import CliArrError
@@ -32,6 +33,30 @@ class TestMain:
         os.environ["EXTERNAL_CRON"] = "TRUE"
         yield
         del os.environ["EXTERNAL_CRON"]
+
+    @pytest.fixture
+    def log_dir(self) -> Generator:
+        os.environ["LOG_DIR"] = "/tmp/renamarr-logs"
+        yield
+        del os.environ["LOG_DIR"]
+
+    @pytest.fixture
+    def log_retention(self) -> Generator:
+        os.environ["LOG_RETENTION"] = "14 days"
+        yield
+        del os.environ["LOG_RETENTION"]
+
+    @pytest.fixture
+    def log_rotation(self) -> Generator:
+        os.environ["LOG_ROTATION"] = "12:00"
+        yield
+        del os.environ["LOG_ROTATION"]
+
+    @pytest.fixture
+    def config_dir(self) -> Generator:
+        os.environ["CONFIG_DIR"] = "tests/fixtures"
+        yield
+        del os.environ["CONFIG_DIR"]
 
     @pytest.fixture
     def config(self) -> Generator:
@@ -78,6 +103,44 @@ class TestMain:
         Main().start()
 
         sonarr_series_scanner.assert_called()
+
+    def test_start_uses_config_dir_env_var(self, config_dir, mocker) -> None:
+        get_config = mocker.patch("pyconfigparser.configparser.get_config")
+        get_config.return_value = configparser.get_config(
+            CONFIG_SCHEMA,
+            config_dir="tests/fixtures",
+            file_name="disabled.yml",
+        )
+        mocker.patch.object(Job, "do")
+
+        Main().start()
+
+        assert get_config.call_args.kwargs["config_dir"] == "tests/fixtures"
+
+    def test_sonarr_log_to_file_configures_instance_sink(
+        self, config, log_dir, log_retention, log_rotation, mocker
+    ) -> None:
+        config.sonarr[0].log_to_file = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        file_sink_call = next(
+            call
+            for call in logger_add.call_args_list
+            if call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log"
+        )
+        assert file_sink_call.kwargs["format"]
+        assert file_sink_call.kwargs["rotation"] == "12:00"
+        assert file_sink_call.kwargs["retention"] == "14 days"
+
+        filter_fn = file_sink_call.kwargs["filter"]
+        assert filter_fn({"extra": {"instance": "sonarr"}})
+        assert not filter_fn({"extra": {"instance": "sonarr1"}})
+        assert not filter_fn({"extra": {}})
 
     def test_sonarr_series_scanner_hourly_job(
         self, config, enable_scheduler, mocker
@@ -211,7 +274,7 @@ class TestMain:
         assert excinfo.value.code == 1
 
         mock_loguru_error.assert_any_call(
-            "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
+            "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
         )
 
     def test_legacy_config_existing_renamer_enabled(
@@ -272,6 +335,31 @@ class TestMain:
         Main().start()
 
         radarr_renamarr.assert_called()
+
+    def test_radarr_log_to_file_configures_instance_sink(
+        self, config, log_dir, log_retention, log_rotation, mocker
+    ) -> None:
+        config.radarr[0].log_to_file = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        file_sink_call = next(
+            call
+            for call in logger_add.call_args_list
+            if call.args and call.args[0] == "/tmp/renamarr-logs/radarr/radarr.log"
+        )
+        assert file_sink_call.kwargs["format"]
+        assert file_sink_call.kwargs["rotation"] == "12:00"
+        assert file_sink_call.kwargs["retention"] == "14 days"
+
+        filter_fn = file_sink_call.kwargs["filter"]
+        assert filter_fn({"extra": {"instance": "radarr"}})
+        assert not filter_fn({"extra": {"instance": "radarr1"}})
+        assert not filter_fn({"extra": {}})
 
     def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
