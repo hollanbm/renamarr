@@ -33,11 +33,11 @@ If uv version is changed, verify that it is also changed in these files
 ## Code Style
 
 - Follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html) for all code contributions, including Google-style docstrings.
-- Use **type hinting** consistently throughout the codebase with the strongest most specific type hints possible. Type casting is forbidden and Any types should be kept to a minimum. Type ignores should almost never be used, other than for third party packages with no typing or dynamic typing.
+- Use **type hinting** consistently throughout the codebase with the strongest most specific type hints possible. Type casting is forbidden and Any types should be kept to a minimum. Type ignores should almost never be used, other than for third-party packages with no typing or dynamic typing.
 - Don't create sub-packages (no `__init__.py` files) in the test directories, a consequence of this test strategy is no duplicate module (.py file) names are allowed anywhere in this repo (with the exception of `__init__.py` and `conftest.py` files) since pytest can't support duplicate test file names without sub-packages.
 - Use the most modern Python idioms and syntax allowed by the minimum supported Python version (currently this is Python 3.14).
 - Comments should be kept to an absolute minimum, try to achieve code readability through meaningful class, function, and variable names. Public functions should have Google-style docstrings; parameters only need to be documented if the name and type hint don't convey the full semantics. Private functions used within a module don't need docstrings (unless their names and type hints aren't sufficient to convey their semantics).
-- Comments should only be used to explain unavoidable code smells (arising from third party package use), or the reason for temporary dependency version pinning (e.g. linking an unresolved GitHub issues) or lastly explaining opaque code or non-obvious trade offs or workarounds.
+- Comments should only be used to explain unavoidable code smells (arising from third-party package use), or the reason for temporary dependency version pinning (e.g. linking an unresolved GitHub issues) or lastly explaining opaque code or non-obvious trade-offs or workarounds.
 
 ## Development Environment / Terminal
 
