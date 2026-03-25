@@ -3,7 +3,7 @@ repos:
     # Ruff version.
     rev: v0.15.7
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,5 +32,5 @@ repos:
         name: pytest
         entry: uv run --frozen --group test pytest --cov=src --cov-branch tests
         language: system
-        types: [python]
+        files: ^(src/|tests/|pyproject\.toml|uv\.lock|uv-secure\.toml)
         pass_filenames: false
