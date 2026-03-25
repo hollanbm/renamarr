@@ -133,8 +133,6 @@ class Main:
             exit(1)
 
         for sonarr_config in config.sonarr:
-            if sonarr_config.log_to_file:
-                self.__configure_file_logging("sonarr", sonarr_config.name)
             if not sonarr_config.series_scanner.enabled and not (
                 sonarr_config.renamarr.enabled or sonarr_config.existing_renamer.enabled
             ):
@@ -149,6 +147,8 @@ class Main:
             if sonarr_config.series_scanner.enabled:
                 self.__schedule_sonarr_series_scanner(sonarr_config)
             if sonarr_config.renamarr.enabled:
+                if sonarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("sonarr", sonarr_config.name)
                 self.__schedule_sonarr_renamarr(sonarr_config)
             elif sonarr_config.existing_renamer.enabled:
                 logger.warning(
@@ -160,9 +160,9 @@ class Main:
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
         for radarr_config in config.radarr:
-            if radarr_config.log_to_file:
-                self.__configure_file_logging("radarr", radarr_config.name)
             if radarr_config.renamarr.enabled:
+                if radarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("radarr", radarr_config.name)
                 self.__schedule_radarr_renamarr(radarr_config)
             else:
                 with logger.contextualize(instance=radarr_config.name):

@@ -152,7 +152,8 @@ class TestMain:
     def test_sonarr_log_to_file_configures_instance_sink(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
-        config.sonarr[0].log_to_file = True
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
         main = Main()
@@ -174,6 +175,23 @@ class TestMain:
         assert filter_fn({"extra": {"instance": "sonarr"}})
         assert not filter_fn({"extra": {"instance": "sonarr1"}})
         assert not filter_fn({"extra": {}})
+
+    def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
+        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = False
+        config.sonarr[0].renamarr.log_to_file = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        assert all(
+            not (call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log")
+            for call in logger_add.call_args_list
+        )
 
     def test_sonarr_series_scanner_hourly_job(
         self, config, enable_scheduler, mocker
@@ -372,7 +390,8 @@ class TestMain:
     def test_radarr_log_to_file_configures_instance_sink(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
-        config.radarr[0].log_to_file = True
+        config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
         main = Main()

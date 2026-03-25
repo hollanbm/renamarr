@@ -6,10 +6,10 @@
 
 ### docker
 
-1) Copy/Rename [config.yml.example](example/config.yml.example) to `config.yml`
-2) Update `config.yml` as needed.
-    * See [Configuration](#configuration) for further explanation
-3) Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
+1. Copy/Rename [config.yml.example](example/config.yml.example) to `config.yml`
+2. Update `config.yml` as needed.
+   - See [Configuration](#configuration) for further explanation
+3. Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
 
 ## How it works
 
@@ -17,35 +17,39 @@
 
 This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https://radarr.video/docs/api/) to do the following
 
-* Iterate over all items (Movies or Series)
-  * Checks if any items need to be renamed
-    * Radarr [get_api_v3_rename](https://radarr.video/docs/api/#/RenameMovie/get_api_v3_rename)
-    * Sonarr [get_api_v3_rename](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
-  * Triggers a rename on any item that need be renamed
-    * Series renames are batched up, for one rename call per series
-    * Movie renames are initiated per movie.
-      * Example, 1 movie, 2 files. There will be 2 rename API calls
+- Iterate over all items (Movies or Series)
+  - Checks if any items need to be renamed
+    - Radarr [get_api_v3_rename](https://radarr.video/docs/api/#/RenameMovie/get_api_v3_rename)
+    - Sonarr [get_api_v3_rename](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
+  - Triggers a rename on any item that need be renamed
+    - Series renames are batched up, for one rename call per series
+    - Movie renames are initiated per movie.
+      - Example, 1 movie, 2 files. There will be 2 rename API calls
 
 #### Analyze Files
+
 This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import. This will initiate a rescan of the files in your library, so that the mediainfo will be udpated. Then renamarr will come through and detect changes, and rename the files
 
 #### Rename Folders (Sonarr Only)
+
 This config option will rename series folders, when they no longer match your configured MediaFormat
-  * uses [/api/v3/series/{id}/folder](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to determine if the series folder requires an update
-  * uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to update series rootFolderPath to it's current value
-    * moving the folder in place
-  * Series are processed in bulk at the end of the run, **per root folder**
+
+- uses [/api/v3/series/{id}/folder](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to determine if the series folder requires an update
+- uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to update series rootFolderPath to it's current value
+  - moving the folder in place
+- Series are processed in bulk at the end of the run, **per root folder**
 
 ### Series Scanner (Sonarr Only)
+
 This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
-* Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
-  * If a series has an episode airing within `config.sonarr[].series_scanner.hours_before_air`
-    * default value of 4, max value of 12
-  * OR
-  * An episode that has aired previously
-  * With a title of TBA (excluding specials)
-    * will trigger a series refresh, to hopefully pull new info from The TVDB
+- Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
+  - If a series has an episode airing within `config.sonarr[].series_scanner.hours_before_air`
+    - default value of 4, max value of 12
+  - OR
+  - An episode that has aired previously
+  - With a title of TBA (excluding specials)
+    - will trigger a series refresh, to hopefully pull new info from The TVDB
 
 This should prevent too many API calls to the TVDB, refreshing individual series, hourly
 
@@ -59,21 +63,21 @@ Logs are always written to stdout.
 
 ### File Logging
 
-Set `sonarr[].log_to_file` or `radarr[].log_to_file` to `true` to enable per-instance log files.
+Set `sonarr[].renamarr.log_to_file` or `radarr[].renamarr.log_to_file` to `true` to enable per-instance log files.
 
 When enabled, logs for that instance are written under `$LOG_DIR` using one of these paths:
 
-* `sonarr/<name>.log`
-* `radarr/<name>.log`
+- `sonarr/<name>.log`
+- `radarr/<name>.log`
 
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description | Default |
-| ---- | ----------- | ------- |
-| `LOG_LEVEL` | Log level passed to Loguru for stdout and file sinks. | `INFO` |
-| `LOG_DIR` | Directory where log files will be stored. | `/config/logs` |
-| `LOG_ROTATION` | Rotation schedule passed to Loguru for file log rotation. | `00:00` |
-| `LOG_RETENTION` | Retention period passed to Loguru for rotated log files. | `7 days` |
+| Environment Variable | Description                                               | Default        |
+| -------------------- | --------------------------------------------------------- | -------------- |
+| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks.     | `INFO`         |
+| `LOG_DIR`            | Directory where log files will be stored.                 | `/config/logs` |
+| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation. | `00:00`        |
+| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.  | `7 days`       |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
@@ -85,7 +89,6 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].name`                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
 | `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
 | `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
-| `sonarr[].log_to_file`                     | boolean | No       | False         | writes logs for this Sonarr instance to `$LOG_DIR/sonarr/<name>.log` with daily rotation                                                        |
 | `sonarr[].series_scanner.enabled`          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
 | `sonarr[].series_scanner.hourly_job`       | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
@@ -93,21 +96,20 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `sonarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `sonarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
+| `sonarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Sonarr instance to `$LOG_DIR/sonarr/<name>.log` with daily rotation                                                         |
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
-| `radarr[].log_to_file`                     | boolean | No       | False         | writes logs for this Radarr instance to `$LOG_DIR/radarr/<name>.log` with daily rotation                                                        |
+| `radarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Radarr instance to `$LOG_DIR/radarr/<name>.log` with daily rotation                                                         |
 
 ### Local Setup
 
 #### Requirements
 
-* [Python 3.14](https://www.python.org/downloads/release/python-3140/)
-* [uv](https://docs.astral.sh/uv/getting-started/installation/)
-* [direnv](https://direnv.net/) (optional, but recommended)
-* Dependency locking is configured for macOS and Linux environments only
-
-####
+- [Python 3.14](https://www.python.org/downloads/release/python-3140/)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [direnv](https://direnv.net/) (optional, but recommended)
+- Dependency locking is configured for macOS and Linux environments only
 
 You will need to create `config.yml` in the root of the repo
 
@@ -115,6 +117,27 @@ You will need to create `config.yml` in the root of the repo
 $ uv sync --group dev --group test
 
 $ uv run python src/main.py
+```
+
+### mdformat
+
+mdformat is used to help standardize markdown files
+
+#### Installation
+
+```shell
+uv tool install mdformat \
+  --with mdformat-footnote \
+  --with mdformat-frontmatter \
+  --with mdformat-gfm \
+  --with mdformat-gfm-alerts \
+  --with mdformat-tables
+```
+
+#### Usage
+
+```shell
+mdformat .
 ```
 
 #### direnv
@@ -129,16 +152,17 @@ $ direnv allow
 
 The included `.envrc` currently sets:
 
-* `BRANCH_NAME` from the current git branch name
-* `CONFIG_DIR` to the repo root so local `config.yml` is discovered
-* `LOG_LEVEL` to `DEBUG`
-* `LOG_DIR` to the repo-local `logs/` directory
-* `LOG_ROTATION` to `00:00`
-* `LOG_RETENTION` to `7 days`
+- `BRANCH_NAME` from the current git branch name
+- `CONFIG_DIR` to the repo root so local `config.yml` is discovered
+- `LOG_LEVEL` to `DEBUG`
+- `LOG_DIR` to the repo-local `logs/` directory
+- `LOG_ROTATION` to `00:00`
+- `LOG_RETENTION` to `7 days`
 
 This makes local file logging work without hardcoding an absolute path, regardless of where the repository is checked out.
 
 #### Unit Tests
+
 ```shell
 $ uv run pytest
 ```

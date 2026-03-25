@@ -27,7 +27,6 @@ CONFIG_SCHEMA = {
                     lambda s: len(s) > 0,
                     error="sonarr[].api_key is a required field",
                 ),
-                Optional("log_to_file", default=False): bool,
                 Optional(
                     "series_scanner",
                     default=dict(
@@ -58,6 +57,7 @@ CONFIG_SCHEMA = {
                         hourly_job=False,
                         analyze_files=False,
                         rename_folders=False,
+                        log_to_file=False,
                     ),
                     ignore_extra_keys=True,
                 ): {
@@ -65,6 +65,7 @@ CONFIG_SCHEMA = {
                     Optional("hourly_job", default=False): bool,
                     Optional("analyze_files", default=False): bool,
                     Optional("rename_folders", default=False): bool,
+                    Optional("log_to_file", default=False): bool,
                 },
             }
         ],
@@ -96,15 +97,20 @@ CONFIG_SCHEMA = {
                     lambda s: len(s) > 0,
                     error="radarr[].api_key is a required field",
                 ),
-                Optional("log_to_file", default=False): bool,
                 Optional(
                     "renamarr",
-                    default=dict(enabled=False, hourly_job=False, analyze_files=False),
+                    default=dict(
+                        enabled=False,
+                        hourly_job=False,
+                        analyze_files=False,
+                        log_to_file=False,
+                    ),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                     Optional("analyze_files", default=False): bool,
+                    Optional("log_to_file", default=False): bool,
                 },
             }
         ],
