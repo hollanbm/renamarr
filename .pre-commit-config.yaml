@@ -3,25 +3,34 @@ repos:
     # Ruff version.
     rev: v0.15.7
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
+        exclude: \.md$
       - id: end-of-file-fixer
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+        - mdformat-footnote
+        - mdformat-frontmatter
+        - mdformat-gfm
+        - mdformat-gfm-alerts
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.12
+    rev: 0.11.1
     hooks:
       - id: uv-lock
+        files: ^(pyproject\.toml|uv\.lock|uv-secure\.toml)
   - repo: local
     hooks:
       - id: pytest
         name: pytest
         entry: uv run --frozen --group test pytest --cov=src --cov-branch tests
         language: system
-        types: [python]
+        files: ^(src/|tests/|pyproject\.toml|uv\.lock|uv-secure\.toml)
         pass_filenames: false
-        always_run: true

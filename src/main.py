@@ -4,6 +4,7 @@ from sys import stdout
 from time import sleep
 
 import schedule
+from dotenv import load_dotenv
 from loguru import logger
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
@@ -22,7 +23,9 @@ class Main:
     RUN_SCHEDULER = True
 
     def __init__(self):
-        logger_format = (
+        load_dotenv(".env.local")
+        log_level = os.getenv("LOG_LEVEL", "INFO")
+        self._logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level}</level> | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
@@ -32,21 +35,49 @@ class Main:
         )
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()
-        logger.add(stdout, format=logger_format)
+        logger.add(stdout, format=self._logger_format, level=log_level)
+
+    def __configure_file_logging(self, service: str, instance_name: str) -> bool:
+        log_dir = os.getenv("LOG_DIR", "/logs")
+        log_rotation = os.getenv("LOG_ROTATION", "00:00")
+        log_retention = os.getenv("LOG_RETENTION", "7 days")
+        log_path = os.path.join(log_dir, service, f"{instance_name}.log")
+        try:
+            logger.add(
+                log_path,
+                format=self._logger_format,
+                level=os.getenv("LOG_LEVEL", "INFO"),
+                rotation=log_rotation,
+                retention=log_retention,
+                # filter ensures that instance logs go to the correct file
+                filter=lambda record, configured_service=service, configured_name=instance_name: (
+                    record["extra"].get("service") == configured_service
+                    and record["extra"].get("instance") == configured_name
+                ),
+            )
+        except OSError as exc:
+            with logger.contextualize(service=service, instance=instance_name):
+                logger.warning(
+                    f"Unable to write logs to {log_path!r}; continuing with stdout logging only."
+                )
+                logger.warning(exc)
+            return False
+        return True
 
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
 
     def __sonarr_series_scanner_job(self, sonarr_config):
-        try:
-            SonarrSeriesScanner(
-                name=sonarr_config.name,
-                url=sonarr_config.url,
-                api_key=sonarr_config.api_key,
-                hours_before_air=sonarr_config.series_scanner.hours_before_air,
-            ).scan()
-        except CliArrError as exc:
-            logger.error(exc)
+        with logger.contextualize(service="sonarr", instance=sonarr_config.name):
+            try:
+                SonarrSeriesScanner(
+                    name=sonarr_config.name,
+                    url=sonarr_config.url,
+                    api_key=sonarr_config.api_key,
+                    hours_before_air=sonarr_config.series_scanner.hours_before_air,
+                ).scan()
+            except CliArrError as exc:
+                logger.error(exc)
 
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
@@ -58,16 +89,17 @@ class Main:
             )
 
     def __sonarr_renamarr_job(self, sonarr_config):
-        try:
-            SonarrRenamarr(
-                name=sonarr_config.name,
-                url=sonarr_config.url,
-                api_key=sonarr_config.api_key,
-                analyze_files=sonarr_config.renamarr.analyze_files,
-                rename_folders=sonarr_config.renamarr.rename_folders,
-            ).scan()
-        except CliArrError as exc:
-            logger.error(exc)
+        with logger.contextualize(service="sonarr", instance=sonarr_config.name):
+            try:
+                SonarrRenamarr(
+                    name=sonarr_config.name,
+                    url=sonarr_config.url,
+                    api_key=sonarr_config.api_key,
+                    analyze_files=sonarr_config.renamarr.analyze_files,
+                    rename_folders=sonarr_config.renamarr.rename_folders,
+                ).scan()
+            except CliArrError as exc:
+                logger.error(exc)
 
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
@@ -79,15 +111,16 @@ class Main:
             )
 
     def __radarr_renamarr_job(self, radarr_config):
-        try:
-            RadarrRenamarr(
-                name=radarr_config.name,
-                url=radarr_config.url,
-                api_key=radarr_config.api_key,
-                analyze_files=radarr_config.renamarr.analyze_files,
-            ).scan()
-        except CliArrError as exc:
-            logger.error(exc)
+        with logger.contextualize(service="radarr", instance=radarr_config.name):
+            try:
+                RadarrRenamarr(
+                    name=radarr_config.name,
+                    url=radarr_config.url,
+                    api_key=radarr_config.api_key,
+                    analyze_files=radarr_config.renamarr.analyze_files,
+                ).scan()
+            except CliArrError as exc:
+                logger.error(exc)
 
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
@@ -99,14 +132,19 @@ class Main:
             )
 
     def start(self) -> None:
+        config_dir = os.getenv("CONFIG_DIR", "/")
         try:
-            # configparser uses cwd, for file opens.
-            # Change to root directory, to look for config in /config/config.yml
-            with set_directory("/"):
+            with set_directory(config_dir):
                 config = configparser.get_config(CONFIG_SCHEMA)
+        except OSError as exc:
+            logger.error(
+                f"Unable to access config directory {config_dir!r}; please check volume mount paths or set $CONFIG_DIR."
+            )
+            logger.error(exc)
+            exit(1)
         except ConfigFileNotFoundError as exc:
             logger.error(
-                "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
+                "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
             )
             logger.error(exc)
             exit(1)
@@ -132,6 +170,8 @@ class Main:
             if sonarr_config.series_scanner.enabled:
                 self.__schedule_sonarr_series_scanner(sonarr_config)
             if sonarr_config.renamarr.enabled:
+                if sonarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("sonarr", sonarr_config.name)
                 self.__schedule_sonarr_renamarr(sonarr_config)
             elif sonarr_config.existing_renamer.enabled:
                 logger.warning(
@@ -144,6 +184,8 @@ class Main:
 
         for radarr_config in config.radarr:
             if radarr_config.renamarr.enabled:
+                if radarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("radarr", radarr_config.name)
                 self.__schedule_radarr_renamarr(radarr_config)
             else:
                 with logger.contextualize(instance=radarr_config.name):
