@@ -37,6 +37,6 @@ direnv allow
 
 The included `.envrc` sets:
 
-| Variable      | Value                   | Purpose                                                                 |
-| ------------- | ----------------------- | ----------------------------------------------------------------------- |
+| Variable      | Value                   | Purpose                                                                           |
+| ------------- | ----------------------- | --------------------------------------------------------------------------------- |
 | `BRANCH_NAME` | current git branch name | used for image tag when building with [docker-compose.yml](../docker-compose.yml) |
