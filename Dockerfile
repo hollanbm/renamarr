@@ -42,6 +42,7 @@ ENV LOG_DIR="/logs"
 RUN mkdir -p /config /logs && \
     chown -R nonroot:nonroot /config /logs
 
+RUN apk add --no-cache tzdata
 USER nonroot
 
 # activate venv
