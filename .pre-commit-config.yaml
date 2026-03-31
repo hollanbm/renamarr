@@ -12,6 +12,12 @@ repos:
       - id: trailing-whitespace
         exclude: \.md$
       - id: end-of-file-fixer
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.37.1
+    hooks:
+      - id: check-renovate
+      - id: check-compose-spec
+      - id: check-github-workflows
   - repo: https://github.com/hukkin/mdformat
     rev: 1.0.0
     hooks:
