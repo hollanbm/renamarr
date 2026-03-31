@@ -22,7 +22,7 @@ repos:
         - mdformat-gfm
         - mdformat-gfm-alerts
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.1
+    rev: 0.11.2
     hooks:
       - id: uv-lock
         files: ^(pyproject\.toml|uv\.lock|uv-secure\.toml)
