@@ -1,0 +1,24 @@
+name: renovate-config-validator
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - renovate.json
+  pull_request:
+    paths:
+      - renovate.json
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: suzuki-shunsuke/github-action-renovate-config-validator@v2.1.0
+        with:
+          config_file_path: renovate.json
+          strict: "true"

@@ -4,22 +4,11 @@
   "minimumReleaseAge": "14 days",
   "packageRules": [
     {
-      "matchDatasources": ["github-releases"],
-      "matchPackageNames": ["astral-sh/uv"],
+      "matchPackageNames": ["astral-sh/uv", "astral-sh/uv-pre-commit"],
       "groupName": "uv"
     },
     {
-      "matchManagers": ["pre-commit"],
-      "matchPackageNames": ["astral-sh/uv-pre-commit"],
-      "groupName": "uv"
-    },
-    {
-      "matchPackageNames": ["ruff"],
-      "groupName": "ruff"
-    },
-    {
-      "matchManagers": ["pre-commit"],
-      "matchPackageNames": ["astral-sh/ruff-pre-commit"],
+      "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
       "groupName": "ruff"
     },
     {
@@ -38,7 +27,8 @@
       "customType": "regex",
       "managerFilePatterns": ["/^Dockerfile$/"],
       "matchStrings": ["ARG UV_VERSION=(?<currentValue>\\S+)"],
-      "depNameTemplate": "astral-sh/uv",
+      "depNameTemplate": "uv",
+      "packageNameTemplate": "astral-sh/uv",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     },
@@ -46,7 +36,8 @@
       "customType": "regex",
       "managerFilePatterns": ["/^pyproject\\.toml$/"],
       "matchStrings": ["required-version = \"==(?<currentValue>[^\"]+)\""],
-      "depNameTemplate": "astral-sh/uv",
+      "depNameTemplate": "uv",
+      "packageNameTemplate": "astral-sh/uv",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     }
