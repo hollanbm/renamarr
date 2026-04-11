@@ -1,4 +1,4 @@
-ARG UV_VERSION=0.11.3
+ARG UV_VERSION=0.11.4
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}-debian AS builder
 
