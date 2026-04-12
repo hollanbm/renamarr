@@ -1,7 +1,7 @@
 services:
   renamarr:
     container_name: renamarr
-    image: ghcr.io/hollanbm/renamarr:latest
+    image: ghcr.io/hollanbm/renamarr:latest@sha256:b562e92f690d83e2522590fa26b35191c2bec93acc7a7c49bb9ff1313bbf73a5
     # user: 1000:1000 # if using the log_to_file feature, recommended to set the container user to match the host user to avoid permission issues with log files.
     restart: unless-stopped
     volumes:
