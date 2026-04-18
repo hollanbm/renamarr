@@ -11,6 +11,10 @@
    - See [Configuration](#configuration) for further explanation
 3. Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
 
+#### Troubleshooting
+
+Image tags ending in `-dev` can be used for troubleshooting purposes, but are not intended for normal usage.
+
 ## How it works
 
 ### Renamarr

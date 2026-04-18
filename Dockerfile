@@ -1,4 +1,5 @@
 ARG UV_VERSION=0.11.6
+ARG RUNTIME_IMAGE=dhi.io/debian-base:trixie
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}-debian AS builder
 
@@ -21,29 +22,26 @@ COPY . /renamarr
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 
-# chainguard secure distroless base image
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:70750dfde91b4c5804b4df269121253fbdff73a9122925c7acc067aa33f9f55e AS runtime
+RUN mkdir -p /config /logs
+
+# Docker Hardened Images Debian runtime base image
+FROM ${RUNTIME_IMAGE} AS runtime
 
 # Grab python from the builder
 COPY --from=builder --chown=nonroot:nonroot /python /python
+COPY --from=builder --chown=nonroot:nonroot /config /config
+COPY --from=builder --chown=nonroot:nonroot /logs /logs
+COPY --from=builder --chown=nonroot:nonroot /renamarr /renamarr
 
 WORKDIR /renamarr
 
-# Copy the application from the builder
-COPY --from=builder --chown=nonroot:nonroot /renamarr /renamarr
+USER nonroot
 
 # default settings
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOG_LEVEL="INFO"
 ENV CONFIG_DIR="/"
 ENV LOG_DIR="/logs"
-
-# Prepare the default config and log directories for the nonroot runtime user.
-RUN mkdir -p /config /logs && \
-    chown -R nonroot:nonroot /config /logs
-
-RUN apk add --no-cache tzdata
-USER nonroot
 
 # activate venv
 ENV PATH="/renamarr/.venv/bin:$PATH"

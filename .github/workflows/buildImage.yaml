@@ -18,17 +18,38 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  DHI_REGISTRY: dhi.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push-image:
     # Only build PR images when explicitly requested via label.
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'build-image') }}
+    name: Docker image (${{ matrix.variant.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: runtime
+            runtime_image: dhi.io/debian-base:trixie
+            tag_suffix: ""
+          - name: runtime-dev
+            runtime_image: dhi.io/debian-base:trixie-dev
+            tag_suffix: "-dev"
     permissions:
       contents: read
       packages: write
     steps:
+      - name: Verify Docker Hardened Images token
+        env:
+          DHI_PAT: ${{ secrets.DHI_PAT }}
+        run: |
+          if [ -z "$DHI_PAT" ]; then
+            echo "::error title=Missing secret::DHI_PAT must be configured for this workflow."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
@@ -46,13 +67,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hardened Images registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.DHI_REGISTRY }}
+          username: ${{ vars.DHI_USERNAME }}
+          password: ${{ secrets.DHI_PAT }}
+
       # This step uses [docker/metadata-action](https://github.com/docker/metadata-action#about) to extract tags and labels that will be applied to the specified image. The `id` "meta" allows the output of this step to be referenced in a subsequent step. The `images` value provides the base name for the tags and labels.
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
+            suffix=${{ matrix.variant.tag_suffix }},onlatest=true
           tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
             type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
             type=raw,value=pr-${{ github.event.pull_request.number }}-{{sha}},enable=${{ github.event_name == 'pull_request' }}
             type=raw,value={{branch}},enable=${{ github.event_name == 'push' }}
@@ -78,6 +110,8 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            RUNTIME_IMAGE=${{ matrix.variant.runtime_image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
