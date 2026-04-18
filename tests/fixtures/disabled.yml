@@ -3,32 +3,33 @@ sonarr:
     url: https://sonarr.tld
     api_key: sonarr-api-key
     series_scanner:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
       hours_before_air: 2
     renamarr:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
   - name: sonarr1
     url: https://sonarr1.tld
     api_key: sonarr1-api-key
     series_scanner:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
       hours_before_air: 4
     renamarr:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
+
 radarr:
   - name: radarr
     url: https://radarr.tld
     api_key: radarr-api-key
     renamarr:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
   - name: radarr1
     url: https://radarr1.tld
     api_key: radarr1-api-key
     renamarr:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false

@@ -33,10 +33,10 @@ jobs:
         variant:
           - name: runtime
             runtime_image: dhi.io/debian-base:trixie
-            tag_suffix: ""
+            tag_suffix: ''
           - name: runtime-dev
             runtime_image: dhi.io/debian-base:trixie-dev
-            tag_suffix: "-dev"
+            tag_suffix: -dev
     permissions:
       contents: read
       packages: write
@@ -49,13 +49,10 @@ jobs:
             echo "::error title=Missing secret::DHI_PAT must be configured for this workflow."
             exit 1
           fi
-
       - name: Checkout repository
         uses: actions/checkout@v6
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -66,7 +63,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Log in to Docker Hardened Images registry
         uses: docker/login-action@v4
         with:
@@ -102,7 +98,6 @@ jobs:
             org.opencontainers.image.description=${{ github.event.repository.description }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:

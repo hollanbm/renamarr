@@ -1,0 +1,5 @@
+whitelines = 1
+section_whitelines = 1
+sequence_style = "block_style"
+line_length = 9999
+explicit_start = false

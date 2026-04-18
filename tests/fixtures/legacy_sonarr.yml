@@ -3,5 +3,5 @@ sonarr:
     url: https://sonarr.tld
     api_key: sonarr-api-key
     existing_renamer:
-      enabled: False
-      hourly_job: False
+      enabled: false
+      hourly_job: false
