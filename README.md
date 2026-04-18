@@ -13,7 +13,7 @@
 
 #### Troubleshooting
 
-Image tags ending in `-dev` can be used for troubleshooting purposes, but are not intended for normal usage.
+Image tags ending in `-dev` can be used for troubleshooting purposes, but are not intended for normal usage. Pre-release images are tagged with their specific release version and do not change or overwrite the `latest` or `latest-dev` tags.
 
 ## How it works
 
