@@ -12,6 +12,8 @@ You will need to create `config.yml` in the [config](../config/) folder in the r
 ```shell
 uv sync --group dev --group test
 
+uv audit --frozen --preview-features audit
+
 uv run python src/main.py
 ```
 
