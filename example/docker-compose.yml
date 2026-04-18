@@ -2,8 +2,8 @@ services:
   renamarr:
     container_name: renamarr
     image: ghcr.io/hollanbm/renamarr:latest
-    # user: 1000:1000 # if using the log_to_file feature, recommended to set the container user to match the host user to avoid permission issues with log files.
+    # user: 1000:1000  # if using the log_to_file feature, recommended to set the container user to match the host user to avoid permission issues with log files.
     restart: unless-stopped
     volumes:
       - ./config.yml:/config/config.yml:ro
-      # - ./logs:/logs:rw # If using the log_to_file option, uncomment this line to persist logs to the host machine. **Don't forget to create logs folder first**
+      # - ./logs:/logs:rw  # If using the log_to_file option, uncomment this line to persist logs to the host machine. **Don't forget to create logs folder first**

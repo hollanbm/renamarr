@@ -21,26 +21,20 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
-          architecture: "x64"
-
+          python-version: '3.14'
+          architecture: x64
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-
       - name: Install dependencies
         run: uv sync --frozen --group dev --group test
-
       - name: Test with pytest
         run: uv run pytest --cov-branch --cov=src --cov-report=xml:coverage.xml --junitxml=junit.xml -o junit_family=legacy tests
-
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
-
       - name: Scan dependencies with uv-secure
         run: uv run uv-secure
-
       - name: Upload coverage
         uses: codecov/codecov-action@v6
         with:
@@ -49,7 +43,6 @@ jobs:
           disable_search: true
           files: ./coverage.xml
           fail_ci_if_error: true
-
       - name: Upload test results to Codecov
         uses: codecov/codecov-action@v6
         with:

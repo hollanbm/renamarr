@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     environment:
       LOG_LEVEL: DEBUG
-    restart: "no"
+    restart: 'no'
     volumes:
       - ./config/config.yml:/config/config.yml:ro
       - ./logs:/logs:rw

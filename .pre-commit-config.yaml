@@ -1,11 +1,30 @@
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.7
+    hooks:
+      - id: uv-lock
+        files: ^(pyproject\.toml|uv\.lock|uv-secure\.toml)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.15.10
     hooks:
       - id: ruff-check
-        args: [--fix]
+        args:
+          - --fix
       - id: ruff-format
+  - repo: https://github.com/lyz-code/yamlfix
+    rev: 1.19.1
+    hooks:
+      - id: yamlfix
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-footnote
+          - mdformat-frontmatter
+          - mdformat-gfm
+          - mdformat-gfm-alerts
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -18,20 +37,6 @@ repos:
       - id: check-renovate
       - id: check-compose-spec
       - id: check-github-workflows
-  - repo: https://github.com/hukkin/mdformat
-    rev: 1.0.0
-    hooks:
-      - id: mdformat
-        additional_dependencies:
-        - mdformat-footnote
-        - mdformat-frontmatter
-        - mdformat-gfm
-        - mdformat-gfm-alerts
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.6
-    hooks:
-      - id: uv-lock
-        files: ^(pyproject\.toml|uv\.lock|uv-secure\.toml)
   - repo: local
     hooks:
       - id: pytest

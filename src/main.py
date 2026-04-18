@@ -156,8 +156,8 @@ class Main:
             exit(1)
 
         for sonarr_config in config.sonarr:
-            if not sonarr_config.series_scanner.enabled and not (
-                sonarr_config.renamarr.enabled or sonarr_config.existing_renamer.enabled
+            if not (
+                sonarr_config.series_scanner.enabled or sonarr_config.renamarr.enabled
             ):
                 with logger.contextualize(instance=sonarr_config.name):
                     logger.warning(
@@ -172,14 +172,6 @@ class Main:
             if sonarr_config.renamarr.enabled:
                 if sonarr_config.renamarr.log_to_file:
                     self.__configure_file_logging("sonarr", sonarr_config.name)
-                self.__schedule_sonarr_renamarr(sonarr_config)
-            elif sonarr_config.existing_renamer.enabled:
-                logger.warning(
-                    "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
-                )
-                logger.warning(
-                    "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
-                )
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
         for radarr_config in config.radarr:
