@@ -35,6 +35,8 @@ COPY --from=builder --chown=nonroot:nonroot /renamarr /renamarr
 
 WORKDIR /renamarr
 
+USER nonroot
+
 # default settings
 ENV LOGURU_DIAGNOSE="NO"
 ENV LOG_LEVEL="INFO"
