@@ -186,7 +186,6 @@ htmlcov/
 .nox/
 .pre-commit-cache/
 .uv-cache/
-.uv-secure-cache/
 .coverage
 .coverage.*
 .cache

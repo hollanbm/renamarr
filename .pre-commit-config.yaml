@@ -3,7 +3,7 @@ repos:
     rev: 0.11.7
     hooks:
       - id: uv-lock
-        files: ^(pyproject\.toml|uv\.lock|uv-secure\.toml)
+        files: ^(pyproject\.toml|uv\.lock)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.15.10
@@ -43,5 +43,5 @@ repos:
         name: pytest
         entry: uv run --frozen --group test pytest --cov=src --cov-branch tests
         language: system
-        files: ^(src/|tests/|pyproject\.toml|uv\.lock|uv-secure\.toml)
+        files: ^(src/|tests/|pyproject\.toml|uv\.lock)
         pass_filenames: false

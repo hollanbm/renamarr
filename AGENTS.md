@@ -20,6 +20,13 @@ If uv version is changed, verify that it is also changed in these files
 - pyproject.toml
 - .pre-commit-config.yaml
 
+## ruff
+
+If ruff version is changed, verify that it is also changed in these files
+
+- pyproject.toml
+- .pre-commit-config.yaml
+
 ## Project Structure
 
 - **src/** – All application code lives here.
@@ -27,7 +34,6 @@ If uv version is changed, verify that it is also changed in these files
 - **coverage.xml** - code coverage analysis
 - **pyproject.toml** - Package configuration
 - **.pre-commit-config.yaml** - Pre-commit linters and some configuration
-- **uv-secure.toml** - uv dependency vulnerability scanner configuration
 - **.yamllint.yaml** - Yaml linter configuration
 - **.envrc** - environment variables useful for development purposes
 

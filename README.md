@@ -110,3 +110,5 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 ### Local Development
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
+
+Dependency audits are run with `uv audit --frozen --preview-features audit`.
