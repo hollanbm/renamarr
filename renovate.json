@@ -5,7 +5,12 @@
   "minimumReleaseAge": "14 days",
   "packageRules": [
     {
-      "matchPackageNames": ["astral-sh/uv", "astral-sh/uv-pre-commit"],
+      "matchPackageNames": [
+        "astral-sh/uv",
+        "astral-sh/uv-pre-commit",
+        "ghcr.io/astral-sh/uv",
+        "uv"
+      ],
       "groupName": "uv"
     },
     {
