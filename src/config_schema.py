@@ -40,16 +40,6 @@ CONFIG_SCHEMA = {
                     Optional("hourly_job", default=False): bool,
                     Optional("hours_before_air", default=4): int,
                 },
-                # keeping for backwards compatibility between v1.0.0 and v0.5
-                Optional(
-                    "existing_renamer",
-                    default=dict(enabled=False, hourly_job=False, analyze_files=False),
-                    ignore_extra_keys=True,
-                ): {
-                    Optional("enabled", default=False): bool,
-                    Optional("hourly_job", default=False): bool,
-                    Optional("analyze_files", default=False): bool,
-                },
                 Optional(
                     "renamarr",
                     default=dict(

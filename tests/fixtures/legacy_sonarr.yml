@@ -1,7 +1,0 @@
-sonarr:
-  - name: sonarr
-    url: https://sonarr.tld
-    api_key: sonarr-api-key
-    existing_renamer:
-      enabled: false
-      hourly_job: false

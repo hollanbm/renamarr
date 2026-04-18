@@ -78,14 +78,6 @@ class TestMain:
             file_name="disabled.yml",
         )
 
-    @pytest.fixture
-    def legacy_sonarr_config(self) -> Generator:
-        yield configparser.get_config(
-            CONFIG_SCHEMA,
-            config_dir="tests/fixtures",
-            file_name="legacy_sonarr.yml",
-        )
-
     def test_all_disabled(self, config, mocker) -> None:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
 
@@ -388,59 +380,6 @@ class TestMain:
         )
         assert isinstance(mock_loguru_error.call_args_list[-1].args[0], OSError)
         assert excinfo.value.code == 1
-
-    def test_legacy_config_existing_renamer_enabled(
-        self, mocker, legacy_sonarr_config, mock_loguru_warning
-    ):
-        legacy_sonarr_config.sonarr[0].existing_renamer.enabled = True
-
-        mocker.patch(
-            "pyconfigparser.configparser.get_config"
-        ).return_value = legacy_sonarr_config
-
-        mocker.patch.object(Job, "do")
-
-        mocker.patch.object(SonarrSeriesScanner, "scan")
-        sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
-        mocker.patch.object(RadarrRenamarr, "scan")
-
-        Main().start()
-
-        sonarr_renamarr.assert_called()
-
-        mock_loguru_warning.assert_any_call(
-            "sonarr[].existing_renamer config option, has been renamed to sonarr[].renamarr. Please update config, as this will stop working in future versions"
-        )
-
-        mock_loguru_warning.assert_any_call(
-            "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
-        )
-
-    def test_legacy_config_existing_renamer_exception(
-        self, mocker, legacy_sonarr_config, mock_loguru_error
-    ):
-        legacy_sonarr_config.sonarr[0].existing_renamer.enabled = True
-
-        mocker.patch(
-            "pyconfigparser.configparser.get_config"
-        ).return_value = legacy_sonarr_config
-
-        mocker.patch.object(Job, "do")
-
-        exception = CliArrError("BOOM!")
-
-        sonarr_renamarr = mocker.patch.object(SonarrRenamarr, "scan")
-        sonarr_renamarr.side_effect = exception
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        Main().start()
-
-        contextualize.assert_any_call(
-            service="sonarr", instance=legacy_sonarr_config.sonarr[0].name
-        )
-        mock_loguru_error.assert_called_once_with(exception)
 
     def test_radarr_renamarr_scan(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
