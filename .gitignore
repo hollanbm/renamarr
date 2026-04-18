@@ -1,6 +1,5 @@
 config.yml
-.pre-commit-cache
-.prek-home
+.prek-home/
 junit.xml
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,linux,python,pycharm+all,visualstudiocode
