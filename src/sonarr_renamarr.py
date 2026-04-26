@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from pathlib import PurePosixPath
 from time import sleep
 from typing import List
 
@@ -61,11 +62,20 @@ class SonarrRenamarr:
                             path=f"/api/v3/series/{show.id}/folder"
                         )["folder"]
 
+                        # Use path-aware comparisons so overlapping roots, such as
+                        # /data/media/tv and /data/media/tv-anime, stay distinct.
+                        show_path = PurePosixPath(show.path)
+
                         for root_folder in root_folders:
                             root_folder_path = root_folder["path"]
+                            root_path = PurePosixPath(root_folder_path)
+                            expected_show_path = root_path / series_folder
+
+                            # Only move shows already under this root when their
+                            # current path differs from Sonarr's expected folder.
                             if (
-                                root_folder_path in show.path
-                                and f"{root_folder_path}/{series_folder}" != show.path
+                                root_path in show_path.parents
+                                and expected_show_path != show_path
                             ):
                                 bulk_move.add(root_folder_path, show.id)
                                 logger.debug(
