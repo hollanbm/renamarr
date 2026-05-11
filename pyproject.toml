@@ -34,6 +34,13 @@ environments = [
   "sys_platform == 'linux'",
 ]
 
+[tool.uv.audit]
+ignore = [
+  "GHSA-58cw-g322-p94v", # mistune 0.8.4, pycliarr downstream dependency
+  "GHSA-8g87-j6q8-g93x", # mistune 0.8.4, pycliarr downstream dependency
+  "GHSA-v87v-83h2-53w7", # mistune 0.8.4, pycliarr downstream dependency
+]
+
 [tool.pytest]
 pythonpath = ["./src", "./src/models"]
 testpaths = ["./tests", "./tests/models"]
