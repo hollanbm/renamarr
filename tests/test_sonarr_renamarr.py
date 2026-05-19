@@ -210,8 +210,8 @@ class TestSonarrRenamarr:
         mock_loguru_info.assert_has_calls(
             [
                 call("Starting Renamarr"),
-                call("Renaming Series folder for series IDs: 1"),
-                call("Series folder rename successful for series IDs: 1"),
+                call("Renaming Series folder for series: Show"),
+                call("Series folder rename successful for series: Show"),
                 call("Initiated disk scan of library"),
                 call("disk scan finished successfully"),
                 call("Finished Renamarr"),
@@ -332,10 +332,10 @@ class TestSonarrRenamarr:
             ]
         )
         mock_loguru_info.assert_any_call(
-            "Series folder rename successful for series IDs: 2"
+            "Series folder rename successful for series: A Show"
         )
         mock_loguru_info.assert_any_call(
-            "Series folder rename successful for series IDs: 1"
+            "Series folder rename successful for series: B Show"
         )
 
     def test_when_root_folder_paths_overlap_uses_matching_root(

@@ -393,6 +393,28 @@ class TestMain:
 
         radarr_renamarr.assert_called()
 
+    def test_radarr_renamarr_rename_folders_defaults_false(self, config) -> None:
+        assert config.radarr[0].renamarr.rename_folders is False
+
+    def test_radarr_renamarr_passes_rename_folders(self, config, mocker) -> None:
+        config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.rename_folders = True
+
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+
+        Main().start()
+
+        radarr_renamarr.assert_called_once_with(
+            name=config.radarr[0].name,
+            url=config.radarr[0].url,
+            api_key=config.radarr[0].api_key,
+            analyze_files=config.radarr[0].renamarr.analyze_files,
+            rename_folders=True,
+        )
+        radarr_renamarr.return_value.scan.assert_called_once_with()
+
     def test_radarr_log_to_file_configures_instance_sink(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
     ) -> None:
