@@ -1,4 +1,3 @@
-from dataclasses import asdict
 from pathlib import PurePosixPath
 from time import sleep
 from typing import List
@@ -8,7 +7,7 @@ from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data, json_dict
 
 from models.batch_rename import BatchRename
-from models.bulk_move import BulkMove
+from models.sonarr_bulk_move import SonarrBulkMove
 
 
 class SonarrRenamarr:
@@ -24,13 +23,13 @@ class SonarrRenamarr:
         self.sonarr_cli = SonarrCli(url, api_key)
         self.analyze_files = analyze_files
         self.rename_folders = rename_folders
-        self.bulk_move = BulkMove()
+        self.bulk_move = SonarrBulkMove()
 
     def scan(self):
         with logger.contextualize(instance=self.name):
             logger.info("Starting Renamarr")
 
-            bulk_move = BulkMove()
+            bulk_move = SonarrBulkMove()
 
             if self.analyze_files:
                 if not self.__analyze_files_enabled():
@@ -77,7 +76,7 @@ class SonarrRenamarr:
                                 root_path in show_path.parents
                                 and expected_show_path != show_path
                             ):
-                                bulk_move.add(root_folder_path, show.id)
+                                bulk_move.add(root_folder_path, show)
                                 logger.debug(
                                     "added series to pending bulk_move operation"
                                 )
@@ -110,16 +109,21 @@ class SonarrRenamarr:
             if bulk_move.has_pending_moves():
                 logger.debug("Processing pending series folder renames")
                 for move in bulk_move.pending_moves:
+                    series_names_message = bulk_move.get_log_message(move)
                     logger.info(
-                        f"Renaming Series folder for series IDs: {', '.join(str(series_id) for series_id in move.seriesIds)}"
+                        f"Renaming Series folder for series: {series_names_message}"
                     )
                     self.sonarr_cli.request_put(
                         path="/api/v3/series/editor",
-                        json_data=asdict(move),
+                        json_data=dict(
+                            rootFolderPath=move.rootFolderPath,
+                            seriesIds=bulk_move.get_series_ids(move),
+                            moveFiles=move.moveFiles,
+                        ),
                     )
 
                     logger.info(
-                        f"Series folder rename successful for series IDs: {', '.join(str(series_id) for series_id in move.seriesIds)}"
+                        f"Series folder rename successful for series: {series_names_message}"
                     )
 
                     # After files are moved, its a good idea to rescan the library
