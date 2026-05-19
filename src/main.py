@@ -118,6 +118,7 @@ class Main:
                     url=radarr_config.url,
                     api_key=radarr_config.api_key,
                     analyze_files=radarr_config.renamarr.analyze_files,
+                    rename_folders=radarr_config.renamarr.rename_folders,
                 ).scan()
             except CliArrError as exc:
                 logger.error(exc)
