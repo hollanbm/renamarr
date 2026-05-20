@@ -36,7 +36,7 @@ environments = [
 ]
 
 [tool.pytest]
-pythonpath = ["./src", "./src/models"]
+pythonpath = ["./src"]
 testpaths = ["./tests", "./tests/models"]
 addopts = [
   "--cov=src",

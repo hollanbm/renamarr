@@ -10,10 +10,10 @@ from config_schema import CONFIG_SCHEMA
 from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
-from radarr_renamarr import RadarrRenamarr
+from renamarr.radarr.services.renamarr import RadarrRenamarr
 from schedule import Job, Scheduler
-from sonarr_renamarr import SonarrRenamarr
-from sonarr_series_scanner import SonarrSeriesScanner
+from renamarr.sonarr.services.renamarr import SonarrRenamarr
+from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 # disable config caching
 configparser.hold_an_instance = False

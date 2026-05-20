@@ -1,41 +1,30 @@
-from dataclasses import dataclass
-
 from pycliarr.api import SonarrSerieItem
 
-
-@dataclass()
-class SonarrMove:
-    """
-    Pending series editor operation, for renaming folders
-    """
-
-    rootFolderPath: str
-    series: list[SonarrSerieItem]
-    moveFiles: bool = True
+from renamarr.sonarr.models.root_move import SonarrRootMove
 
 
 class SonarrBulkMove:
-    """Class maintains a list of pending SonarrMove operations"""
+    """Class maintains a list of pending SonarrRootMove operations"""
 
     def __init__(self):
-        self.pending_moves: list[SonarrMove] = []
+        self.pending_moves: list[SonarrRootMove] = []
 
     def has_pending_moves(self) -> bool:
         return len(self.pending_moves) > 0
 
     def add(self, root_folder_path: str, series: SonarrSerieItem) -> None:
-        """Create a new SonarrMove operation, or update an existing move."""
+        """Create a new SonarrRootMove operation, or update an existing move."""
         for move in self.pending_moves:
             if root_folder_path == move.rootFolderPath:
                 move.series.append(series)
                 return
 
-        self.pending_moves.append(SonarrMove(root_folder_path, [series]))
+        self.pending_moves.append(SonarrRootMove(root_folder_path, [series]))
 
-    def get_log_message(self, move: SonarrMove) -> str:
+    def get_log_message(self, move: SonarrRootMove) -> str:
         """Return a comma-separated list of series titles for a pending move."""
         return ", ".join(series.title for series in move.series)
 
-    def get_series_ids(self, move: SonarrMove) -> list[int]:
+    def get_series_ids(self, move: SonarrRootMove) -> list[int]:
         """Return series IDs for the Sonarr series editor API payload."""
         return [series.id for series in move.series]

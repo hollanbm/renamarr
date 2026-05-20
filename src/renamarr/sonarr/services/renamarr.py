@@ -6,8 +6,8 @@ from loguru import logger
 from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data, json_dict
 
-from models.batch_rename import BatchRename
-from models.sonarr_bulk_move import SonarrBulkMove
+from renamarr.sonarr.models.batch_rename import BatchRename
+from renamarr.sonarr.models.bulk_move import SonarrBulkMove
 
 
 class SonarrRenamarr:

@@ -1,6 +1,6 @@
 from pycliarr.api import SonarrSerieItem
 
-from models.sonarr_bulk_move import SonarrBulkMove
+from renamarr.sonarr.models.bulk_move import SonarrBulkMove
 
 
 def make_series(series_id: int, title: str) -> SonarrSerieItem:

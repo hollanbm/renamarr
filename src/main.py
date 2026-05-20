@@ -10,9 +10,9 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
-from radarr_renamarr import RadarrRenamarr
-from sonarr_renamarr import SonarrRenamarr
-from sonarr_series_scanner import SonarrSeriesScanner as SonarrSeriesScanner
+from renamarr.radarr.services.renamarr import RadarrRenamarr
+from renamarr.sonarr.services.renamarr import SonarrRenamarr
+from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 
 class Main:

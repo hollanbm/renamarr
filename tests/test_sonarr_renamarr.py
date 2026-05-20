@@ -3,7 +3,7 @@ from unittest.mock import call
 
 from pycliarr.api import SonarrCli
 
-from sonarr_renamarr import SonarrRenamarr
+from renamarr.sonarr.services.renamarr import SonarrRenamarr
 
 
 class TestSonarrRenamarr:
@@ -138,7 +138,7 @@ class TestSonarrRenamarr:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="successful"
         )
-        mocker.patch("sonarr_renamarr.sleep").return_value = None
+        mocker.patch("renamarr.sonarr.services.renamarr.sleep").return_value = None
 
         SonarrRenamarr(
             "test",
@@ -165,7 +165,7 @@ class TestSonarrRenamarr:
         mocker.patch.object(SonarrCli, "get_command").return_value = dict(
             status="completed", result="failed"
         )
-        mocker.patch("sonarr_renamarr.sleep").return_value = None
+        mocker.patch("renamarr.sonarr.services.renamarr.sleep").return_value = None
 
         SonarrRenamarr(
             "test",

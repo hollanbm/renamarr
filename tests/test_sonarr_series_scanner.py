@@ -5,7 +5,7 @@ from typing import List
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
-from sonarr_series_scanner import SonarrSeriesScanner
+from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 from tests.conftest import episode_data
 

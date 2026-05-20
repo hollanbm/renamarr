@@ -1,5 +1,5 @@
 import pytest
-from batch_rename import BatchRename
+from renamarr.sonarr.models.batch_rename import BatchRename
 
 
 class TestBatchRename:

@@ -1,6 +1,6 @@
 from typing import List
 
-from models.rename import Rename
+from renamarr.sonarr.models.rename import Rename
 
 
 class BatchRename:
