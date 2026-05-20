@@ -25,7 +25,9 @@ class MovieFolderRename:
         for root_folder_rename in folder_rename_plan.root_folder_renames:
             movie_titles = folder_rename_plan.get_movie_titles(root_folder_rename)
             movie_ids = folder_rename_plan.get_movie_ids(root_folder_rename)
-            logger.info(f"Renaming Movie folder for movies: {movie_titles}")
+
+            # TODO: update this string so that it uses folders and movies when len(movie_titles) > 1 else folder movie
+            logger.info(f"Renaming Movie folder(s) for movie(s): {movie_titles}")
             self.radarr_cli.request_put(
                 path="/api/v3/movie/editor",
                 json_data=dict(
@@ -36,6 +38,9 @@ class MovieFolderRename:
             )
             logger.info(f"Movie folder rename successful for movies: {movie_titles}")
             logger.info("Initiated disk scan of updated movies")
+
+            # TODO: confirm folder rename operation was successful before rescanning movies
+
             if self.__rescan_movies(movie_ids):
                 logger.info("disk scan finished successfully")
             else:
@@ -55,6 +60,9 @@ class MovieFolderRename:
                 )
 
                 if movie_root_folder is None:
+                    logger.warning(
+                        f"Unable to determine matching Radarr root folder for movie path {current_movie_path}"
+                    )
                     continue
 
                 expected_folder_name: str = self.radarr_cli.request_get(
@@ -84,9 +92,6 @@ class MovieFolderRename:
             if root_folder_path in current_movie_path.parents:
                 return root_folder
 
-        logger.warning(
-            f"Unable to determine matching Radarr root folder for movie path {current_movie_path}"
-        )
         return None
 
     def __rescan_movies(self, movie_ids: list[int]) -> bool:

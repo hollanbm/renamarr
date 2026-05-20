@@ -25,10 +25,17 @@ class Main:
     def __init__(self):
         load_dotenv(".env.local")
         log_level = os.getenv("LOG_LEVEL", "INFO")
+
+        function_name_format = (
+            "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+            if log_level.upper() == "DEBUG"
+            else ""
+        )
+
         self._logger_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+            f"{function_name_format}"
             "{extra[instance]} | "
             "{extra[item]} | "
             "<level>{message}</level>"
