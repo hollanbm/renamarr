@@ -1,13 +1,9 @@
-from pathlib import PurePosixPath
-from time import sleep
-from typing import List
-
 from loguru import logger
 from pycliarr.api import SonarrCli
-from pycliarr.api.base_api import json_data, json_dict
 
-from renamarr.sonarr.models.batch_rename import BatchRename
-from renamarr.sonarr.models.bulk_move import SonarrBulkMove
+from renamarr.sonarr.services.analyze_files import AnalyzeFiles
+from renamarr.sonarr.services.series_folder_rename import SeriesFolderRename
+from renamarr.sonarr.services.series_rename import SeriesRename
 
 
 class SonarrRenamarr:
@@ -17,153 +13,32 @@ class SonarrRenamarr:
         url: str,
         api_key: str,
         analyze_files: bool = False,
-        rename_folders=True,
-    ):
+        rename_folders: bool = False,
+    ) -> None:
         self.name = name
         self.sonarr_cli = SonarrCli(url, api_key)
         self.analyze_files = analyze_files
         self.rename_folders = rename_folders
-        self.bulk_move = SonarrBulkMove()
 
-    def scan(self):
+    def scan(self) -> None:
+        """Run the Sonarr Renamarr workflow."""
         with logger.contextualize(instance=self.name):
             logger.info("Starting Renamarr")
 
-            bulk_move = SonarrBulkMove()
-
             if self.analyze_files:
-                if not self.__analyze_files_enabled():
-                    logger.warning(
-                        "Analyse video files is not enabled, please enable setting, in order to use the reanalyze_files feature"
-                    )
-                else:
-                    logger.info("Initiated disk scan of library")
-                    if self.__rescan_series():
-                        logger.info("disk scan finished successfully")
-                    else:
-                        logger.info("disk scan failed")
+                AnalyzeFiles(self.sonarr_cli).process()
 
-            series = self.sonarr_cli.get_serie()
-
+            series = sorted(self.sonarr_cli.get_serie(), key=lambda show: show.title)
             if len(series) == 0:
                 logger.error("Sonarr returned empty series list")
-            else:
-                logger.debug("Retrieved series list")
+                logger.info("Finished Renamarr")
+                return
 
-            for show in sorted(series, key=lambda s: s.title):
-                with logger.contextualize(item=show.title):
-                    if self.rename_folders:
-                        root_folders: List[json_dict] = (
-                            self.sonarr_cli.get_root_folder()
-                        )
+            logger.debug("Retrieved series list")
 
-                        series_folder: str = self.sonarr_cli.request_get(
-                            path=f"/api/v3/series/{show.id}/folder"
-                        )["folder"]
+            SeriesRename(self.sonarr_cli).process(series)
 
-                        # Use path-aware comparisons so overlapping roots, such as
-                        # /data/media/tv and /data/media/tv-anime, stay distinct.
-                        show_path = PurePosixPath(show.path)
-
-                        for root_folder in root_folders:
-                            root_folder_path = root_folder["path"]
-                            root_path = PurePosixPath(root_folder_path)
-                            expected_show_path = root_path / series_folder
-
-                            # Only move shows already under this root when their
-                            # current path differs from Sonarr's expected folder.
-                            if (
-                                root_path in show_path.parents
-                                and expected_show_path != show_path
-                            ):
-                                bulk_move.add(root_folder_path, show)
-                                logger.debug(
-                                    "added series to pending bulk_move operation"
-                                )
-
-                    episodes_to_rename: List[json_data] = self.sonarr_cli.request_get(
-                        path="/api/v3/rename",
-                        url_params=dict(seriesId=show.id),
-                    )
-
-                    if len(episodes_to_rename) == 0:
-                        logger.debug("No episodes to rename")
-                    else:
-                        batch_rename: BatchRename = BatchRename()
-
-                        for episode in episodes_to_rename:
-                            logger.debug("Found episodes to be renamed")
-
-                            batch_rename.append(
-                                file_id=episode["episodeFileId"],
-                                season_number=episode["seasonNumber"],
-                                episode_numbers=episode["episodeNumbers"],
-                            )
-
-                        logger.info(f"Renaming {batch_rename.get_log_message()}")
-
-                        self.sonarr_cli.rename_files(
-                            batch_rename.get_file_ids(), show.id
-                        )
-
-            if bulk_move.has_pending_moves():
-                logger.debug("Processing pending series folder renames")
-                for move in bulk_move.pending_moves:
-                    series_names_message = bulk_move.get_log_message(move)
-                    logger.info(
-                        f"Renaming Series folder for series: {series_names_message}"
-                    )
-                    self.sonarr_cli.request_put(
-                        path="/api/v3/series/editor",
-                        json_data=dict(
-                            rootFolderPath=move.rootFolderPath,
-                            seriesIds=bulk_move.get_series_ids(move),
-                            moveFiles=move.moveFiles,
-                        ),
-                    )
-
-                    logger.info(
-                        f"Series folder rename successful for series: {series_names_message}"
-                    )
-
-                    # After files are moved, its a good idea to rescan the library
-                    logger.info("Initiated disk scan of library")
-                    if self.__rescan_series():
-                        logger.info("disk scan finished successfully")
-                    else:
-                        logger.info("disk scan failed")
+            if self.rename_folders:
+                SeriesFolderRename(self.sonarr_cli).process(series)
 
             logger.info("Finished Renamarr")
-
-    def __rescan_series(self) -> bool:
-        """_summary_
-
-        Returns:
-            bool: if disk scan succeeded
-        """
-        rescan_command = self.sonarr_cli._sendCommand(
-            {
-                "name": "RescanSeries",
-                "priority": "high",
-            }
-        )
-        resp: json_data = {}
-
-        # sonarr commands have to be polled for completion status
-        while resp.get("status") != "completed":
-            sleep(10)
-            resp = self.sonarr_cli.get_command(cid=rescan_command["id"])
-
-        return resp["result"] == "successful"
-
-    def __analyze_files_enabled(self) -> bool:
-        """_summary_
-
-        Returns:
-            bool: if analyze_files is enabled
-        """
-        mediamanagement: json_data = self.sonarr_cli.request_get(
-            path="/api/v3/config/mediamanagement"
-        )
-
-        return mediamanagement["enableMediaInfo"]
