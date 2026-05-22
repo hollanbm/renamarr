@@ -1,5 +1,6 @@
 from unittest.mock import call
 
+import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
@@ -105,6 +106,76 @@ class TestMovieFolderRename:
                 call("Movie folder rename successful for movies: Movie B"),
                 call("Initiated disk scan of updated movies"),
                 call("disk scan finished successfully"),
+            ]
+        )
+
+    @pytest.mark.parametrize(
+        ("movie_a_root", "movie_b_root"),
+        [
+            ("/movies", "/movies-4k"),
+            ("/movies-4k", "/movies"),
+        ],
+    )
+    def test_process_matches_movies_to_overlapping_root_folder_names(
+        self, movie_a_root, movie_b_root, mocker
+    ) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        movie_a = RadarrMovieItem(id=1, title="Movie A", path=f"{movie_a_root}/OldA")
+        movie_b = RadarrMovieItem(id=2, title="Movie B", path=f"{movie_b_root}/OldB")
+        mocker.patch.object(
+            radarr_cli,
+            "get_root_folder",
+            return_value=[dict(path="/movies"), dict(path="/movies-4k")],
+        )
+        mocker.patch.object(radarr_cli, "request_get").side_effect = [
+            dict(folder="NewA"),
+            dict(folder="NewB"),
+        ]
+        request = mocker.patch.object(
+            radarr_cli._session,
+            "request",
+            side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=200)],
+        )
+        send_command = mocker.patch.object(radarr_cli, "_sendCommand")
+        send_command.side_effect = [dict(id=10), dict(id=20)]
+        mocker.patch.object(
+            radarr_cli,
+            "get_command",
+            side_effect=[
+                dict(status="completed", result="successful"),
+                dict(status="completed", result="successful"),
+            ],
+        )
+        mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
+
+        MovieFolderRename(radarr_cli).process([movie_a, movie_b])
+
+        request.assert_has_calls(
+            [
+                call(
+                    "PUT",
+                    "test.tld/api/v3/movie/editor",
+                    json=dict(
+                        rootFolderPath=movie_a_root,
+                        movieIds=[1],
+                        moveFiles=True,
+                    ),
+                ),
+                call(
+                    "PUT",
+                    "test.tld/api/v3/movie/editor",
+                    json=dict(
+                        rootFolderPath=movie_b_root,
+                        movieIds=[2],
+                        moveFiles=True,
+                    ),
+                ),
+            ]
+        )
+        send_command.assert_has_calls(
+            [
+                call(dict(priority="high", name="RefreshMovie", movieIds=[1])),
+                call(dict(priority="high", name="RefreshMovie", movieIds=[2])),
             ]
         )
 
