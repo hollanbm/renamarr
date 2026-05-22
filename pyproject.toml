@@ -40,11 +40,14 @@ pythonpath = ["./src"]
 testpaths = ["./tests", "./tests/models"]
 addopts = [
   "--cov=src",
-  "tests",
   "--cov-branch",
+  "--cov-fail-under=100",
   "--capture=sys",
   "--cov-report=xml:coverage.xml",
   "--cov-report=html",
   "--import-mode=importlib",
+]
+filterwarnings = [
+  "error",
 ]
 mock_use_standalone_module = "True"

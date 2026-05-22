@@ -41,7 +41,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: uv run --frozen --group test pytest --cov=src --cov-branch tests
+        entry: uv run --frozen --group test pytest
         language: system
         files: ^(src/|tests/|pyproject\.toml|uv\.lock)
         pass_filenames: false

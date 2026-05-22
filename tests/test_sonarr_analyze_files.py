@@ -29,16 +29,29 @@ class TestAnalyzeFiles:
         mocker.patch.object(
             sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
         )
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=1))
-        mocker.patch.object(
+        send_command = mocker.patch.object(
+            sonarr_cli, "_sendCommand", return_value=dict(id=1)
+        )
+        get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            side_effect=[
+                dict(status="started"),
+                dict(status="completed", result="successful"),
+            ],
         )
-        mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
+        sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
 
         AnalyzeFiles(sonarr_cli).process()
 
+        send_command.assert_called_once_with(
+            {
+                "name": "RescanSeries",
+                "priority": "high",
+            }
+        )
+        get_command.assert_has_calls([call(cid=1), call(cid=1)])
+        assert sleep.call_count == 2
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of library"),
@@ -53,16 +66,26 @@ class TestAnalyzeFiles:
         mocker.patch.object(
             sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
         )
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=1))
-        mocker.patch.object(
+        send_command = mocker.patch.object(
+            sonarr_cli, "_sendCommand", return_value=dict(id=1)
+        )
+        get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
             return_value=dict(status="completed", result="failed"),
         )
-        mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
+        sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
 
         AnalyzeFiles(sonarr_cli).process()
 
+        send_command.assert_called_once_with(
+            {
+                "name": "RescanSeries",
+                "priority": "high",
+            }
+        )
+        get_command.assert_called_once_with(cid=1)
+        sleep.assert_called_once_with(10)
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of library"),

@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 import pytest
@@ -9,6 +9,20 @@ from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 from tests.conftest import episode_data
 
+FIXED_NOW = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+
+
+def tba_episode_at(air_date_utc: datetime) -> json_data:
+    return dict(
+        id=1,
+        title="TBA",
+        airDateUtc=air_date_utc.isoformat(),
+        seasonNumber=1,
+        episodeNumber=1,
+        hasFile=True,
+        episodeFileId=1,
+    )
+
 
 class TestSeriesScanner:
     @pytest.fixture(autouse=True)
@@ -16,6 +30,12 @@ class TestSeriesScanner:
         mocker.patch.object(SonarrCli, "request_get").return_value = dict(
             episodeTitleRequired=True
         )
+
+    @pytest.fixture
+    def fixed_now(self, mocker) -> datetime:
+        datetime_mock = mocker.patch("renamarr.sonarr.services.series_scanner.datetime")
+        datetime_mock.now.return_value = FIXED_NOW
+        return FIXED_NOW
 
     def test_when_episode_title_required_false(self, caplog, mocker) -> None:
         mocker.patch.object(SonarrCli, "request_get").return_value = dict(
@@ -122,7 +142,7 @@ class TestSeriesScanner:
         with caplog.at_level(logging.DEBUG):
             SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
-        assert refresh_serie.called
+        refresh_serie.assert_called_once_with(1)
         assert "Found TBA episode, airing within the next 4 hours" in caplog.text
         assert "Series rescan triggered" in caplog.text
 
@@ -144,6 +164,62 @@ class TestSeriesScanner:
         with caplog.at_level(logging.DEBUG):
             SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
 
-        assert refresh_serie.called
+        refresh_serie.assert_called_once_with(1)
         assert "Found previously aired episode with TBA title" in caplog.text
         assert "Series rescan triggered" in caplog.text
+
+    def test_when_hours_before_air_above_max_is_capped(
+        self, get_serie, fixed_now, mocker
+    ) -> None:
+        mocker.patch.object(
+            SonarrCli,
+            "get_episode",
+            return_value=[tba_episode_at(fixed_now + timedelta(hours=13))],
+        )
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        SonarrSeriesScanner("test", "test.tld", "test-api-key", 99).scan()
+
+        refresh_serie.assert_not_called()
+
+    def test_when_tba_episode_is_exactly_at_future_limit_refreshes(
+        self, get_serie, fixed_now, mocker
+    ) -> None:
+        mocker.patch.object(
+            SonarrCli,
+            "get_episode",
+            return_value=[tba_episode_at(fixed_now + timedelta(hours=4))],
+        )
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        refresh_serie.assert_called_once_with(1)
+
+    def test_when_tba_episode_is_just_beyond_future_limit_does_not_refresh(
+        self, get_serie, fixed_now, mocker
+    ) -> None:
+        mocker.patch.object(
+            SonarrCli,
+            "get_episode",
+            return_value=[tba_episode_at(fixed_now + timedelta(hours=4, seconds=1))],
+        )
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        refresh_serie.assert_not_called()
+
+    def test_when_tba_episode_is_exactly_now_does_not_refresh(
+        self, get_serie, fixed_now, mocker
+    ) -> None:
+        mocker.patch.object(
+            SonarrCli,
+            "get_episode",
+            return_value=[tba_episode_at(fixed_now)],
+        )
+        refresh_serie = mocker.patch.object(SonarrCli, "refresh_serie")
+
+        SonarrSeriesScanner("test", "test.tld", "test-api-key", 4).scan()
+
+        refresh_serie.assert_not_called()
