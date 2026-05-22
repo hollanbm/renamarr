@@ -81,11 +81,11 @@ _To avoid permission issues when creating log files, set the user option in dock
 
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description                                               | Default  |
-| -------------------- | --------------------------------------------------------- | -------- |
+| Environment Variable | Description                                                                                           | Default  |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
 | `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. | `INFO`   |
-| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation. | `00:00`  |
-| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.  | `7 days` |
+| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation.                                             | `00:00`  |
+| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.                                              | `7 days` |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
