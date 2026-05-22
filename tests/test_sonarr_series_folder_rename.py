@@ -44,7 +44,11 @@ class TestSeriesFolderRename:
             dict(folder="NewB"),
             dict(folder="NewC"),
         ]
-        request_put = mocker.patch.object(sonarr_cli, "request_put")
+        request_put = mocker.patch.object(
+            sonarr_cli,
+            "request_put",
+            side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=299)],
+        )
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
         send_command.side_effect = [dict(id=10), dict(id=20)]
         get_command = mocker.patch.object(
@@ -83,19 +87,19 @@ class TestSeriesFolderRename:
         get_command.assert_has_calls([call(cid=10), call(cid=20)])
         send_command.assert_has_calls(
             [
-                call(dict(name="RescanSeries", priority="high")),
-                call(dict(name="RescanSeries", priority="high")),
+                call(dict(name="RescanSeries", priority="high", seriesIds=[1, 3])),
+                call(dict(name="RescanSeries", priority="high", seriesIds=[2])),
             ]
         )
         mock_loguru_info.assert_has_calls(
             [
-                call("Renaming Series folder for series: Show A, Show C"),
+                call("Renaming Series folders for: Show A, Show C"),
                 call("Series folder rename successful for series: Show A, Show C"),
-                call("Initiated disk scan of library"),
+                call("Initiated disk scan of updated series"),
                 call("disk scan finished successfully"),
-                call("Renaming Series folder for series: Show B"),
+                call("Renaming Series folder for: Show B"),
                 call("Series folder rename successful for series: Show B"),
-                call("Initiated disk scan of library"),
+                call("Initiated disk scan of updated series"),
                 call("disk scan finished successfully"),
             ]
         )
@@ -109,7 +113,9 @@ class TestSeriesFolderRename:
             sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(sonarr_cli, "request_put")
+        mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+        )
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(
             sonarr_cli,
@@ -122,9 +128,39 @@ class TestSeriesFolderRename:
 
         mock_loguru_info.assert_has_calls(
             [
-                call("Initiated disk scan of library"),
+                call("Initiated disk scan of updated series"),
                 call("disk scan failed"),
             ]
+        )
+
+    def test_process_skips_rescan_when_folder_rename_status_is_unsuccessful(
+        self, mock_loguru_error, mock_loguru_info, mocker
+    ) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
+        mocker.patch.object(
+            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+        )
+        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=300)
+        )
+        send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
+
+        SeriesFolderRename(sonarr_cli).process([series])
+
+        send_command.assert_not_called()
+        mock_loguru_info.assert_any_call("Renaming Series folder for: Show")
+        mock_loguru_error.assert_called_once_with(
+            "Series folder rename failed for series: Show: status code 300"
+        )
+        assert (
+            call("Series folder rename successful for series: Show")
+            not in mock_loguru_info.mock_calls
+        )
+        assert (
+            call("Initiated disk scan of updated series")
+            not in mock_loguru_info.mock_calls
         )
 
     def test_process_warns_and_skips_series_without_matching_root_folder(
@@ -166,7 +202,9 @@ class TestSeriesFolderRename:
             ],
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        request_put = mocker.patch.object(sonarr_cli, "request_put")
+        request_put = mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+        )
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(
             sonarr_cli,
