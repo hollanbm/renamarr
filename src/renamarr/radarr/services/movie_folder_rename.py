@@ -116,7 +116,7 @@ class MovieFolderRename:
                 movie path.
         """
 
-        # Nested root folders are a vaild radarr configuration
+        # Nested root folders are a valid Radarr configuration
         # This makes it possible for a movie to match multiple root folders
         # collect all matches, so that we can select the best match, instead of the first match
         matching_root_folders: list[tuple[PurePosixPath, json_dict]] = []

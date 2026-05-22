@@ -113,7 +113,7 @@ class SeriesFolderRename:
                 series path.
         """
 
-        # Nested root folders are a vaild radarr configuration
+        # Nested root folders are a valid Sonarr configuration
         # This makes it possible for a single series to match multiple root folders
         # collect all matches, so that we can select the best match, instead of the first match
         matching_root_folders: list[tuple[PurePosixPath, json_dict]] = []
