@@ -21,24 +21,28 @@ class Main:
     """
 
     RUN_SCHEDULER = True
+    _LOG_FORMAT = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level}</level> | "
+        "{extra[instance]} | "
+        "{extra[item]} | "
+        "<level>{message}</level>"
+    )
+    _DEBUG_LOG_FORMAT = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level}</level> | "
+        "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "{extra[instance]} | "
+        "{extra[item]} | "
+        "<level>{message}</level>"
+    )
 
     def __init__(self):
         load_dotenv(".env.local")
         log_level = os.getenv("LOG_LEVEL", "INFO")
 
-        function_name_format = (
-            "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            if log_level.upper() == "DEBUG"
-            else ""
-        )
-
         self._logger_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level}</level> | "
-            f"{function_name_format}"
-            "{extra[instance]} | "
-            "{extra[item]} | "
-            "<level>{message}</level>"
+            self._DEBUG_LOG_FORMAT if log_level.upper() == "DEBUG" else self._LOG_FORMAT
         )
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()

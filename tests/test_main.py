@@ -162,10 +162,7 @@ class TestMain:
         Main()
 
         logger_format = logger_add.call_args_list[0].kwargs["format"]
-        assert (
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            in logger_format
-        )
+        assert "<cyan>{function}</cyan>:<cyan>{line}</cyan> | " in logger_format
 
     def test_init_loads_local_dotenv_file(self, mocker) -> None:
         logger_add = mocker.patch.object(logger, "add")

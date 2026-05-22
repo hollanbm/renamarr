@@ -26,20 +26,29 @@ class MovieFolderRename:
             movie_titles = folder_rename_plan.get_movie_titles(root_folder_rename)
             movie_ids = folder_rename_plan.get_movie_ids(root_folder_rename)
 
-            # TODO: update this string so that it uses folders and movies when len(movie_titles) > 1 else folder movie
-            logger.info(f"Renaming Movie folder(s) for movie(s): {movie_titles}")
-            self.radarr_cli.request_put(
-                path="/api/v3/movie/editor",
-                json_data=dict(
+            multiple_movies = len(movie_ids) > 1
+            logger.info(
+                f"Renaming Movie {'folders' if multiple_movies else 'folder'} "
+                f"for {'movies' if multiple_movies else 'movie'}: {movie_titles}"
+            )
+            folder_rename_response = self.radarr_cli._session.request(
+                "PUT",
+                f"{self.radarr_cli.host_url}/api/v3/movie/editor",
+                json=dict(
                     rootFolderPath=root_folder_rename.root_folder_path,
                     movieIds=movie_ids,
                     moveFiles=root_folder_rename.move_files,
                 ),
             )
+            if not 200 <= folder_rename_response.status_code <= 299:
+                logger.error(
+                    f"Movie folder rename failed for movies: {movie_titles}: "
+                    f"status code {folder_rename_response.status_code}"
+                )
+                continue
+
             logger.info(f"Movie folder rename successful for movies: {movie_titles}")
             logger.info("Initiated disk scan of updated movies")
-
-            # TODO: confirm folder rename operation was successful before rescanning movies
 
             if self.__rescan_movies(movie_ids):
                 logger.info("disk scan finished successfully")

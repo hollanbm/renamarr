@@ -1,6 +1,5 @@
 from unittest.mock import call
 
-import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
@@ -18,12 +17,12 @@ class TestMovieFolderRename:
         mocker.patch.object(
             radarr_cli, "request_get", return_value=dict(folder="Movie")
         )
-        request_put = mocker.patch.object(radarr_cli, "request_put")
+        request = mocker.patch.object(radarr_cli._session, "request")
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 
         MovieFolderRename(radarr_cli).process([movie])
 
-        request_put.assert_not_called()
+        request.assert_not_called()
         send_command.assert_not_called()
         assert (
             call("Processing pending movie folder renames")
@@ -47,7 +46,11 @@ class TestMovieFolderRename:
             dict(folder="NewB"),
             dict(folder="NewC"),
         ]
-        request_put = mocker.patch.object(radarr_cli, "request_put")
+        request = mocker.patch.object(
+            radarr_cli._session,
+            "request",
+            side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=299)],
+        )
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
         send_command.side_effect = [dict(id=10), dict(id=20)]
         get_command = mocker.patch.object(
@@ -63,19 +66,21 @@ class TestMovieFolderRename:
         MovieFolderRename(radarr_cli).process([movie_a, movie_b, movie_c])
 
         mock_loguru_debug.assert_any_call("Processing pending movie folder renames")
-        request_put.assert_has_calls(
+        request.assert_has_calls(
             [
                 call(
-                    path="/api/v3/movie/editor",
-                    json_data=dict(
+                    "PUT",
+                    "test.tld/api/v3/movie/editor",
+                    json=dict(
                         rootFolderPath="/rootA",
                         movieIds=[1, 3],
                         moveFiles=True,
                     ),
                 ),
                 call(
-                    path="/api/v3/movie/editor",
-                    json_data=dict(
+                    "PUT",
+                    "test.tld/api/v3/movie/editor",
+                    json=dict(
                         rootFolderPath="/rootB",
                         movieIds=[2],
                         moveFiles=True,
@@ -92,11 +97,11 @@ class TestMovieFolderRename:
         )
         mock_loguru_info.assert_has_calls(
             [
-                call("Renaming Movie folder for movies: Movie A, Movie C"),
+                call("Renaming Movie folders for movies: Movie A, Movie C"),
                 call("Movie folder rename successful for movies: Movie A, Movie C"),
                 call("Initiated disk scan of updated movies"),
                 call("disk scan finished successfully"),
-                call("Renaming Movie folder for movies: Movie B"),
+                call("Renaming Movie folder for movie: Movie B"),
                 call("Movie folder rename successful for movies: Movie B"),
                 call("Initiated disk scan of updated movies"),
                 call("disk scan finished successfully"),
@@ -112,7 +117,9 @@ class TestMovieFolderRename:
             radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(radarr_cli, "request_put")
+        mocker.patch.object(
+            radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
+        )
         mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(
             radarr_cli,
@@ -130,8 +137,8 @@ class TestMovieFolderRename:
             ]
         )
 
-    def test_process_raises_without_success_log_when_folder_rename_fails(
-        self, mock_loguru_info, mocker
+    def test_process_skips_rescan_when_folder_rename_status_is_unsuccessful(
+        self, mock_loguru_error, mock_loguru_info, mocker
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
@@ -140,19 +147,23 @@ class TestMovieFolderRename:
         )
         mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
         mocker.patch.object(
-            radarr_cli,
-            "request_put",
-            side_effect=RuntimeError("Radarr rejected folder rename"),
+            radarr_cli._session, "request", return_value=mocker.Mock(status_code=300)
         )
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 
-        with pytest.raises(RuntimeError, match="Radarr rejected folder rename"):
-            MovieFolderRename(radarr_cli).process([movie])
+        MovieFolderRename(radarr_cli).process([movie])
 
         send_command.assert_not_called()
-        mock_loguru_info.assert_any_call("Renaming Movie folder for movies: Movie")
+        mock_loguru_info.assert_any_call("Renaming Movie folder for movie: Movie")
+        mock_loguru_error.assert_called_once_with(
+            "Movie folder rename failed for movies: Movie: status code 300"
+        )
         assert (
             call("Movie folder rename successful for movies: Movie")
+            not in mock_loguru_info.mock_calls
+        )
+        assert (
+            call("Initiated disk scan of updated movies")
             not in mock_loguru_info.mock_calls
         )
 
@@ -165,7 +176,7 @@ class TestMovieFolderRename:
             radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         request_get = mocker.patch.object(radarr_cli, "request_get")
-        request_put = mocker.patch.object(radarr_cli, "request_put")
+        request = mocker.patch.object(radarr_cli._session, "request")
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 
         MovieFolderRename(radarr_cli).process([movie])
@@ -174,5 +185,5 @@ class TestMovieFolderRename:
             "Unable to determine matching Radarr root folder for movie path /unmatched/Movie"
         )
         request_get.assert_not_called()
-        request_put.assert_not_called()
+        request.assert_not_called()
         send_command.assert_not_called()
