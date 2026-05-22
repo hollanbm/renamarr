@@ -1,8 +1,14 @@
+from pathlib import PurePosixPath
 from unittest.mock import call
 
+import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
-from renamarr.sonarr.services.series_folder_rename import SeriesFolderRename
+from renamarr.sonarr.services.series_folder_rename import (
+    MAX_WAIT_SECONDS,
+    SeriesFolderRename,
+    SeriesRootFolderNotFoundError,
+)
 
 
 class TestSeriesFolderRename:
@@ -104,6 +110,27 @@ class TestSeriesFolderRename:
             ]
         )
 
+    def test_process_sorts_root_folders_before_matching_series(self, mocker) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        series = SonarrSerieItem(id=1, title="Show", path="/rootA/Show")
+        mocker.patch.object(
+            sonarr_cli,
+            "get_root_folder",
+            return_value=[dict(path="/rootB"), dict(path="/rootA")],
+        )
+        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="Show"))
+        service = SeriesFolderRename(sonarr_cli)
+        find_series_root_folder = mocker.spy(
+            service, "_SeriesFolderRename__find_series_root_folder"
+        )
+
+        service.process([series])
+
+        assert find_series_root_folder.call_args.args[1] == [
+            dict(path="/rootA"),
+            dict(path="/rootB"),
+        ]
+
     def test_process_logs_when_series_rescan_fails(
         self, mock_loguru_info, mocker
     ) -> None:
@@ -126,6 +153,44 @@ class TestSeriesFolderRename:
 
         SeriesFolderRename(sonarr_cli).process([series])
 
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Initiated disk scan of updated series"),
+                call("disk scan failed"),
+            ]
+        )
+
+    def test_process_logs_when_series_rescan_times_out(
+        self, mock_loguru_error, mock_loguru_info, mocker
+    ) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
+        mocker.patch.object(
+            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+        )
+        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+        )
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        get_command = mocker.patch.object(
+            sonarr_cli,
+            "get_command",
+            return_value=dict(status="started"),
+        )
+        sleep = mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
+        mocker.patch(
+            "renamarr.sonarr.services.series_folder_rename.time.time",
+            side_effect=[0, 0, MAX_WAIT_SECONDS],
+        )
+
+        SeriesFolderRename(sonarr_cli).process([series])
+
+        get_command.assert_called_once_with(cid=10)
+        sleep.assert_called_once_with(10)
+        mock_loguru_error.assert_called_once_with(
+            "Timed out waiting for Sonarr series rescan command 10 after 300 seconds"
+        )
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of updated series"),
@@ -163,26 +228,62 @@ class TestSeriesFolderRename:
             not in mock_loguru_info.mock_calls
         )
 
-    def test_process_warns_and_skips_series_without_matching_root_folder(
-        self, mock_loguru_warning, mocker
+    def test_process_logs_error_and_continues_after_series_without_matching_root_folder(
+        self, mock_loguru_error, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
-        series = SonarrSerieItem(id=1, title="Show", path="/unmatched/Show")
+        unmatched_series = SonarrSerieItem(
+            id=1, title="Unmatched Show", path="/unmatched/Show"
+        )
+        matched_series = SonarrSerieItem(id=2, title="Matched Show", path="/root/Old")
         mocker.patch.object(
             sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
-        request_get = mocker.patch.object(sonarr_cli, "request_get")
-        request_put = mocker.patch.object(sonarr_cli, "request_put")
-        send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
+        request_get = mocker.patch.object(
+            sonarr_cli, "request_get", return_value=dict(folder="New")
+        )
+        request_put = mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+        )
+        send_command = mocker.patch.object(
+            sonarr_cli, "_sendCommand", return_value=dict(id=10)
+        )
+        mocker.patch.object(
+            sonarr_cli,
+            "get_command",
+            return_value=dict(status="completed", result="successful"),
+        )
+        mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
 
-        SeriesFolderRename(sonarr_cli).process([series])
+        SeriesFolderRename(sonarr_cli).process([unmatched_series, matched_series])
 
-        mock_loguru_warning.assert_called_once_with(
+        mock_loguru_error.assert_called_once_with(
             "Unable to determine matching Sonarr root folder for series path /unmatched/Show"
         )
-        request_get.assert_not_called()
-        request_put.assert_not_called()
-        send_command.assert_not_called()
+        request_get.assert_called_once_with(path="/api/v3/series/2/folder")
+        request_put.assert_called_once_with(
+            path="/api/v3/series/editor",
+            json_data=dict(rootFolderPath="/root", seriesIds=[2], moveFiles=True),
+        )
+        send_command.assert_called_once_with(
+            dict(name="RescanSeries", priority="high", seriesIds=[2])
+        )
+
+    def test_find_series_root_folder_raises_when_no_root_folder_matches(self) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        service = SeriesFolderRename(sonarr_cli)
+
+        with pytest.raises(
+            SeriesRootFolderNotFoundError,
+            match=(
+                "Unable to determine matching Sonarr root folder for series path "
+                "/unmatched/Show"
+            ),
+        ):
+            service._SeriesFolderRename__find_series_root_folder(
+                PurePosixPath("/unmatched/Show"),
+                [dict(path="/root")],
+            )
 
     def test_process_uses_path_matching_for_overlapping_root_names(
         self, mock_loguru_debug, mocker
@@ -220,6 +321,59 @@ class TestSeriesFolderRename:
             path="/api/v3/series/editor",
             json_data=dict(
                 rootFolderPath="/data/media/tv-anime",
+                seriesIds=[1],
+                moveFiles=True,
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        ("series_path", "root_folders", "expected_root_folder"),
+        [
+            (
+                "/data/media/tv/OldName",
+                [dict(path="/data/media"), dict(path="/data/media/tv")],
+                "/data/media/tv",
+            ),
+            (
+                "/data/media/tv",
+                [dict(path="/data/media"), dict(path="/data/media/tv")],
+                "/data/media/tv",
+            ),
+        ],
+        ids=["nested-roots", "root-equals-series-path"],
+    )
+    def test_process_uses_deepest_matching_root_folder(
+        self,
+        series_path,
+        root_folders,
+        expected_root_folder,
+        mocker,
+    ) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        series = SonarrSerieItem(id=1, title="Show", path=series_path)
+        mocker.patch.object(
+            sonarr_cli,
+            "get_root_folder",
+            return_value=root_folders,
+        )
+        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        request_put = mocker.patch.object(
+            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+        )
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(
+            sonarr_cli,
+            "get_command",
+            return_value=dict(status="completed", result="successful"),
+        )
+        mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
+
+        SeriesFolderRename(sonarr_cli).process([series])
+
+        request_put.assert_called_once_with(
+            path="/api/v3/series/editor",
+            json_data=dict(
+                rootFolderPath=expected_root_folder,
                 seriesIds=[1],
                 moveFiles=True,
             ),

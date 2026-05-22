@@ -31,7 +31,7 @@ class Main:
     _DEBUG_LOG_FORMAT = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level}</level> | "
-        "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
         "{extra[instance]} | "
         "{extra[item]} | "
         "<level>{message}</level>"

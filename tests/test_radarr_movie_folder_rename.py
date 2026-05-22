@@ -1,9 +1,14 @@
+from pathlib import PurePosixPath
 from unittest.mock import call
 
 import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
-from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
+from renamarr.radarr.services.movie_folder_rename import (
+    MAX_WAIT_SECONDS,
+    MovieFolderRename,
+    MovieRootFolderNotFoundError,
+)
 
 
 class TestMovieFolderRename:
@@ -179,6 +184,29 @@ class TestMovieFolderRename:
             ]
         )
 
+    def test_process_sorts_root_folders_before_matching_movies(self, mocker) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        movie = RadarrMovieItem(id=1, title="Movie", path="/rootA/Movie")
+        mocker.patch.object(
+            radarr_cli,
+            "get_root_folder",
+            return_value=[dict(path="/rootB"), dict(path="/rootA")],
+        )
+        mocker.patch.object(
+            radarr_cli, "request_get", return_value=dict(folder="Movie")
+        )
+        service = MovieFolderRename(radarr_cli)
+        find_movie_root_folder = mocker.spy(
+            service, "_MovieFolderRename__find_movie_root_folder"
+        )
+
+        service.process([movie])
+
+        assert find_movie_root_folder.call_args.args[1] == [
+            dict(path="/rootA"),
+            dict(path="/rootB"),
+        ]
+
     def test_process_logs_when_updated_movie_rescan_fails(
         self, mock_loguru_info, mocker
     ) -> None:
@@ -201,6 +229,44 @@ class TestMovieFolderRename:
 
         MovieFolderRename(radarr_cli).process([movie])
 
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Initiated disk scan of updated movies"),
+                call("disk scan failed"),
+            ]
+        )
+
+    def test_process_logs_when_updated_movie_rescan_times_out(
+        self, mock_loguru_error, mock_loguru_info, mocker
+    ) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
+        mocker.patch.object(
+            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+        )
+        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(
+            radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
+        )
+        mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
+        get_command = mocker.patch.object(
+            radarr_cli,
+            "get_command",
+            return_value=dict(status="started"),
+        )
+        sleep = mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
+        mocker.patch(
+            "renamarr.radarr.services.movie_folder_rename.time.time",
+            side_effect=[0, 0, MAX_WAIT_SECONDS],
+        )
+
+        MovieFolderRename(radarr_cli).process([movie])
+
+        get_command.assert_called_once_with(cid=10)
+        sleep.assert_called_once_with(10)
+        mock_loguru_error.assert_called_once_with(
+            "Timed out waiting for Radarr movie rescan command 10 after 300 seconds"
+        )
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of updated movies"),
@@ -238,23 +304,114 @@ class TestMovieFolderRename:
             not in mock_loguru_info.mock_calls
         )
 
-    def test_process_warns_and_skips_movie_without_matching_root_folder(
-        self, mock_loguru_warning, mocker
+    def test_process_logs_error_and_continues_after_movie_without_matching_root_folder(
+        self, mock_loguru_error, mocker
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
-        movie = RadarrMovieItem(id=1, title="Movie", path="/unmatched/Movie")
+        unmatched_movie = RadarrMovieItem(
+            id=1, title="Unmatched Movie", path="/unmatched/Movie"
+        )
+        matched_movie = RadarrMovieItem(id=2, title="Matched Movie", path="/root/Old")
         mocker.patch.object(
             radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
-        request_get = mocker.patch.object(radarr_cli, "request_get")
-        request = mocker.patch.object(radarr_cli._session, "request")
-        send_command = mocker.patch.object(radarr_cli, "_sendCommand")
+        request_get = mocker.patch.object(
+            radarr_cli, "request_get", return_value=dict(folder="New")
+        )
+        request = mocker.patch.object(
+            radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
+        )
+        send_command = mocker.patch.object(
+            radarr_cli, "_sendCommand", return_value=dict(id=10)
+        )
+        mocker.patch.object(
+            radarr_cli,
+            "get_command",
+            return_value=dict(status="completed", result="successful"),
+        )
+        mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
+
+        MovieFolderRename(radarr_cli).process([unmatched_movie, matched_movie])
+
+        mock_loguru_error.assert_called_once_with(
+            "Unable to determine matching Radarr root folder for movie path /unmatched/Movie"
+        )
+        request_get.assert_called_once_with(path="/api/v3/movie/2/folder")
+        request.assert_called_once_with(
+            "PUT",
+            "test.tld/api/v3/movie/editor",
+            json=dict(rootFolderPath="/root", movieIds=[2], moveFiles=True),
+        )
+        send_command.assert_called_once_with(
+            dict(priority="high", name="RefreshMovie", movieIds=[2])
+        )
+
+    def test_find_movie_root_folder_raises_when_no_root_folder_matches(self) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        service = MovieFolderRename(radarr_cli)
+
+        with pytest.raises(
+            MovieRootFolderNotFoundError,
+            match=(
+                "Unable to determine matching Radarr root folder for movie path "
+                "/unmatched/Movie"
+            ),
+        ):
+            service._MovieFolderRename__find_movie_root_folder(
+                PurePosixPath("/unmatched/Movie"),
+                [dict(path="/root")],
+            )
+
+    @pytest.mark.parametrize(
+        ("movie_path", "root_folders", "expected_root_folder"),
+        [
+            (
+                "/data/media/movies/OldName",
+                [dict(path="/data/media"), dict(path="/data/media/movies")],
+                "/data/media/movies",
+            ),
+            (
+                "/data/media/movies",
+                [dict(path="/data/media"), dict(path="/data/media/movies")],
+                "/data/media/movies",
+            ),
+        ],
+        ids=["nested-roots", "root-equals-movie-path"],
+    )
+    def test_process_uses_deepest_matching_root_folder(
+        self,
+        movie_path,
+        root_folders,
+        expected_root_folder,
+        mocker,
+    ) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        movie = RadarrMovieItem(id=1, title="Movie", path=movie_path)
+        mocker.patch.object(
+            radarr_cli,
+            "get_root_folder",
+            return_value=root_folders,
+        )
+        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        request = mocker.patch.object(
+            radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
+        )
+        mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(
+            radarr_cli,
+            "get_command",
+            return_value=dict(status="completed", result="successful"),
+        )
+        mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
 
         MovieFolderRename(radarr_cli).process([movie])
 
-        mock_loguru_warning.assert_called_once_with(
-            "Unable to determine matching Radarr root folder for movie path /unmatched/Movie"
+        request.assert_called_once_with(
+            "PUT",
+            "test.tld/api/v3/movie/editor",
+            json=dict(
+                rootFolderPath=expected_root_folder,
+                movieIds=[1],
+                moveFiles=True,
+            ),
         )
-        request_get.assert_not_called()
-        request.assert_not_called()
-        send_command.assert_not_called()

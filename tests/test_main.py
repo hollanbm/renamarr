@@ -146,17 +146,19 @@ class TestMain:
         assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
 
     def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
+        mocker.patch("main.load_dotenv")
+        mocker.patch.dict(os.environ, {}, clear=True)
         logger_add = mocker.patch.object(logger, "add")
 
         Main()
 
         logger_format = logger_add.call_args_list[0].kwargs["format"]
-        assert (
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            not in logger_format
-        )
+        logger_name_format = "<cyan>{name}</cyan>"
+        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        assert logger_name_format not in logger_format
+        assert source_location_format not in logger_format
 
-    def test_init_shows_logger_source_location_when_log_level_is_debug(
+    def test_init_shows_logger_name_and_source_location_when_log_level_is_debug(
         self, mocker
     ) -> None:
         mocker.patch.dict(os.environ, {"LOG_LEVEL": "debug"})
@@ -165,7 +167,9 @@ class TestMain:
         Main()
 
         logger_format = logger_add.call_args_list[0].kwargs["format"]
-        assert "<cyan>{function}</cyan>:<cyan>{line}</cyan> | " in logger_format
+        logger_name_format = "<cyan>{name}</cyan>"
+        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        assert f"{logger_name_format}:{source_location_format}" in logger_format
 
     def test_init_loads_local_dotenv_file(self, mocker) -> None:
         logger_add = mocker.patch.object(logger, "add")
