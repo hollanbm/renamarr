@@ -27,21 +27,24 @@ This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https:/
     - Sonarr [get_api_v3_rename](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
   - Triggers a rename on any item that need be renamed
     - Series renames are batched up, for one rename call per series
-    - Movie renames are initiated per movie.
-      - Example, 1 movie, 2 files. There will be 2 rename API calls
+    - Movie renames are discovered per movie, then initiated in one batch command with all movie IDs that need a rename
 
 #### Analyze Files
 
 This config option is useful if you have audio/video codec information as part of your mediaformat, and you are transcoding files after import. This will initiate a rescan of the files in your library, so that the mediainfo will be updated. Then renamarr will come through and detect changes, and rename the files
 
-#### Rename Folders (Sonarr Only)
+#### Rename Folders
 
-This config option will rename series folders, when they no longer match your configured MediaFormat
+This config option will rename series or movie folders when they no longer match your configured MediaFormat.
 
 - uses [/api/v3/series/{id}/folder](https://sonarr.tv/docs/api/#/SeriesFolder/get_api_v3_series__id__folder) endpoint to determine if the series folder requires an update
 - uses [/api/v3/series/editor](https://sonarr.tv/docs/api/#v3/tag/serieseditor/PUT/api/v3/series/editor) endpoint to update series rootFolderPath to it's current value
   - moving the folder in place
-- Series are processed in bulk at the end of the run, **per root folder**
+- uses [/api/v3/movie/{id}/folder](https://radarr.video/docs/api/#/MovieFolder/get_api_v3_movie__id__folder) endpoint to determine if the movie folder requires an update
+- uses [/api/v3/movie/editor](https://radarr.video/docs/api/#/MovieEditor/put_api_v3_movie_editor) endpoint to update movie rootFolderPath to it's current value
+  - moving the folder in place
+- sends a Radarr `RefreshMovie` command to rescan movies after successful folder moves
+- Series and movies are processed in bulk at the end of the run, **per root folder**
 
 ### Series Scanner (Sonarr Only)
 
@@ -78,11 +81,11 @@ _To avoid permission issues when creating log files, set the user option in dock
 
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description                                               | Default  |
-| -------------------- | --------------------------------------------------------- | -------- |
-| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks.     | `INFO`   |
-| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation. | `00:00`  |
-| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.  | `7 days` |
+| Environment Variable | Description                                                                                           | Default  |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
+| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. | `INFO`   |
+| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation.                                             | `00:00`  |
+| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.                                              | `7 days` |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
@@ -105,6 +108,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
+| `radarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
 | `radarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Radarr instance to `/logs/radarr/<name>.log` with daily rotation                                                            |
 
 ### Local Development

@@ -10,9 +10,9 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
-from radarr_renamarr import RadarrRenamarr
-from sonarr_renamarr import SonarrRenamarr
-from sonarr_series_scanner import SonarrSeriesScanner as SonarrSeriesScanner
+from renamarr.radarr.services.renamarr import RadarrRenamarr
+from renamarr.sonarr.services.renamarr import SonarrRenamarr
+from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 
 class Main:
@@ -21,17 +21,28 @@ class Main:
     """
 
     RUN_SCHEDULER = True
+    _LOG_FORMAT = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level}</level> | "
+        "{extra[instance]} | "
+        "{extra[item]} | "
+        "<level>{message}</level>"
+    )
+    _DEBUG_LOG_FORMAT = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+        "<level>{level}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "{extra[instance]} | "
+        "{extra[item]} | "
+        "<level>{message}</level>"
+    )
 
     def __init__(self):
         load_dotenv(".env.local")
         log_level = os.getenv("LOG_LEVEL", "INFO")
+
         self._logger_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            "{extra[instance]} | "
-            "{extra[item]} | "
-            "<level>{message}</level>"
+            self._DEBUG_LOG_FORMAT if log_level.upper() == "DEBUG" else self._LOG_FORMAT
         )
         logger.configure(extra={"instance": "", "item": ""})  # Default values
         logger.remove()
@@ -118,6 +129,7 @@ class Main:
                     url=radarr_config.url,
                     api_key=radarr_config.api_key,
                     analyze_files=radarr_config.renamarr.analyze_files,
+                    rename_folders=radarr_config.renamarr.rename_folders,
                 ).scan()
             except CliArrError as exc:
                 logger.error(exc)

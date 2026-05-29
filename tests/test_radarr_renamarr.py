@@ -1,15 +1,19 @@
 from unittest.mock import call
 
-from pycliarr.api import RadarrCli
+from pycliarr.api import RadarrCli, RadarrMovieItem
 
-from radarr_renamarr import RadarrRenamarr
+from renamarr.radarr.services.renamarr import RadarrRenamarr
 
 
 class TestRadarrRenamarr:
     def test_no_movies_returned(
         self, get_movie_empty, mock_loguru_info, mock_loguru_error, mocker
     ) -> None:
-        rename_files = mocker.patch.object(RadarrCli, "rename_files")
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
+        )
 
         RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
 
@@ -17,102 +21,126 @@ class TestRadarrRenamarr:
             [call("Starting Renamarr"), call("Finished Renamarr")]
         )
         mock_loguru_error.assert_any_call("Radarr returned empty movie list")
+        analyze_files.assert_not_called()
+        movie_rename.assert_not_called()
+        movie_folder_rename.assert_not_called()
 
-        rename_files.assert_not_called()
-
-    def test_when_movie_does_not_need_renamed(
-        self, get_movie, mock_loguru_info, mock_loguru_debug, mocker
+    def test_scan_sorts_movies_and_runs_movie_rename(
+        self, mock_loguru_debug, mocker
     ) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = []
-        _sendCommand = mocker.patch.object(RadarrCli, "_sendCommand")
+        movie_b = RadarrMovieItem(id=2, title="B Movie")
+        movie_a = RadarrMovieItem(id=1, title="A Movie")
+        mocker.patch.object(RadarrCli, "get_movie").return_value = [movie_b, movie_a]
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
+        )
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
+        RadarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=False,
+        ).scan()
 
-        mock_loguru_debug.assert_any_call("Nothing to rename")
-        _sendCommand.assert_not_called()
+        mock_loguru_debug.assert_any_call("Retrieved movie list")
+        analyze_files.assert_not_called()
+        movie_rename.return_value.process.assert_called_once_with([movie_a, movie_b])
+        movie_folder_rename.assert_not_called()
 
-    def test_when_movie_need_renamed(self, get_movie, mocker) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = [
-            dict(movieId=1, movieFileId=1)
+    def test_scan_runs_folder_rename_when_enabled(self, get_movie, mocker) -> None:
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
+        )
+
+        RadarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=False,
+            rename_folders=True,
+        ).scan()
+
+        analyze_files.assert_not_called()
+        movie_rename.return_value.process.assert_called_once()
+        movie_folder_rename.return_value.process.assert_called_once()
+
+    def test_scan_runs_analyze_files_before_processing(self, get_movie, mocker) -> None:
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
+        )
+        events: list[str] = []
+        analyze_files.return_value.process.side_effect = lambda: events.append(
+            "analyze_files"
+        )
+        movie_rename.return_value.process.side_effect = lambda _: events.append(
+            "movie_rename"
+        )
+        movie_folder_rename.return_value.process.side_effect = lambda _: events.append(
+            "movie_folder_rename"
+        )
+
+        RadarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=True,
+        ).scan()
+
+        assert events == [
+            "analyze_files",
+            "movie_rename",
+            "movie_folder_rename",
         ]
-        _sendCommand = mocker.patch.object(RadarrCli, "_sendCommand")
+        analyze_files.return_value.process.assert_called_once()
+        movie_rename.return_value.process.assert_called_once()
+        movie_folder_rename.return_value.process.assert_called_once()
 
-        rename_payload = dict(
-            name="RenameFiles",
-            files=[1],
-            movieId=1,
-        )
-
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
-
-        _sendCommand.assert_called_once_with(rename_payload)
-
-    def test_when_multiple_movies_need_renamed(self, get_movie, caplog, mocker) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = [
-            dict(movieId=1, movieFileId=1),
-            dict(movieId=1, movieFileId=2),
-        ]
-        _sendCommand = mocker.patch.object(RadarrCli, "_sendCommand")
-
-        rename_payload1 = dict(
-            name="RenameFiles",
-            files=[1],
-            movieId=1,
-        )
-        rename_payload2 = dict(
-            name="RenameFiles",
-            files=[2],
-            movieId=1,
-        )
-
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=False).scan()
-
-        _sendCommand.assert_has_calls([call(rename_payload1), call(rename_payload2)])
-
-    def test_when_disk_scan_enabled_and_analyze_files_is_not(
-        self, get_movie_empty, mock_loguru_warning, mocker
+    def test_scan_skips_post_analyze_when_folder_rename_is_disabled(
+        self, get_movie, mocker
     ) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = dict(
-            enableMediaInfo=False
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
         )
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
+        RadarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=False,
+        ).scan()
 
-        mock_loguru_warning.assert_called_once_with(
-            "Analyse video files is not enabled, please enable setting, in order to use the reanalyze_files feature"
-        )
+        analyze_files.return_value.process.assert_called_once()
+        movie_rename.return_value.process.assert_called_once()
+        movie_folder_rename.assert_not_called()
 
-    def test_when_disk_scan_enabled(
-        self, get_movie_empty, mock_loguru_info, mocker
+    def test_scan_with_analyze_files_returns_after_empty_movie_list(
+        self, get_movie_empty, mocker
     ) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = dict(
-            enableMediaInfo=True
-        )
-        mocker.patch.object(RadarrCli, "_sendCommand").return_value = dict(id=1)
-        mocker.patch.object(RadarrCli, "get_command").return_value = dict(
-            status="completed", result="successful"
-        )
-        mocker.patch("radarr_renamarr.sleep").return_value = None
-
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
-
-        assert call("Initiated disk scan of library") in mock_loguru_info.call_args_list
-        assert (
-            call("disk scan finished successfully") in mock_loguru_info.call_args_list
+        analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
+        movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
+        movie_folder_rename = mocker.patch(
+            "renamarr.radarr.services.renamarr.MovieFolderRename"
         )
 
-    def test_when_disk_scan_enabled_and_fails(
-        self, get_movie_empty, mock_loguru_info, mocker
-    ) -> None:
-        mocker.patch.object(RadarrCli, "request_get").return_value = dict(
-            enableMediaInfo=True
-        )
-        mocker.patch.object(RadarrCli, "_sendCommand").return_value = dict(id=1)
-        mocker.patch.object(RadarrCli, "get_command").return_value = dict(
-            status="completed", result="failed"
-        )
-        mocker.patch("radarr_renamarr.sleep").return_value = None
+        RadarrRenamarr(
+            "test",
+            "test.tld",
+            "test-api-key",
+            analyze_files=True,
+            rename_folders=True,
+        ).scan()
 
-        RadarrRenamarr("test", "test.tld", "test-api-key", analyze_files=True).scan()
-
-        assert call("disk scan failed") in mock_loguru_info.call_args_list
+        analyze_files.return_value.process.assert_called_once()
+        movie_rename.assert_not_called()
+        movie_folder_rename.assert_not_called()

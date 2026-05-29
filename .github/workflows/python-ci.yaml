@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --group dev --group test
       - name: Test with pytest
-        run: uv run pytest --cov-branch --cov=src --cov-report=xml:coverage.xml --junitxml=junit.xml -o junit_family=legacy tests
+        run: uv run pytest --junitxml=junit.xml -o junit_family=legacy
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
       - name: Audit dependencies with uv
