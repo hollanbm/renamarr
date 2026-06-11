@@ -3,8 +3,8 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from typing import Literal, Protocol, TypeAlias
 
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.metrics import Counter
 from opentelemetry import trace
