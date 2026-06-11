@@ -1,10 +1,21 @@
+from collections.abc import Generator
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from typing import List
 
 import pytest
 from loguru import logger
+from renamarr.observability import DisabledObservability
+import renamarr.observability as observability_module
 from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
+
+
+@pytest.fixture(autouse=True)
+def reset_observability() -> Generator[None]:
+    observability_module._observability = DisabledObservability()
+    yield
+    observability_module._observability = DisabledObservability()
 
 
 @pytest.fixture
@@ -49,6 +60,13 @@ def mock_loguru_debug(mocker) -> None:
 @pytest.fixture
 def mock_loguru_warning(mocker) -> None:
     return mocker.patch.object(logger, "warning")
+
+
+@pytest.fixture
+def fake_observability(mocker):
+    observability = mocker.Mock()
+    observability.start_span.side_effect = lambda *args, **kwargs: nullcontext()
+    return observability
 
 
 def episode_data(
