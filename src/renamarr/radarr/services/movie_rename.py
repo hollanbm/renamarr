@@ -2,31 +2,60 @@ from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem
 from pycliarr.api.base_api import json_data
 
+from renamarr.observability import get_observability
 from renamarr.radarr.models.movie_rename_plan import RadarrMovieRenamePlan
 
 
 class MovieRename:
     """Service for renaming Radarr movie files."""
 
-    def __init__(self, radarr_cli: RadarrCli) -> None:
+    def __init__(self, radarr_cli: RadarrCli, name: str = "") -> None:
         self.radarr_cli = radarr_cli
+        self.name = name
 
     def process(self, movies: list[RadarrMovieItem]) -> None:
         """Rename movie files for movies with pending rename previews."""
-        movie_rename_plan = self.__build_movie_rename_plan(movies)
+        observability = get_observability()
+        with observability.start_span(
+            "renamarr.radarr.rename",
+            attributes={
+                "service": "radarr",
+                "name": self.name,
+                "operation": "rename",
+            },
+        ):
+            movie_rename_plan = self.__build_movie_rename_plan(movies)
 
-        if not movie_rename_plan.has_movie_renames():
-            return
+            if not movie_rename_plan.has_movie_renames():
+                return
 
-        movie_names = movie_rename_plan.get_movie_titles()
-        logger.info(f"Renaming Movies: {movie_names}")
-        self.radarr_cli._sendCommand(
-            {
-                "name": "RenameMovie",
-                "movieIds": movie_rename_plan.get_movie_ids(),
-            }
-        )
-        logger.info(f"Movie rename successful for movies: {movie_names}")
+            movie_names = movie_rename_plan.get_movie_titles()
+            movie_ids = movie_rename_plan.get_movie_ids()
+            logger.info(f"Renaming Movies: {movie_names}")
+            try:
+                self.radarr_cli._sendCommand(
+                    {
+                        "name": "RenameMovie",
+                        "movieIds": movie_ids,
+                    }
+                )
+            except Exception:
+                observability.record_operation_items(
+                    "radarr",
+                    "rename",
+                    self.name,
+                    "failed",
+                    len(movie_ids),
+                )
+                raise
+            observability.record_operation_items(
+                "radarr",
+                "rename",
+                self.name,
+                "accepted",
+                len(movie_ids),
+            )
+            logger.info(f"Movie rename successful for movies: {movie_names}")
 
     def __build_movie_rename_plan(
         self, movies: list[RadarrMovieItem]

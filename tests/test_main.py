@@ -2,7 +2,7 @@ import os
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Generator
-from unittest.mock import PropertyMock
+from unittest.mock import ANY, PropertyMock
 
 import pytest
 from loguru import logger
@@ -144,6 +144,46 @@ class TestMain:
         Main()
 
         assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
+
+    def test_init_keeps_log_format_unchanged_when_otel_is_disabled(
+        self, mocker
+    ) -> None:
+        mocker.patch("main.load_dotenv")
+        mocker.patch("main.is_otel_enabled", return_value=False)
+        configure_observability = mocker.patch("main.configure_observability")
+        logger_configure = mocker.patch.object(logger, "configure")
+        logger_add = mocker.patch.object(logger, "add")
+
+        Main()
+
+        logger_configure.assert_called_once_with(
+            extra={"instance": "", "item": ""},
+            patcher=None,
+        )
+        assert logger_add.call_args_list[0].kwargs["format"] == Main._LOG_FORMAT
+        configure_observability.assert_called_once_with()
+
+    def test_init_adds_trace_fields_when_otel_is_enabled(self, mocker) -> None:
+        mocker.patch("main.load_dotenv")
+        mocker.patch.dict(os.environ, {}, clear=True)
+        mocker.patch("main.is_otel_enabled", return_value=True)
+        configure_observability = mocker.patch("main.configure_observability")
+        logger_configure = mocker.patch.object(logger, "configure")
+        logger_add = mocker.patch.object(logger, "add")
+
+        Main()
+
+        logger_configure.assert_called_once_with(
+            extra={"instance": "", "item": "", "trace_id": "", "span_id": ""},
+            patcher=ANY,
+        )
+        assert logger_configure.call_args.kwargs["patcher"].__name__ == (
+            "enrich_log_record_with_trace"
+        )
+        logger_format = logger_add.call_args_list[0].kwargs["format"]
+        assert "trace_id={extra[trace_id]}" in logger_format
+        assert "span_id={extra[span_id]}" in logger_format
+        configure_observability.assert_called_once_with()
 
     def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
         mocker.patch("main.load_dotenv")
@@ -316,6 +356,69 @@ class TestMain:
             rename_folders=True,
         )
         sonarr_renamarr.return_value.scan.assert_called_once_with()
+
+    def test_job_observability_records_success_and_flushes(
+        self, config, fake_observability, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.configure_observability", return_value=fake_observability)
+        mocker.patch("main.perf_counter", side_effect=[10.0, 12.5])
+        mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        fake_observability.start_span.assert_called_once_with(
+            "renamarr.job.sonarr.renamarr",
+            attributes={
+                "service": "sonarr",
+                "name": config.sonarr[0].name,
+                "job": "renamarr",
+            },
+        )
+        fake_observability.record_job.assert_called_once_with(
+            "sonarr",
+            config.sonarr[0].name,
+            "renamarr",
+            "success",
+            2.5,
+        )
+        fake_observability.force_flush.assert_called_once_with()
+        fake_observability.shutdown.assert_called_once_with()
+
+    def test_job_observability_records_failure_and_flushes(
+        self, config, fake_observability, mock_loguru_error, mocker
+    ) -> None:
+        config.radarr[0].renamarr.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.configure_observability", return_value=fake_observability)
+        mocker.patch("main.perf_counter", side_effect=[1.0, 4.0])
+        exception = CliArrError("BOOM!")
+        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        radarr_renamarr.return_value.scan.side_effect = exception
+
+        Main().start()
+
+        fake_observability.start_span.assert_called_once_with(
+            "renamarr.job.radarr.renamarr",
+            attributes={
+                "service": "radarr",
+                "name": config.radarr[0].name,
+                "job": "renamarr",
+            },
+        )
+        fake_observability.record_job.assert_called_once_with(
+            "radarr",
+            config.radarr[0].name,
+            "renamarr",
+            "failed",
+            3.0,
+        )
+        fake_observability.force_flush.assert_called_once_with()
+        fake_observability.shutdown.assert_called_once_with()
+        mock_loguru_error.assert_called_once_with(exception)
 
     def test_sonarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
