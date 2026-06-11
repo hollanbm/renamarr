@@ -1,6 +1,8 @@
 import os
+from collections.abc import Callable
 from contextlib import contextmanager
 from sys import stdout
+from time import perf_counter
 from time import sleep
 
 import schedule
@@ -10,6 +12,12 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
+from renamarr.observability import (
+    ServiceName,
+    configure_observability,
+    enrich_log_record_with_trace,
+    is_otel_enabled,
+)
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
@@ -36,17 +44,34 @@ class Main:
         "{extra[item]} | "
         "<level>{message}</level>"
     )
+    _TRACE_LOG_FORMAT = "trace_id={extra[trace_id]} | span_id={extra[span_id]} | "
 
     def __init__(self):
         load_dotenv(".env.local")
         log_level = os.getenv("LOG_LEVEL", "INFO")
 
-        self._logger_format = (
+        otel_enabled = is_otel_enabled()
+        base_logger_format = (
             self._DEBUG_LOG_FORMAT if log_level.upper() == "DEBUG" else self._LOG_FORMAT
         )
-        logger.configure(extra={"instance": "", "item": ""})  # Default values
+        self._logger_format = (
+            base_logger_format.replace(
+                "<level>{message}</level>",
+                f"{self._TRACE_LOG_FORMAT}<level>{{message}}</level>",
+            )
+            if otel_enabled
+            else base_logger_format
+        )
+        log_extra = {"instance": "", "item": ""}
+        if otel_enabled:
+            log_extra |= {"trace_id": "", "span_id": ""}
+        logger.configure(
+            extra=log_extra,
+            patcher=enrich_log_record_with_trace if otel_enabled else None,
+        )
         logger.remove()
         logger.add(stdout, format=self._logger_format, level=log_level)
+        self.observability = configure_observability()
 
     def __configure_file_logging(self, service: str, instance_name: str) -> bool:
         log_dir = os.getenv("LOG_DIR", "/logs")
@@ -78,17 +103,51 @@ class Main:
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
 
+    def __run_observed_job(
+        self,
+        service: ServiceName,
+        instance_name: str,
+        job_name: str,
+        job: Callable[[], None],
+    ) -> None:
+        start_time = perf_counter()
+        result = "success"
+        try:
+            with self.observability.start_span(
+                f"renamarr.job.{service}.{job_name}",
+                attributes={
+                    "service": service,
+                    "name": instance_name,
+                    "job": job_name,
+                },
+            ):
+                job()
+        except CliArrError as exc:
+            result = "failed"
+            logger.error(exc)
+        finally:
+            self.observability.record_job(
+                service,
+                instance_name,
+                job_name,
+                result,
+                perf_counter() - start_time,
+            )
+            self.observability.force_flush()
+
     def __sonarr_series_scanner_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
-            try:
-                SonarrSeriesScanner(
+            self.__run_observed_job(
+                "sonarr",
+                sonarr_config.name,
+                "series_scanner",
+                lambda: SonarrSeriesScanner(
                     name=sonarr_config.name,
                     url=sonarr_config.url,
                     api_key=sonarr_config.api_key,
                     hours_before_air=sonarr_config.series_scanner.hours_before_air,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+                ).scan(),
+            )
 
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
@@ -101,16 +160,18 @@ class Main:
 
     def __sonarr_renamarr_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
-            try:
-                SonarrRenamarr(
+            self.__run_observed_job(
+                "sonarr",
+                sonarr_config.name,
+                "renamarr",
+                lambda: SonarrRenamarr(
                     name=sonarr_config.name,
                     url=sonarr_config.url,
                     api_key=sonarr_config.api_key,
                     analyze_files=sonarr_config.renamarr.analyze_files,
                     rename_folders=sonarr_config.renamarr.rename_folders,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+                ).scan(),
+            )
 
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
@@ -123,16 +184,18 @@ class Main:
 
     def __radarr_renamarr_job(self, radarr_config):
         with logger.contextualize(service="radarr", instance=radarr_config.name):
-            try:
-                RadarrRenamarr(
+            self.__run_observed_job(
+                "radarr",
+                radarr_config.name,
+                "renamarr",
+                lambda: RadarrRenamarr(
                     name=radarr_config.name,
                     url=radarr_config.url,
                     api_key=radarr_config.api_key,
                     analyze_files=radarr_config.renamarr.analyze_files,
                     rename_folders=radarr_config.renamarr.rename_folders,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+                ).scan(),
+            )
 
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
@@ -143,7 +206,7 @@ class Main:
                 self.__sonarr_renamarr_job, sonarr_config=sonarr_config
             )
 
-    def start(self) -> None:
+    def __start(self) -> None:
         config_dir = os.getenv("CONFIG_DIR", "/")
         try:
             with set_directory(config_dir):
@@ -204,6 +267,12 @@ class Main:
             while self.RUN_SCHEDULER:
                 schedule.run_pending()
                 sleep(1)
+
+    def start(self) -> None:
+        try:
+            self.__start()
+        finally:
+            self.observability.shutdown()
 
 
 @contextmanager

@@ -6,6 +6,7 @@ from loguru import logger
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data, json_dict
 
+from renamarr.observability import get_observability
 from renamarr.sonarr.models.folder_rename_plan import SonarrFolderRenamePlan
 
 MAX_WAIT_SECONDS = 5 * 60
@@ -18,47 +19,83 @@ class SeriesRootFolderNotFoundError(Exception):
 class SeriesFolderRename:
     """Service for renaming Sonarr series folders."""
 
-    def __init__(self, sonarr_cli: SonarrCli) -> None:
+    def __init__(self, sonarr_cli: SonarrCli, name: str = "") -> None:
         self.sonarr_cli = sonarr_cli
+        self.name = name
 
     def process(self, series: list[SonarrSerieItem]) -> None:
         """Rename series folders whose path differs from Sonarr's expected folder."""
-        folder_rename_plan = self.__build_folder_rename_plan(series)
+        observability = get_observability()
+        with observability.start_span(
+            "renamarr.sonarr.folder_rename",
+            attributes={
+                "service": "sonarr",
+                "name": self.name,
+                "operation": "folder_rename",
+            },
+        ):
+            folder_rename_plan = self.__build_folder_rename_plan(series)
 
-        if not folder_rename_plan.has_folder_renames():
-            return
+            if not folder_rename_plan.has_folder_renames():
+                return
 
-        logger.debug("Processing pending series folder renames")
-        for root_folder_rename in folder_rename_plan.root_folder_renames:
-            series_titles = folder_rename_plan.get_series_titles(root_folder_rename)
-            series_ids = folder_rename_plan.get_series_ids(root_folder_rename)
+            logger.debug("Processing pending series folder renames")
+            for root_folder_rename in folder_rename_plan.root_folder_renames:
+                series_titles = folder_rename_plan.get_series_titles(root_folder_rename)
+                series_ids = folder_rename_plan.get_series_ids(root_folder_rename)
 
-            multiple_series = len(series_ids) > 1
-            logger.info(
-                f"Renaming Series {'folders' if multiple_series else 'folder'} "
-                f"for: {series_titles}"
-            )
-            folder_rename_response = self.sonarr_cli.request_put(
-                path="/api/v3/series/editor",
-                json_data=dict(
-                    rootFolderPath=root_folder_rename.root_folder_path,
-                    seriesIds=series_ids,
-                    moveFiles=root_folder_rename.move_files,
-                ),
-            )
-            if not 200 <= folder_rename_response.status_code <= 299:
-                logger.error(
-                    f"Series folder rename failed for series: {series_titles}: "
-                    f"status code {folder_rename_response.status_code}"
+                multiple_series = len(series_ids) > 1
+                logger.info(
+                    f"Renaming Series {'folders' if multiple_series else 'folder'} "
+                    f"for: {series_titles}"
                 )
-                continue
+                try:
+                    folder_rename_response = self.sonarr_cli.request_put(
+                        path="/api/v3/series/editor",
+                        json_data=dict(
+                            rootFolderPath=root_folder_rename.root_folder_path,
+                            seriesIds=series_ids,
+                            moveFiles=root_folder_rename.move_files,
+                        ),
+                    )
+                except Exception:
+                    observability.record_operation_items(
+                        "sonarr",
+                        "folder_rename",
+                        self.name,
+                        "failed",
+                        len(series_ids),
+                    )
+                    raise
+                if not 200 <= folder_rename_response.status_code <= 299:
+                    observability.record_operation_items(
+                        "sonarr",
+                        "folder_rename",
+                        self.name,
+                        "failed",
+                        len(series_ids),
+                    )
+                    logger.error(
+                        f"Series folder rename failed for series: {series_titles}: "
+                        f"status code {folder_rename_response.status_code}"
+                    )
+                    continue
 
-            logger.info(f"Series folder rename successful for series: {series_titles}")
-            logger.info("Initiated disk scan of updated series")
-            if self.__rescan_series(series_ids):
-                logger.info("disk scan finished successfully")
-            else:
-                logger.info("disk scan failed")
+                observability.record_operation_items(
+                    "sonarr",
+                    "folder_rename",
+                    self.name,
+                    "accepted",
+                    len(series_ids),
+                )
+                logger.info(
+                    f"Series folder rename successful for series: {series_titles}"
+                )
+                logger.info("Initiated disk scan of updated series")
+                if self.__rescan_series(series_ids):
+                    logger.info("disk scan finished successfully")
+                else:
+                    logger.info("disk scan failed")
 
     def __build_folder_rename_plan(
         self, series: list[SonarrSerieItem]
