@@ -3,8 +3,13 @@ import os
 from renamarr.observability import (
     DEFAULT_SERVICE_NAME,
     OTEL_ENABLED_ENV_VAR,
+    ArrCommandResult,
     DisabledObservability,
+    JobResult,
     OpenTelemetryObservability,
+    OperationName,
+    OperationResult,
+    ServiceName,
     configure_observability,
     enrich_log_record_with_trace,
     get_log_trace_context,
@@ -18,14 +23,28 @@ def test_disabled_observability_noops() -> None:
     with observability.start_span("span") as span:
         assert span is None
 
-    observability.record_job_started("sonarr", "sonarr", "renamarr", 1.0)
-    observability.record_job("sonarr", "sonarr", "renamarr", "success", 1.0)
-    observability.record_operation_scanned_items("sonarr", "sonarr", "rename", 1)
-    observability.record_operation_candidate_items("sonarr", "sonarr", "rename", 1)
-    observability.record_operation_run("sonarr", "sonarr", "rename", "noop")
-    observability.record_operation_items("sonarr", "sonarr", "rename", "accepted", 1)
+    observability.record_job_started(ServiceName.SONARR, "sonarr", "renamarr", 1.0)
+    observability.record_job(
+        ServiceName.SONARR, "sonarr", "renamarr", JobResult.SUCCESS, 1.0
+    )
+    observability.record_operation_scanned_items(
+        ServiceName.SONARR, "sonarr", OperationName.RENAME, 1
+    )
+    observability.record_operation_candidate_items(
+        ServiceName.SONARR, "sonarr", OperationName.RENAME, 1
+    )
+    observability.record_operation_run(
+        ServiceName.SONARR, "sonarr", OperationName.RENAME, OperationResult.NOOP
+    )
+    observability.record_operation_items(
+        ServiceName.SONARR,
+        "sonarr",
+        OperationName.RENAME,
+        OperationResult.ACCEPTED,
+        1,
+    )
     observability.record_arr_command(
-        "sonarr", "sonarr", "RescanSeries", "successful", 1.0
+        ServiceName.SONARR, "sonarr", "RescanSeries", ArrCommandResult.SUCCESSFUL, 1.0
     )
     observability.force_flush()
     observability.shutdown()
@@ -160,26 +179,37 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     )
     assert meter.create_counter.call_args_list[5].args == ("renamarr.arr.command.runs",)
 
-    returned_context = observability.start_span("span", {"service": "sonarr"})
-    observability.record_job_started("sonarr", "tv", "renamarr", 99.0)
-    observability.record_operation_scanned_items("radarr", "radarr-4k", "rename", 3)
-    observability.record_operation_candidate_items("radarr", "radarr-4k", "rename", 2)
-    observability.record_operation_run("radarr", "radarr-4k", "folder_rename", "failed")
-    observability.record_operation_items(
-        "radarr",
+    returned_context = observability.start_span("span", {"service": ServiceName.SONARR})
+    observability.record_job_started(ServiceName.SONARR, "tv", "renamarr", 99.0)
+    observability.record_operation_scanned_items(
+        ServiceName.RADARR, "radarr-4k", OperationName.RENAME, 3
+    )
+    observability.record_operation_candidate_items(
+        ServiceName.RADARR, "radarr-4k", OperationName.RENAME, 2
+    )
+    observability.record_operation_run(
+        ServiceName.RADARR,
         "radarr-4k",
-        "folder_rename",
-        "failed",
+        OperationName.FOLDER_RENAME,
+        OperationResult.FAILED,
+    )
+    observability.record_operation_items(
+        ServiceName.RADARR,
+        "radarr-4k",
+        OperationName.FOLDER_RENAME,
+        OperationResult.FAILED,
         2,
     )
     observability.record_arr_command(
-        "radarr",
+        ServiceName.RADARR,
         "radarr-4k",
         "RefreshMovie",
-        "successful",
+        ArrCommandResult.SUCCESSFUL,
         12.5,
     )
-    observability.record_job("sonarr", "tv", "renamarr", "success", 1.25)
+    observability.record_job(
+        ServiceName.SONARR, "tv", "renamarr", JobResult.SUCCESS, 1.25
+    )
     observability.force_flush()
     observability.shutdown()
 
@@ -187,80 +217,88 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     tracer_provider.get_tracer.assert_called_once_with(DEFAULT_SERVICE_NAME)
     meter_provider.get_meter.assert_called_once_with(DEFAULT_SERVICE_NAME)
     tracer.start_as_current_span.assert_called_once_with(
-        "span", attributes={"service": "sonarr"}
+        "span", attributes={"service": ServiceName.SONARR}
     )
     job_last_started.set.assert_called_once_with(
         99.0,
-        attributes={"service": "sonarr", "name": "tv", "job": "renamarr"},
+        attributes={"service": ServiceName.SONARR, "name": "tv", "job": "renamarr"},
     )
     operation_scanned_items.add.assert_called_once_with(
         3,
-        attributes={"service": "radarr", "name": "radarr-4k", "operation": "rename"},
+        attributes={
+            "service": ServiceName.RADARR,
+            "name": "radarr-4k",
+            "operation": OperationName.RENAME,
+        },
     )
     operation_candidate_items.add.assert_called_once_with(
         2,
-        attributes={"service": "radarr", "name": "radarr-4k", "operation": "rename"},
+        attributes={
+            "service": ServiceName.RADARR,
+            "name": "radarr-4k",
+            "operation": OperationName.RENAME,
+        },
     )
     operation_runs.add.assert_called_once_with(
         1,
         attributes={
-            "service": "radarr",
+            "service": ServiceName.RADARR,
             "name": "radarr-4k",
-            "operation": "folder_rename",
-            "result": "failed",
+            "operation": OperationName.FOLDER_RENAME,
+            "result": OperationResult.FAILED,
         },
     )
     operation_items.add.assert_called_once_with(
         2,
         attributes={
-            "service": "radarr",
+            "service": ServiceName.RADARR,
             "name": "radarr-4k",
-            "operation": "folder_rename",
-            "result": "failed",
+            "operation": OperationName.FOLDER_RENAME,
+            "result": OperationResult.FAILED,
         },
     )
     arr_command_runs.add.assert_called_once_with(
         1,
         attributes={
-            "service": "radarr",
+            "service": ServiceName.RADARR,
             "name": "radarr-4k",
             "command": "RefreshMovie",
-            "result": "successful",
+            "result": ArrCommandResult.SUCCESSFUL,
         },
     )
     arr_command_duration.record.assert_called_once_with(
         12.5,
         attributes={
-            "service": "radarr",
+            "service": ServiceName.RADARR,
             "name": "radarr-4k",
             "command": "RefreshMovie",
-            "result": "successful",
+            "result": ArrCommandResult.SUCCESSFUL,
         },
     )
     job_runs.add.assert_called_once_with(
         1,
         attributes={
-            "service": "sonarr",
+            "service": ServiceName.SONARR,
             "name": "tv",
             "job": "renamarr",
-            "result": "success",
+            "result": JobResult.SUCCESS,
         },
     )
     job_last_completed.set.assert_called_once_with(
         100.0,
-        attributes={"service": "sonarr", "name": "tv", "job": "renamarr"},
+        attributes={"service": ServiceName.SONARR, "name": "tv", "job": "renamarr"},
     )
     job_last_success.set.assert_called_once_with(
         100.0,
-        attributes={"service": "sonarr", "name": "tv", "job": "renamarr"},
+        attributes={"service": ServiceName.SONARR, "name": "tv", "job": "renamarr"},
     )
     job_duration.record.assert_called_once_with(
         1.25,
         attributes={
-            "service": "sonarr",
+            "service": ServiceName.SONARR,
             "name": "tv",
             "job": "renamarr",
-            "result": "success",
+            "result": JobResult.SUCCESS,
         },
     )
     assert tracer_provider.force_flush.call_count == 2
@@ -295,11 +333,13 @@ def test_open_telemetry_observability_does_not_record_success_timestamp_for_fail
         requests_instrumentor,
     )
 
-    observability.record_job("sonarr", "tv", "renamarr", "failed", 1.25)
+    observability.record_job(
+        ServiceName.SONARR, "tv", "renamarr", JobResult.FAILED, 1.25
+    )
 
     job_last_completed.set.assert_called_once_with(
         100.0,
-        attributes={"service": "sonarr", "name": "tv", "job": "renamarr"},
+        attributes={"service": ServiceName.SONARR, "name": "tv", "job": "renamarr"},
     )
     job_last_success.set.assert_not_called()
 

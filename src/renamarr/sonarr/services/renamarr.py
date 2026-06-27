@@ -1,7 +1,7 @@
 from loguru import logger
 from pycliarr.api import SonarrCli
 
-from renamarr.observability import get_observability
+from renamarr.observability import OperationName, ServiceName, get_observability
 from renamarr.sonarr.services.analyze_files import AnalyzeFiles
 from renamarr.sonarr.services.series_folder_rename import SeriesFolderRename
 from renamarr.sonarr.services.series_rename import SeriesRename
@@ -26,7 +26,11 @@ class SonarrRenamarr:
         observability = get_observability()
         with observability.start_span(
             "renamarr.sonarr.scan",
-            attributes={"service": "sonarr", "name": self.name, "job": "renamarr"},
+            attributes={
+                "service": ServiceName.SONARR,
+                "name": self.name,
+                "job": "renamarr",
+            },
         ):
             with logger.contextualize(instance=self.name):
                 logger.info("Starting Renamarr")
@@ -35,9 +39,9 @@ class SonarrRenamarr:
                     with observability.start_span(
                         "renamarr.sonarr.analyze_files",
                         attributes={
-                            "service": "sonarr",
+                            "service": ServiceName.SONARR,
                             "name": self.name,
-                            "operation": "analyze_files",
+                            "operation": OperationName.ANALYZE_FILES,
                         },
                     ):
                         AnalyzeFiles(self.sonarr_cli, name=self.name).process()

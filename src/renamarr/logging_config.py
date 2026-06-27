@@ -77,9 +77,7 @@ class LoggingConfigurator:
 
     def _logger_format(self, log_level: str, otel_enabled: bool) -> str:
         base_logger_format = (
-            self._DEBUG_LOG_FORMAT
-            if log_level.upper() == "DEBUG"
-            else self._LOG_FORMAT
+            self._DEBUG_LOG_FORMAT if log_level.upper() == "DEBUG" else self._LOG_FORMAT
         )
         if not otel_enabled:
             return base_logger_format

@@ -2,6 +2,7 @@ from unittest.mock import ANY, call
 
 from pycliarr.api import SonarrCli
 
+from renamarr.observability import ArrCommandResult, ServiceName
 from renamarr.sonarr.services.analyze_files import AnalyzeFiles
 
 
@@ -63,10 +64,10 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
             "RescanSeries",
-            "successful",
+            ArrCommandResult.SUCCESSFUL,
             ANY,
         )
 
@@ -108,10 +109,10 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
             "RescanSeries",
-            "failed",
+            ArrCommandResult.FAILED,
             ANY,
         )
 
@@ -152,9 +153,9 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
             "RescanSeries",
-            "timeout",
+            ArrCommandResult.TIMEOUT,
             300,
         )

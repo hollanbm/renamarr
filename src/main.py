@@ -13,7 +13,7 @@ from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
 from renamarr.logging_config import LoggingConfigurator
-from renamarr.observability import ServiceName, configure_observability
+from renamarr.observability import JobResult, ServiceName, configure_observability
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
@@ -49,7 +49,7 @@ class Main:
             job_name,
             time(),
         )
-        result = "success"
+        result = JobResult.SUCCESS
         try:
             with self.observability.start_span(
                 f"renamarr.job.{service}.{job_name}",
@@ -61,10 +61,10 @@ class Main:
             ):
                 job()
         except CliArrError as exc:
-            result = "failed"
+            result = JobResult.FAILED
             logger.error(exc)
         except Exception:
-            result = "failed"
+            result = JobResult.FAILED
             raise
         finally:
             self.observability.record_job(
@@ -77,9 +77,11 @@ class Main:
             self.observability.force_flush()
 
     def __sonarr_series_scanner_job(self, sonarr_config):
-        with logger.contextualize(service="sonarr", instance=sonarr_config.name):
+        with logger.contextualize(
+            service=ServiceName.SONARR, instance=sonarr_config.name
+        ):
             self.__run_observed_job(
-                "sonarr",
+                ServiceName.SONARR,
                 sonarr_config.name,
                 "series_scanner",
                 lambda: SonarrSeriesScanner(
@@ -100,9 +102,11 @@ class Main:
             )
 
     def __sonarr_renamarr_job(self, sonarr_config):
-        with logger.contextualize(service="sonarr", instance=sonarr_config.name):
+        with logger.contextualize(
+            service=ServiceName.SONARR, instance=sonarr_config.name
+        ):
             self.__run_observed_job(
-                "sonarr",
+                ServiceName.SONARR,
                 sonarr_config.name,
                 "renamarr",
                 lambda: SonarrRenamarr(
@@ -124,9 +128,11 @@ class Main:
             )
 
     def __radarr_renamarr_job(self, radarr_config):
-        with logger.contextualize(service="radarr", instance=radarr_config.name):
+        with logger.contextualize(
+            service=ServiceName.RADARR, instance=radarr_config.name
+        ):
             self.__run_observed_job(
-                "radarr",
+                ServiceName.RADARR,
                 radarr_config.name,
                 "renamarr",
                 lambda: RadarrRenamarr(
@@ -188,7 +194,7 @@ class Main:
             if sonarr_config.renamarr.enabled:
                 if sonarr_config.renamarr.log_to_file:
                     self._logging_configurator.configure_instance_file(
-                        "sonarr", sonarr_config.name
+                        ServiceName.SONARR, sonarr_config.name
                     )
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
@@ -196,7 +202,7 @@ class Main:
             if radarr_config.renamarr.enabled:
                 if radarr_config.renamarr.log_to_file:
                     self._logging_configurator.configure_instance_file(
-                        "radarr", radarr_config.name
+                        ServiceName.RADARR, radarr_config.name
                     )
                 self.__schedule_radarr_renamarr(radarr_config)
             else:

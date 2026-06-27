@@ -3,6 +3,7 @@ from unittest.mock import call
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
+from renamarr.observability import OperationName, OperationResult, ServiceName
 from renamarr.sonarr.services.series_rename import SeriesRename
 
 
@@ -34,17 +35,17 @@ class TestSeriesRename:
         ]
         rename_files.assert_not_called()
         fake_observability.record_operation_scanned_items.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "",
-            "rename",
+            OperationName.RENAME,
             2,
         )
         fake_observability.record_operation_candidate_items.assert_not_called()
         fake_observability.record_operation_run.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "",
-            "rename",
-            "noop",
+            OperationName.RENAME,
+            OperationResult.NOOP,
         )
 
     def test_process_renames_episodes_per_series(
@@ -79,35 +80,35 @@ class TestSeriesRename:
         fake_observability.start_span.assert_called_once_with(
             "renamarr.sonarr.rename",
             attributes={
-                "service": "sonarr",
+                "service": ServiceName.SONARR,
                 "name": "tv",
-                "operation": "rename",
+                "operation": OperationName.RENAME,
             },
         )
         fake_observability.record_operation_scanned_items.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
+            OperationName.RENAME,
             1,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
+            OperationName.RENAME,
             2,
         )
         fake_observability.record_operation_items.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
-            "accepted",
+            OperationName.RENAME,
+            OperationResult.ACCEPTED,
             2,
         )
         fake_observability.record_operation_run.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
-            "accepted",
+            OperationName.RENAME,
+            OperationResult.ACCEPTED,
         )
 
     def test_process_records_failed_metric_when_rename_submission_fails(
@@ -133,18 +134,43 @@ class TestSeriesRename:
 
         assert excinfo.value is exception
         fake_observability.record_operation_run.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
-            "failed",
+            OperationName.RENAME,
+            OperationResult.FAILED,
         )
         fake_observability.record_operation_items.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             "tv",
-            "rename",
-            "failed",
+            OperationName.RENAME,
+            OperationResult.FAILED,
             1,
         )
+
+    def test_process_records_failed_run_when_rename_discovery_fails(
+        self, fake_observability, mocker
+    ) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        series = SonarrSerieItem(id=1, title="Show")
+        mocker.patch(
+            "renamarr.sonarr.services.series_rename.get_observability",
+            return_value=fake_observability,
+        )
+        exception = RuntimeError("BOOM!")
+        mocker.patch.object(sonarr_cli, "request_get", side_effect=exception)
+
+        with pytest.raises(RuntimeError) as excinfo:
+            SeriesRename(sonarr_cli, name="tv").process([series])
+
+        assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            ServiceName.SONARR,
+            "tv",
+            OperationName.RENAME,
+            OperationResult.FAILED,
+        )
+        fake_observability.record_operation_candidate_items.assert_not_called()
+        fake_observability.record_operation_items.assert_not_called()
 
     def test_process_batches_each_series_independently(
         self, mock_loguru_info, mocker

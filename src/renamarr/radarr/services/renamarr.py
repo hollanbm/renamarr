@@ -1,7 +1,7 @@
 from loguru import logger
 from pycliarr.api import RadarrCli
 
-from renamarr.observability import get_observability
+from renamarr.observability import OperationName, ServiceName, get_observability
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
 from renamarr.radarr.services.movie_rename import MovieRename
@@ -26,7 +26,11 @@ class RadarrRenamarr:
         observability = get_observability()
         with observability.start_span(
             "renamarr.radarr.scan",
-            attributes={"service": "radarr", "name": self.name, "job": "renamarr"},
+            attributes={
+                "service": ServiceName.RADARR,
+                "name": self.name,
+                "job": "renamarr",
+            },
         ):
             with logger.contextualize(instance=self.name):
                 logger.info("Starting Renamarr")
@@ -35,9 +39,9 @@ class RadarrRenamarr:
                     with observability.start_span(
                         "renamarr.radarr.analyze_files",
                         attributes={
-                            "service": "radarr",
+                            "service": ServiceName.RADARR,
                             "name": self.name,
-                            "operation": "analyze_files",
+                            "operation": OperationName.ANALYZE_FILES,
                         },
                     ):
                         AnalyzeFiles(self.radarr_cli, name=self.name).process()

@@ -2,7 +2,8 @@ import os
 import time
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
-from typing import Literal, Protocol, TypeAlias
+from enum import StrEnum
+from typing import Protocol, TypeAlias
 
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -17,11 +18,45 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 AttributeValue: TypeAlias = str | bool | int | float
 SpanAttributes: TypeAlias = Mapping[str, AttributeValue]
 TraceContext: TypeAlias = dict[str, str]
-ServiceName: TypeAlias = Literal["sonarr", "radarr"]
-OperationName: TypeAlias = Literal["rename", "folder_rename"]
-OperationResult: TypeAlias = Literal["accepted", "failed", "noop"]
-JobResult: TypeAlias = Literal["success", "failed"]
-ArrCommandResult: TypeAlias = Literal["successful", "failed", "timeout"]
+
+
+class ServiceName(StrEnum):
+    """Supported Arr service names."""
+
+    SONARR = "sonarr"
+    RADARR = "radarr"
+
+
+class OperationName(StrEnum):
+    """Telemetry operation names."""
+
+    RENAME = "rename"
+    FOLDER_RENAME = "folder_rename"
+    ANALYZE_FILES = "analyze_files"
+
+
+class OperationResult(StrEnum):
+    """Telemetry operation result labels."""
+
+    ACCEPTED = "accepted"
+    FAILED = "failed"
+    NOOP = "noop"
+
+
+class JobResult(StrEnum):
+    """Telemetry job result labels."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+class ArrCommandResult(StrEnum):
+    """Telemetry Arr command result labels."""
+
+    SUCCESSFUL = "successful"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+
 
 OTEL_ENABLED_ENV_VAR = "RENAMARR_OTEL_ENABLED"
 DEFAULT_SERVICE_NAME = "renamarr"
@@ -403,7 +438,7 @@ class OpenTelemetryObservability:
             timestamp_seconds,
             attributes=timestamp_attributes,
         )
-        if result == "success":
+        if result == JobResult.SUCCESS:
             self._job_last_success.set(
                 timestamp_seconds,
                 attributes=timestamp_attributes,

@@ -12,6 +12,8 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job, Scheduler
 
+from renamarr.observability import JobResult, ServiceName
+
 # disable config caching
 configparser.hold_an_instance = False
 
@@ -133,7 +135,7 @@ class TestMain:
         Main().start()
 
         logging_configurator.configure_instance_file.assert_called_once_with(
-            "sonarr", config.sonarr[0].name
+            ServiceName.SONARR, config.sonarr[0].name
         )
 
     def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
@@ -196,7 +198,9 @@ class TestMain:
             api_key=config.sonarr[0].api_key,
             hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
         )
-        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
+        contextualize.assert_any_call(
+            service=ServiceName.SONARR, instance=config.sonarr[0].name
+        )
         mock_loguru_error.assert_called_once_with(exception)
 
     def test_sonarr_renamarr_scan(self, config, mocker) -> None:
@@ -235,22 +239,22 @@ class TestMain:
         fake_observability.start_span.assert_called_once_with(
             "renamarr.job.sonarr.renamarr",
             attributes={
-                "service": "sonarr",
+                "service": ServiceName.SONARR,
                 "name": config.sonarr[0].name,
                 "job": "renamarr",
             },
         )
         fake_observability.record_job_started.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             config.sonarr[0].name,
             "renamarr",
             100.0,
         )
         fake_observability.record_job.assert_called_once_with(
-            "sonarr",
+            ServiceName.SONARR,
             config.sonarr[0].name,
             "renamarr",
-            "success",
+            JobResult.SUCCESS,
             2.5,
         )
         fake_observability.force_flush.assert_called_once_with()
@@ -274,22 +278,22 @@ class TestMain:
         fake_observability.start_span.assert_called_once_with(
             "renamarr.job.radarr.renamarr",
             attributes={
-                "service": "radarr",
+                "service": ServiceName.RADARR,
                 "name": config.radarr[0].name,
                 "job": "renamarr",
             },
         )
         fake_observability.record_job_started.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             config.radarr[0].name,
             "renamarr",
             101.0,
         )
         fake_observability.record_job.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             config.radarr[0].name,
             "renamarr",
-            "failed",
+            JobResult.FAILED,
             3.0,
         )
         fake_observability.force_flush.assert_called_once_with()
@@ -314,16 +318,16 @@ class TestMain:
 
         assert excinfo.value is exception
         fake_observability.record_job_started.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             config.radarr[0].name,
             "renamarr",
             101.0,
         )
         fake_observability.record_job.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             config.radarr[0].name,
             "renamarr",
-            "failed",
+            JobResult.FAILED,
             3.0,
         )
         fake_observability.force_flush.assert_called_once_with()
@@ -418,7 +422,9 @@ class TestMain:
             analyze_files=config.sonarr[0].renamarr.analyze_files,
             rename_folders=config.sonarr[0].renamarr.rename_folders,
         )
-        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
+        contextualize.assert_any_call(
+            service=ServiceName.SONARR, instance=config.sonarr[0].name
+        )
         mock_loguru_error.assert_called_once_with(exception)
 
     def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
@@ -523,7 +529,7 @@ class TestMain:
         Main().start()
 
         logging_configurator.configure_instance_file.assert_called_once_with(
-            "radarr", config.radarr[0].name
+            ServiceName.RADARR, config.radarr[0].name
         )
 
     def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
@@ -594,5 +600,7 @@ class TestMain:
             analyze_files=config.radarr[0].renamarr.analyze_files,
             rename_folders=config.radarr[0].renamarr.rename_folders,
         )
-        contextualize.assert_any_call(service="radarr", instance=config.radarr[0].name)
+        contextualize.assert_any_call(
+            service=ServiceName.RADARR, instance=config.radarr[0].name
+        )
         mock_loguru_error.assert_called_once_with(exception)

@@ -6,7 +6,13 @@ from loguru import logger
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data, json_dict
 
-from renamarr.observability import ArrCommandResult, get_observability
+from renamarr.observability import (
+    ArrCommandResult,
+    OperationName,
+    OperationResult,
+    ServiceName,
+    get_observability,
+)
 from renamarr.sonarr.models.folder_rename_plan import SonarrFolderRenamePlan
 
 MAX_WAIT_SECONDS = 5 * 60
@@ -26,112 +32,111 @@ class SeriesFolderRename:
     def process(self, series: list[SonarrSerieItem]) -> None:
         """Rename series folders whose path differs from Sonarr's expected folder."""
         observability = get_observability()
+        operation_result = OperationResult.FAILED
         with observability.start_span(
             "renamarr.sonarr.folder_rename",
             attributes={
-                "service": "sonarr",
+                "service": ServiceName.SONARR,
                 "name": self.name,
-                "operation": "folder_rename",
+                "operation": OperationName.FOLDER_RENAME,
             },
         ):
-            observability.record_operation_scanned_items(
-                "sonarr",
-                self.name,
-                "folder_rename",
-                len(series),
-            )
-            folder_rename_plan = self.__build_folder_rename_plan(series)
-            candidate_count = sum(
-                len(root_folder_rename.series)
-                for root_folder_rename in folder_rename_plan.root_folder_renames
-            )
-            observability.record_operation_candidate_items(
-                "sonarr",
-                self.name,
-                "folder_rename",
-                candidate_count,
-            )
+            try:
+                observability.record_operation_scanned_items(
+                    ServiceName.SONARR,
+                    self.name,
+                    OperationName.FOLDER_RENAME,
+                    len(series),
+                )
+                folder_rename_plan = self.__build_folder_rename_plan(series)
+                candidate_count = sum(
+                    len(root_folder_rename.series)
+                    for root_folder_rename in folder_rename_plan.root_folder_renames
+                )
+                observability.record_operation_candidate_items(
+                    ServiceName.SONARR,
+                    self.name,
+                    OperationName.FOLDER_RENAME,
+                    candidate_count,
+                )
 
-            if not folder_rename_plan.has_folder_renames():
+                if not folder_rename_plan.has_folder_renames():
+                    operation_result = OperationResult.NOOP
+                    return
+
+                operation_failed = False
+                logger.debug("Processing pending series folder renames")
+                for root_folder_rename in folder_rename_plan.root_folder_renames:
+                    series_titles = folder_rename_plan.get_series_titles(
+                        root_folder_rename
+                    )
+                    series_ids = folder_rename_plan.get_series_ids(root_folder_rename)
+
+                    multiple_series = len(series_ids) > 1
+                    logger.info(
+                        f"Renaming Series {'folders' if multiple_series else 'folder'} "
+                        f"for: {series_titles}"
+                    )
+                    try:
+                        folder_rename_response = self.sonarr_cli.request_put(
+                            path="/api/v3/series/editor",
+                            json_data=dict(
+                                rootFolderPath=root_folder_rename.root_folder_path,
+                                seriesIds=series_ids,
+                                moveFiles=root_folder_rename.move_files,
+                            ),
+                        )
+                    except Exception:
+                        observability.record_operation_items(
+                            ServiceName.SONARR,
+                            self.name,
+                            OperationName.FOLDER_RENAME,
+                            OperationResult.FAILED,
+                            len(series_ids),
+                        )
+                        raise
+                    if not 200 <= folder_rename_response.status_code <= 299:
+                        operation_failed = True
+                        observability.record_operation_items(
+                            ServiceName.SONARR,
+                            self.name,
+                            OperationName.FOLDER_RENAME,
+                            OperationResult.FAILED,
+                            len(series_ids),
+                        )
+                        logger.error(
+                            f"Series folder rename failed for series: {series_titles}: "
+                            f"status code {folder_rename_response.status_code}"
+                        )
+                        continue
+
+                    observability.record_operation_items(
+                        ServiceName.SONARR,
+                        self.name,
+                        OperationName.FOLDER_RENAME,
+                        OperationResult.ACCEPTED,
+                        len(series_ids),
+                    )
+                    logger.info(
+                        f"Series folder rename successful for series: {series_titles}"
+                    )
+                    logger.info("Initiated disk scan of updated series")
+                    if self.__rescan_series(series_ids):
+                        logger.info("disk scan finished successfully")
+                    else:
+                        logger.info("disk scan failed")
+                operation_result = (
+                    OperationResult.FAILED
+                    if operation_failed
+                    else OperationResult.ACCEPTED
+                )
+            finally:
                 observability.record_operation_run(
-                    "sonarr",
+                    ServiceName.SONARR,
                     self.name,
-                    "folder_rename",
-                    "noop",
+                    OperationName.FOLDER_RENAME,
+                    operation_result,
                 )
-                return
-
-            operation_failed = False
-            logger.debug("Processing pending series folder renames")
-            for root_folder_rename in folder_rename_plan.root_folder_renames:
-                series_titles = folder_rename_plan.get_series_titles(root_folder_rename)
-                series_ids = folder_rename_plan.get_series_ids(root_folder_rename)
-
-                multiple_series = len(series_ids) > 1
-                logger.info(
-                    f"Renaming Series {'folders' if multiple_series else 'folder'} "
-                    f"for: {series_titles}"
-                )
-                try:
-                    folder_rename_response = self.sonarr_cli.request_put(
-                        path="/api/v3/series/editor",
-                        json_data=dict(
-                            rootFolderPath=root_folder_rename.root_folder_path,
-                            seriesIds=series_ids,
-                            moveFiles=root_folder_rename.move_files,
-                        ),
-                    )
-                except Exception:
-                    observability.record_operation_run(
-                        "sonarr",
-                        self.name,
-                        "folder_rename",
-                        "failed",
-                    )
-                    observability.record_operation_items(
-                        "sonarr",
-                        self.name,
-                        "folder_rename",
-                        "failed",
-                        len(series_ids),
-                    )
-                    raise
-                if not 200 <= folder_rename_response.status_code <= 299:
-                    operation_failed = True
-                    observability.record_operation_items(
-                        "sonarr",
-                        self.name,
-                        "folder_rename",
-                        "failed",
-                        len(series_ids),
-                    )
-                    logger.error(
-                        f"Series folder rename failed for series: {series_titles}: "
-                        f"status code {folder_rename_response.status_code}"
-                    )
-                    continue
-
-                observability.record_operation_items(
-                    "sonarr",
-                    self.name,
-                    "folder_rename",
-                    "accepted",
-                    len(series_ids),
-                )
-                logger.info(
-                    f"Series folder rename successful for series: {series_titles}"
-                )
-                logger.info("Initiated disk scan of updated series")
-                if self.__rescan_series(series_ids):
-                    logger.info("disk scan finished successfully")
-                else:
-                    logger.info("disk scan failed")
-            observability.record_operation_run(
-                "sonarr",
-                self.name,
-                "folder_rename",
-                "failed" if operation_failed else "accepted",
-            )
 
     def __build_folder_rename_plan(
         self, series: list[SonarrSerieItem]
@@ -209,7 +214,7 @@ class SeriesFolderRename:
     def __rescan_series(self, series_ids: list[int]) -> bool:
         """Rescan the Sonarr series library after folder moves."""
         start = time.time()
-        result: ArrCommandResult = "failed"
+        result = ArrCommandResult.FAILED
 
         try:
             rescan_command = self.sonarr_cli._sendCommand(
@@ -222,16 +227,20 @@ class SeriesFolderRename:
                         f"Timed out waiting for Sonarr series rescan command {rescan_command['id']} "
                         f"after {MAX_WAIT_SECONDS} seconds"
                     )
-                    result = "timeout"
+                    result = ArrCommandResult.TIMEOUT
                     return False
                 sleep(10)
                 resp = self.sonarr_cli.get_command(cid=rescan_command["id"])
 
-            result = "successful" if resp["result"] == "successful" else "failed"
-            return result == "successful"
+            result = (
+                ArrCommandResult.SUCCESSFUL
+                if resp["result"] == ArrCommandResult.SUCCESSFUL
+                else ArrCommandResult.FAILED
+            )
+            return result == ArrCommandResult.SUCCESSFUL
         finally:
             get_observability().record_arr_command(
-                "sonarr",
+                ServiceName.SONARR,
                 self.name,
                 "RescanSeries",
                 result,

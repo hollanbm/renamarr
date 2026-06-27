@@ -5,7 +5,7 @@ from loguru import logger
 from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
 
-from renamarr.observability import ArrCommandResult, get_observability
+from renamarr.observability import ArrCommandResult, ServiceName, get_observability
 
 MAX_WAIT_SECONDS = 5 * 60
 
@@ -35,7 +35,7 @@ class AnalyzeFiles:
         observability = get_observability()
         command_name = "RescanSeries"
         start_time = time.time()
-        result: ArrCommandResult = "failed"
+        result = ArrCommandResult.FAILED
         try:
             rescan_command = self.sonarr_cli._sendCommand(
                 {
@@ -51,16 +51,20 @@ class AnalyzeFiles:
                         f"Timed out waiting for Sonarr analyze files command {rescan_command['id']} "
                         f"after {MAX_WAIT_SECONDS} seconds"
                     )
-                    result = "timeout"
+                    result = ArrCommandResult.TIMEOUT
                     return False
                 sleep(10)
                 resp = self.sonarr_cli.get_command(cid=rescan_command["id"])
 
-            result = "successful" if resp["result"] == "successful" else "failed"
-            return result == "successful"
+            result = (
+                ArrCommandResult.SUCCESSFUL
+                if resp["result"] == ArrCommandResult.SUCCESSFUL
+                else ArrCommandResult.FAILED
+            )
+            return result == ArrCommandResult.SUCCESSFUL
         finally:
             observability.record_arr_command(
-                "sonarr",
+                ServiceName.SONARR,
                 self.name,
                 command_name,
                 result,

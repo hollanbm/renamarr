@@ -3,6 +3,7 @@ from unittest.mock import call
 import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
+from renamarr.observability import OperationName, OperationResult, ServiceName
 from renamarr.radarr.services.movie_rename import MovieRename
 
 
@@ -34,22 +35,22 @@ class TestMovieRename:
         ]
         send_command.assert_not_called()
         fake_observability.record_operation_scanned_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "",
-            "rename",
+            OperationName.RENAME,
             2,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "",
-            "rename",
+            OperationName.RENAME,
             0,
         )
         fake_observability.record_operation_run.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "",
-            "rename",
-            "noop",
+            OperationName.RENAME,
+            OperationResult.NOOP,
         )
 
     def test_process_sends_one_rename_movie_command_with_movie_ids(
@@ -85,35 +86,35 @@ class TestMovieRename:
         fake_observability.start_span.assert_called_once_with(
             "renamarr.radarr.rename",
             attributes={
-                "service": "radarr",
+                "service": ServiceName.RADARR,
                 "name": "movies",
-                "operation": "rename",
+                "operation": OperationName.RENAME,
             },
         )
         fake_observability.record_operation_scanned_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
+            OperationName.RENAME,
             2,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
+            OperationName.RENAME,
             2,
         )
         fake_observability.record_operation_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
-            "accepted",
+            OperationName.RENAME,
+            OperationResult.ACCEPTED,
             2,
         )
         fake_observability.record_operation_run.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
-            "accepted",
+            OperationName.RENAME,
+            OperationResult.ACCEPTED,
         )
 
     def test_process_records_failed_metric_when_rename_command_fails(
@@ -139,15 +140,40 @@ class TestMovieRename:
 
         assert excinfo.value is exception
         fake_observability.record_operation_run.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
-            "failed",
+            OperationName.RENAME,
+            OperationResult.FAILED,
         )
         fake_observability.record_operation_items.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
-            "rename",
-            "failed",
+            OperationName.RENAME,
+            OperationResult.FAILED,
             1,
         )
+
+    def test_process_records_failed_run_when_rename_discovery_fails(
+        self, fake_observability, mocker
+    ) -> None:
+        radarr_cli = RadarrCli("test.tld", "test-api-key")
+        movie = RadarrMovieItem(id=1, title="Movie")
+        mocker.patch(
+            "renamarr.radarr.services.movie_rename.get_observability",
+            return_value=fake_observability,
+        )
+        exception = RuntimeError("BOOM!")
+        mocker.patch.object(radarr_cli, "request_get", side_effect=exception)
+
+        with pytest.raises(RuntimeError) as excinfo:
+            MovieRename(radarr_cli, name="movies").process([movie])
+
+        assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            ServiceName.RADARR,
+            "movies",
+            OperationName.RENAME,
+            OperationResult.FAILED,
+        )
+        fake_observability.record_operation_candidate_items.assert_not_called()
+        fake_observability.record_operation_items.assert_not_called()

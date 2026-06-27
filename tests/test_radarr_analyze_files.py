@@ -2,6 +2,7 @@ from unittest.mock import ANY, call
 
 from pycliarr.api import RadarrCli
 
+from renamarr.observability import ArrCommandResult, ServiceName
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 
 
@@ -63,10 +64,10 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
             "RescanMovie",
-            "successful",
+            ArrCommandResult.SUCCESSFUL,
             ANY,
         )
 
@@ -108,10 +109,10 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
             "RescanMovie",
-            "failed",
+            ArrCommandResult.FAILED,
             ANY,
         )
 
@@ -152,9 +153,9 @@ class TestAnalyzeFiles:
             ]
         )
         fake_observability.record_arr_command.assert_called_once_with(
-            "radarr",
+            ServiceName.RADARR,
             "movies",
             "RescanMovie",
-            "timeout",
+            ArrCommandResult.TIMEOUT,
             300,
         )
