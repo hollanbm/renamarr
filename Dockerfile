@@ -1,4 +1,4 @@
-ARG UV_VERSION=0.11.23
+ARG UV_VERSION=0.11.24
 ARG RUNTIME_IMAGE=dhi.io/debian-base:trixie
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}-debian AS builder
