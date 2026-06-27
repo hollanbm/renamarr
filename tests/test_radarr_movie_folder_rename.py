@@ -1,5 +1,5 @@
 from pathlib import PurePosixPath
-from unittest.mock import call
+from unittest.mock import ANY, call
 
 import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
@@ -129,10 +129,32 @@ class TestMovieFolderRename:
         )
         fake_observability.record_operation_items.assert_has_calls(
             [
-                call("radarr", "folder_rename", "movies", "accepted", 2),
-                call("radarr", "folder_rename", "movies", "accepted", 1),
+                call("radarr", "movies", "folder_rename", "accepted", 2),
+                call("radarr", "movies", "folder_rename", "accepted", 1),
             ]
         )
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "radarr",
+            "movies",
+            "folder_rename",
+            3,
+        )
+        fake_observability.record_operation_candidate_items.assert_called_once_with(
+            "radarr",
+            "movies",
+            "folder_rename",
+            3,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "movies",
+            "folder_rename",
+            "accepted",
+        )
+        assert fake_observability.record_arr_command.call_args_list == [
+            call("radarr", "movies", "RefreshMovie", "successful", ANY),
+            call("radarr", "movies", "RefreshMovie", "successful", ANY),
+        ]
 
     @pytest.mark.parametrize(
         ("movie_a_root", "movie_b_root"),
@@ -277,7 +299,7 @@ class TestMovieFolderRename:
         sleep = mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
         mocker.patch(
             "renamarr.radarr.services.movie_folder_rename.time.time",
-            side_effect=[0, 0, MAX_WAIT_SECONDS],
+            side_effect=[0, 0, MAX_WAIT_SECONDS, MAX_WAIT_SECONDS],
         )
 
         MovieFolderRename(radarr_cli).process([movie])
@@ -329,10 +351,16 @@ class TestMovieFolderRename:
         )
         fake_observability.record_operation_items.assert_called_once_with(
             "radarr",
-            "folder_rename",
             "movies",
+            "folder_rename",
             "failed",
             1,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "movies",
+            "folder_rename",
+            "failed",
         )
 
     def test_process_records_failed_metric_when_folder_rename_request_fails(
@@ -355,10 +383,16 @@ class TestMovieFolderRename:
             MovieFolderRename(radarr_cli, name="movies").process([movie])
 
         assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "movies",
+            "folder_rename",
+            "failed",
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "radarr",
-            "folder_rename",
             "movies",
+            "folder_rename",
             "failed",
             1,
         )

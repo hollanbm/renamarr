@@ -1,4 +1,4 @@
-from unittest.mock import call
+from unittest.mock import ANY, call
 
 from pycliarr.api import SonarrCli
 
@@ -23,9 +23,13 @@ class TestAnalyzeFiles:
         send_command.assert_not_called()
 
     def test_process_logs_success_when_rescan_succeeds(
-        self, mock_loguru_info, mocker
+        self, fake_observability, mock_loguru_info, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        mocker.patch(
+            "renamarr.sonarr.services.analyze_files.get_observability",
+            return_value=fake_observability,
+        )
         mocker.patch.object(
             sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
         )
@@ -42,7 +46,7 @@ class TestAnalyzeFiles:
         )
         sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
 
-        AnalyzeFiles(sonarr_cli).process()
+        AnalyzeFiles(sonarr_cli, name="tv").process()
 
         send_command.assert_called_once_with(
             {
@@ -58,11 +62,22 @@ class TestAnalyzeFiles:
                 call("disk scan finished successfully"),
             ]
         )
+        fake_observability.record_arr_command.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "RescanSeries",
+            "successful",
+            ANY,
+        )
 
     def test_process_logs_failure_when_rescan_fails(
-        self, mock_loguru_info, mocker
+        self, fake_observability, mock_loguru_info, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        mocker.patch(
+            "renamarr.sonarr.services.analyze_files.get_observability",
+            return_value=fake_observability,
+        )
         mocker.patch.object(
             sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
         )
@@ -76,7 +91,7 @@ class TestAnalyzeFiles:
         )
         sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
 
-        AnalyzeFiles(sonarr_cli).process()
+        AnalyzeFiles(sonarr_cli, name="tv").process()
 
         send_command.assert_called_once_with(
             {
@@ -91,4 +106,55 @@ class TestAnalyzeFiles:
                 call("Initiated disk scan of library"),
                 call("disk scan failed"),
             ]
+        )
+        fake_observability.record_arr_command.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "RescanSeries",
+            "failed",
+            ANY,
+        )
+
+    def test_process_logs_failure_and_records_timeout_when_rescan_times_out(
+        self, fake_observability, mock_loguru_error, mock_loguru_info, mocker
+    ) -> None:
+        sonarr_cli = SonarrCli("test.tld", "test-api-key")
+        mocker.patch(
+            "renamarr.sonarr.services.analyze_files.get_observability",
+            return_value=fake_observability,
+        )
+        mocker.patch.object(
+            sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
+        )
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=1))
+        get_command = mocker.patch.object(
+            sonarr_cli,
+            "get_command",
+            return_value=dict(status="started"),
+        )
+        sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
+        mocker.patch(
+            "renamarr.sonarr.services.analyze_files.time.time",
+            side_effect=[0, 0, 300, 300],
+        )
+
+        AnalyzeFiles(sonarr_cli, name="tv").process()
+
+        get_command.assert_called_once_with(cid=1)
+        sleep.assert_called_once_with(10)
+        mock_loguru_error.assert_called_once_with(
+            "Timed out waiting for Sonarr analyze files command 1 after 300 seconds"
+        )
+        mock_loguru_info.assert_has_calls(
+            [
+                call("Initiated disk scan of library"),
+                call("disk scan failed"),
+            ]
+        )
+        fake_observability.record_arr_command.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "RescanSeries",
+            "timeout",
+            300,
         )

@@ -6,7 +6,7 @@ from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem
 from pycliarr.api.base_api import json_data, json_dict
 
-from renamarr.observability import get_observability
+from renamarr.observability import ArrCommandResult, get_observability
 from renamarr.radarr.models.folder_rename_plan import RadarrFolderRenamePlan
 
 MAX_WAIT_SECONDS = 5 * 60
@@ -34,11 +34,34 @@ class MovieFolderRename:
                 "operation": "folder_rename",
             },
         ):
+            observability.record_operation_scanned_items(
+                "radarr",
+                self.name,
+                "folder_rename",
+                len(movies),
+            )
             folder_rename_plan = self.__build_folder_rename_plan(movies)
+            candidate_count = sum(
+                len(root_folder_rename.movies)
+                for root_folder_rename in folder_rename_plan.root_folder_renames
+            )
+            observability.record_operation_candidate_items(
+                "radarr",
+                self.name,
+                "folder_rename",
+                candidate_count,
+            )
 
             if not folder_rename_plan.has_folder_renames():
+                observability.record_operation_run(
+                    "radarr",
+                    self.name,
+                    "folder_rename",
+                    "noop",
+                )
                 return
 
+            operation_failed = False
             logger.debug("Processing pending movie folder renames")
             for root_folder_rename in folder_rename_plan.root_folder_renames:
                 movie_titles = folder_rename_plan.get_movie_titles(root_folder_rename)
@@ -60,19 +83,26 @@ class MovieFolderRename:
                         ),
                     )
                 except Exception:
+                    observability.record_operation_run(
+                        "radarr",
+                        self.name,
+                        "folder_rename",
+                        "failed",
+                    )
                     observability.record_operation_items(
                         "radarr",
-                        "folder_rename",
                         self.name,
+                        "folder_rename",
                         "failed",
                         len(movie_ids),
                     )
                     raise
                 if not 200 <= folder_rename_response.status_code <= 299:
+                    operation_failed = True
                     observability.record_operation_items(
                         "radarr",
-                        "folder_rename",
                         self.name,
+                        "folder_rename",
                         "failed",
                         len(movie_ids),
                     )
@@ -84,8 +114,8 @@ class MovieFolderRename:
 
                 observability.record_operation_items(
                     "radarr",
-                    "folder_rename",
                     self.name,
+                    "folder_rename",
                     "accepted",
                     len(movie_ids),
                 )
@@ -98,6 +128,12 @@ class MovieFolderRename:
                     logger.info("disk scan finished successfully")
                 else:
                     logger.info("disk scan failed")
+            observability.record_operation_run(
+                "radarr",
+                self.name,
+                "folder_rename",
+                "failed" if operation_failed else "accepted",
+            )
 
     def __build_folder_rename_plan(
         self, movies: list[RadarrMovieItem]
@@ -176,23 +212,35 @@ class MovieFolderRename:
     def __rescan_movies(self, movie_ids: list[int]) -> bool:
         """Rescan the Radarr movies that were moved."""
         start = time.time()
-        rescan_command = self.radarr_cli._sendCommand(
-            {
-                "priority": "high",
-                "name": "RefreshMovie",
-                "movieIds": movie_ids,
-            }
-        )
-        resp: json_data = {}
+        result: ArrCommandResult = "failed"
 
-        while resp.get("status") != "completed":
-            if time.time() - start >= MAX_WAIT_SECONDS:
-                logger.error(
-                    f"Timed out waiting for Radarr movie rescan command {rescan_command['id']} "
-                    f"after {MAX_WAIT_SECONDS} seconds"
-                )
-                return False
-            sleep(10)
-            resp = self.radarr_cli.get_command(cid=rescan_command["id"])
+        try:
+            rescan_command = self.radarr_cli._sendCommand(
+                {
+                    "priority": "high",
+                    "name": "RefreshMovie",
+                    "movieIds": movie_ids,
+                }
+            )
+            resp: json_data = {}
+            while resp.get("status") != "completed":
+                if time.time() - start >= MAX_WAIT_SECONDS:
+                    logger.error(
+                        f"Timed out waiting for Radarr movie rescan command {rescan_command['id']} "
+                        f"after {MAX_WAIT_SECONDS} seconds"
+                    )
+                    result = "timeout"
+                    return False
+                sleep(10)
+                resp = self.radarr_cli.get_command(cid=rescan_command["id"])
 
-        return resp["result"] == "successful"
+            result = "successful" if resp["result"] == "successful" else "failed"
+            return result == "successful"
+        finally:
+            get_observability().record_arr_command(
+                "radarr",
+                self.name,
+                "RefreshMovie",
+                result,
+                time.time() - start,
+            )

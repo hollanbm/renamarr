@@ -2,7 +2,7 @@ import os
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Generator
-from unittest.mock import ANY, PropertyMock
+from unittest.mock import PropertyMock
 
 import pytest
 from loguru import logger
@@ -32,30 +32,6 @@ class TestMain:
         os.environ["EXTERNAL_CRON"] = "TRUE"
         yield
         del os.environ["EXTERNAL_CRON"]
-
-    @pytest.fixture
-    def log_dir(self) -> Generator:
-        os.environ["LOG_DIR"] = "/tmp/renamarr-logs"
-        yield
-        del os.environ["LOG_DIR"]
-
-    @pytest.fixture
-    def log_retention(self) -> Generator:
-        os.environ["LOG_RETENTION"] = "14 days"
-        yield
-        del os.environ["LOG_RETENTION"]
-
-    @pytest.fixture
-    def log_rotation(self) -> Generator:
-        os.environ["LOG_ROTATION"] = "12:00"
-        yield
-        del os.environ["LOG_ROTATION"]
-
-    @pytest.fixture
-    def log_level(self) -> Generator:
-        os.environ["LOG_LEVEL"] = "DEBUG"
-        yield
-        del os.environ["LOG_LEVEL"]
 
     @pytest.fixture
     def config_dir(self) -> Generator:
@@ -138,154 +114,40 @@ class TestMain:
         finally:
             del os.environ["CONFIG_DIR"]
 
-    def test_init_uses_log_level_env_var(self, log_level, mocker) -> None:
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
-
-    def test_init_keeps_log_format_unchanged_when_otel_is_disabled(
-        self, mocker
-    ) -> None:
-        mocker.patch("main.load_dotenv")
-        mocker.patch("main.is_otel_enabled", return_value=False)
-        configure_observability = mocker.patch("main.configure_observability")
-        logger_configure = mocker.patch.object(logger, "configure")
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_configure.assert_called_once_with(
-            extra={"instance": "", "item": ""},
-            patcher=None,
-        )
-        assert logger_add.call_args_list[0].kwargs["format"] == Main._LOG_FORMAT
-        configure_observability.assert_called_once_with()
-
-    def test_init_adds_trace_fields_when_otel_is_enabled(self, mocker) -> None:
-        mocker.patch("main.load_dotenv")
-        mocker.patch.dict(os.environ, {}, clear=True)
-        mocker.patch("main.is_otel_enabled", return_value=True)
-        configure_observability = mocker.patch("main.configure_observability")
-        logger_configure = mocker.patch.object(logger, "configure")
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_configure.assert_called_once_with(
-            extra={"instance": "", "item": "", "trace_id": "", "span_id": ""},
-            patcher=ANY,
-        )
-        assert logger_configure.call_args.kwargs["patcher"].__name__ == (
-            "enrich_log_record_with_trace"
-        )
-        logger_format = logger_add.call_args_list[0].kwargs["format"]
-        assert "trace_id={extra[trace_id]}" in logger_format
-        assert "span_id={extra[span_id]}" in logger_format
-        configure_observability.assert_called_once_with()
-
-    def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
-        mocker.patch("main.load_dotenv")
-        mocker.patch.dict(os.environ, {}, clear=True)
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_format = logger_add.call_args_list[0].kwargs["format"]
-        logger_name_format = "<cyan>{name}</cyan>"
-        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        assert logger_name_format not in logger_format
-        assert source_location_format not in logger_format
-
-    def test_init_shows_logger_name_and_source_location_when_log_level_is_debug(
-        self, mocker
-    ) -> None:
-        mocker.patch.dict(os.environ, {"LOG_LEVEL": "debug"})
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_format = logger_add.call_args_list[0].kwargs["format"]
-        logger_name_format = "<cyan>{name}</cyan>"
-        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        assert f"{logger_name_format}:{source_location_format}" in logger_format
-
     def test_init_loads_local_dotenv_file(self, mocker) -> None:
-        logger_add = mocker.patch.object(logger, "add")
         load_dotenv = mocker.patch("main.load_dotenv")
+        logging_configurator = mocker.patch("main.LoggingConfigurator").return_value
 
         Main()
 
-        load_dotenv.assert_called_once()
-        assert load_dotenv.call_args.args == (".env.local",)
-        assert logger_add.called
+        load_dotenv.assert_called_once_with(".env.local")
+        logging_configurator.configure_stdout.assert_called_once_with()
 
-    def test_sonarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
-    ) -> None:
+    def test_sonarr_log_to_file_configures_instance_sink(self, config, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
+        logging_configurator = mocker.patch("main.LoggingConfigurator").return_value
 
-        main.start()
+        Main().start()
 
-        file_sink_call = next(
-            call
-            for call in logger_add.call_args_list
-            if call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log"
+        logging_configurator.configure_instance_file.assert_called_once_with(
+            "sonarr", config.sonarr[0].name
         )
-        assert file_sink_call.kwargs["format"]
-        assert file_sink_call.kwargs["level"] == "DEBUG"
-        assert file_sink_call.kwargs["rotation"] == "12:00"
-        assert file_sink_call.kwargs["retention"] == "14 days"
-
-        filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"service": "sonarr", "instance": "sonarr"}})
-        assert not filter_fn({"extra": {"service": "radarr", "instance": "sonarr"}})
-        assert not filter_fn({"extra": {"service": "sonarr", "instance": "sonarr1"}})
-        assert not filter_fn({"extra": {}})
 
     def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+        self, config, mocker
     ) -> None:
         config.sonarr[0].renamarr.enabled = False
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
+        logging_configurator = mocker.patch("main.LoggingConfigurator").return_value
 
-        main.start()
+        Main().start()
 
-        assert all(
-            not (call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log")
-            for call in logger_add.call_args_list
-        )
-
-    def test_sonarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
-    ) -> None:
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-        logger_add.side_effect = PermissionError("read-only file system")
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        configured = main._Main__configure_file_logging("sonarr", "sonarr")
-
-        assert not configured
-        contextualize.assert_called_once_with(service="sonarr", instance="sonarr")
-        mock_loguru_warning.assert_any_call(
-            "Unable to write logs to '/tmp/renamarr-logs/sonarr/sonarr.log'; continuing with stdout logging only."
-        )
-        assert isinstance(
-            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
-        )
+        logging_configurator.configure_instance_file.assert_not_called()
 
     def test_sonarr_series_scanner_hourly_job(
         self, config, enable_scheduler, mocker
@@ -364,6 +226,7 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
         mocker.patch("main.configure_observability", return_value=fake_observability)
+        mocker.patch("main.time", return_value=100.0)
         mocker.patch("main.perf_counter", side_effect=[10.0, 12.5])
         mocker.patch("main.SonarrRenamarr")
 
@@ -376,6 +239,12 @@ class TestMain:
                 "name": config.sonarr[0].name,
                 "job": "renamarr",
             },
+        )
+        fake_observability.record_job_started.assert_called_once_with(
+            "sonarr",
+            config.sonarr[0].name,
+            "renamarr",
+            100.0,
         )
         fake_observability.record_job.assert_called_once_with(
             "sonarr",
@@ -394,6 +263,7 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
         mocker.patch("main.configure_observability", return_value=fake_observability)
+        mocker.patch("main.time", return_value=101.0)
         mocker.patch("main.perf_counter", side_effect=[1.0, 4.0])
         exception = CliArrError("BOOM!")
         radarr_renamarr = mocker.patch("main.RadarrRenamarr")
@@ -409,6 +279,12 @@ class TestMain:
                 "job": "renamarr",
             },
         )
+        fake_observability.record_job_started.assert_called_once_with(
+            "radarr",
+            config.radarr[0].name,
+            "renamarr",
+            101.0,
+        )
         fake_observability.record_job.assert_called_once_with(
             "radarr",
             config.radarr[0].name,
@@ -419,6 +295,39 @@ class TestMain:
         fake_observability.force_flush.assert_called_once_with()
         fake_observability.shutdown.assert_called_once_with()
         mock_loguru_error.assert_called_once_with(exception)
+
+    def test_job_observability_records_unexpected_failure_before_reraising(
+        self, config, fake_observability, mocker
+    ) -> None:
+        config.radarr[0].renamarr.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.configure_observability", return_value=fake_observability)
+        mocker.patch("main.time", return_value=101.0)
+        mocker.patch("main.perf_counter", side_effect=[1.0, 4.0])
+        exception = RuntimeError("BOOM!")
+        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        radarr_renamarr.return_value.scan.side_effect = exception
+
+        with pytest.raises(RuntimeError) as excinfo:
+            Main().start()
+
+        assert excinfo.value is exception
+        fake_observability.record_job_started.assert_called_once_with(
+            "radarr",
+            config.radarr[0].name,
+            "renamarr",
+            101.0,
+        )
+        fake_observability.record_job.assert_called_once_with(
+            "radarr",
+            config.radarr[0].name,
+            "renamarr",
+            "failed",
+            3.0,
+        )
+        fake_observability.force_flush.assert_called_once_with()
+        fake_observability.shutdown.assert_called_once_with()
 
     def test_sonarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
@@ -604,53 +513,17 @@ class TestMain:
         )
         radarr_renamarr.return_value.scan.assert_called_once_with()
 
-    def test_radarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
-    ) -> None:
+    def test_radarr_log_to_file_configures_instance_sink(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
+        logging_configurator = mocker.patch("main.LoggingConfigurator").return_value
 
-        main.start()
+        Main().start()
 
-        file_sink_call = next(
-            call
-            for call in logger_add.call_args_list
-            if call.args and call.args[0] == "/tmp/renamarr-logs/radarr/radarr.log"
-        )
-        assert file_sink_call.kwargs["format"]
-        assert file_sink_call.kwargs["level"] == "DEBUG"
-        assert file_sink_call.kwargs["rotation"] == "12:00"
-        assert file_sink_call.kwargs["retention"] == "14 days"
-
-        filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"service": "radarr", "instance": "radarr"}})
-        assert not filter_fn({"extra": {"service": "sonarr", "instance": "radarr"}})
-        assert not filter_fn({"extra": {"service": "radarr", "instance": "radarr1"}})
-        assert not filter_fn({"extra": {}})
-
-    def test_radarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
-    ) -> None:
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-        logger_add.side_effect = PermissionError("read-only file system")
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        configured = main._Main__configure_file_logging("radarr", "radarr")
-
-        assert not configured
-        contextualize.assert_called_once_with(service="radarr", instance="radarr")
-        mock_loguru_warning.assert_any_call(
-            "Unable to write logs to '/tmp/renamarr-logs/radarr/radarr.log'; continuing with stdout logging only."
-        )
-        assert isinstance(
-            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
+        logging_configurator.configure_instance_file.assert_called_once_with(
+            "radarr", config.radarr[0].name
         )
 
     def test_radarr_renamarr_hourly_job(self, config, enable_scheduler, mocker) -> None:

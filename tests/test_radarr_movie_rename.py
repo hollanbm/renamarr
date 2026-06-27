@@ -8,11 +8,15 @@ from renamarr.radarr.services.movie_rename import MovieRename
 
 class TestMovieRename:
     def test_process_skips_command_when_no_movies_need_rename(
-        self, mock_loguru_debug, mocker
+        self, fake_observability, mock_loguru_debug, mocker
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A")
         movie_b = RadarrMovieItem(id=2, title="Movie B")
+        mocker.patch(
+            "renamarr.radarr.services.movie_rename.get_observability",
+            return_value=fake_observability,
+        )
         request_get = mocker.patch.object(radarr_cli, "request_get", return_value=[])
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 
@@ -29,6 +33,24 @@ class TestMovieRename:
             call("Nothing to rename"),
         ]
         send_command.assert_not_called()
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "radarr",
+            "",
+            "rename",
+            2,
+        )
+        fake_observability.record_operation_candidate_items.assert_called_once_with(
+            "radarr",
+            "",
+            "rename",
+            0,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "",
+            "rename",
+            "noop",
+        )
 
     def test_process_sends_one_rename_movie_command_with_movie_ids(
         self, fake_observability, mock_loguru_info, mocker
@@ -68,12 +90,30 @@ class TestMovieRename:
                 "operation": "rename",
             },
         )
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "radarr",
+            "movies",
+            "rename",
+            2,
+        )
+        fake_observability.record_operation_candidate_items.assert_called_once_with(
+            "radarr",
+            "movies",
+            "rename",
+            2,
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "radarr",
-            "rename",
             "movies",
+            "rename",
             "accepted",
             2,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "movies",
+            "rename",
+            "accepted",
         )
 
     def test_process_records_failed_metric_when_rename_command_fails(
@@ -98,10 +138,16 @@ class TestMovieRename:
             MovieRename(radarr_cli, name="movies").process([movie])
 
         assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            "radarr",
+            "movies",
+            "rename",
+            "failed",
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "radarr",
-            "rename",
             "movies",
+            "rename",
             "failed",
             1,
         )

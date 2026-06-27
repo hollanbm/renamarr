@@ -40,7 +40,7 @@ class RadarrRenamarr:
                             "operation": "analyze_files",
                         },
                     ):
-                        AnalyzeFiles(self.radarr_cli).process()
+                        AnalyzeFiles(self.radarr_cli, name=self.name).process()
 
                 movies = sorted(
                     self.radarr_cli.get_movie(), key=lambda movie: movie.title

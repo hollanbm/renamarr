@@ -24,13 +24,31 @@ class MovieRename:
                 "operation": "rename",
             },
         ):
+            observability.record_operation_scanned_items(
+                "radarr",
+                self.name,
+                "rename",
+                len(movies),
+            )
             movie_rename_plan = self.__build_movie_rename_plan(movies)
+            movie_ids = movie_rename_plan.get_movie_ids()
+            observability.record_operation_candidate_items(
+                "radarr",
+                self.name,
+                "rename",
+                len(movie_ids),
+            )
 
             if not movie_rename_plan.has_movie_renames():
+                observability.record_operation_run(
+                    "radarr",
+                    self.name,
+                    "rename",
+                    "noop",
+                )
                 return
 
             movie_names = movie_rename_plan.get_movie_titles()
-            movie_ids = movie_rename_plan.get_movie_ids()
             logger.info(f"Renaming Movies: {movie_names}")
             try:
                 self.radarr_cli._sendCommand(
@@ -40,20 +58,32 @@ class MovieRename:
                     }
                 )
             except Exception:
+                observability.record_operation_run(
+                    "radarr",
+                    self.name,
+                    "rename",
+                    "failed",
+                )
                 observability.record_operation_items(
                     "radarr",
-                    "rename",
                     self.name,
+                    "rename",
                     "failed",
                     len(movie_ids),
                 )
                 raise
             observability.record_operation_items(
                 "radarr",
-                "rename",
                 self.name,
+                "rename",
                 "accepted",
                 len(movie_ids),
+            )
+            observability.record_operation_run(
+                "radarr",
+                self.name,
+                "rename",
+                "accepted",
             )
             logger.info(f"Movie rename successful for movies: {movie_names}")
 

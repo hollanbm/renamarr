@@ -24,6 +24,13 @@ class SeriesRename:
                 "operation": "rename",
             },
         ):
+            observability.record_operation_scanned_items(
+                "sonarr",
+                self.name,
+                "rename",
+                len(series),
+            )
+            found_candidates = False
             for show in series:
                 with logger.contextualize(item=show.title):
                     episodes_to_rename: list[json_data] = self.sonarr_cli.request_get(
@@ -45,22 +52,41 @@ class SeriesRename:
                         )
 
                     file_ids = episode_rename_plan.get_file_ids()
+                    found_candidates = True
+                    observability.record_operation_candidate_items(
+                        "sonarr",
+                        self.name,
+                        "rename",
+                        len(file_ids),
+                    )
                     logger.info(f"Renaming {episode_rename_plan.get_log_message()}")
                     try:
                         self.sonarr_cli.rename_files(file_ids, show.id)
                     except Exception:
+                        observability.record_operation_run(
+                            "sonarr",
+                            self.name,
+                            "rename",
+                            "failed",
+                        )
                         observability.record_operation_items(
                             "sonarr",
-                            "rename",
                             self.name,
+                            "rename",
                             "failed",
                             len(file_ids),
                         )
                         raise
                     observability.record_operation_items(
                         "sonarr",
-                        "rename",
                         self.name,
+                        "rename",
                         "accepted",
                         len(file_ids),
                     )
+            observability.record_operation_run(
+                "sonarr",
+                self.name,
+                "rename",
+                "accepted" if found_candidates else "noop",
+            )

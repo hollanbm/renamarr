@@ -1,5 +1,5 @@
 from pathlib import PurePosixPath
-from unittest.mock import call
+from unittest.mock import ANY, call
 
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
@@ -125,10 +125,32 @@ class TestSeriesFolderRename:
         )
         fake_observability.record_operation_items.assert_has_calls(
             [
-                call("sonarr", "folder_rename", "tv", "accepted", 2),
-                call("sonarr", "folder_rename", "tv", "accepted", 1),
+                call("sonarr", "tv", "folder_rename", "accepted", 2),
+                call("sonarr", "tv", "folder_rename", "accepted", 1),
             ]
         )
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "folder_rename",
+            3,
+        )
+        fake_observability.record_operation_candidate_items.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "folder_rename",
+            3,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "folder_rename",
+            "accepted",
+        )
+        assert fake_observability.record_arr_command.call_args_list == [
+            call("sonarr", "tv", "RescanSeries", "successful", ANY),
+            call("sonarr", "tv", "RescanSeries", "successful", ANY),
+        ]
 
     def test_process_sorts_root_folders_before_matching_series(self, mocker) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
@@ -201,7 +223,7 @@ class TestSeriesFolderRename:
         sleep = mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
         mocker.patch(
             "renamarr.sonarr.services.series_folder_rename.time.time",
-            side_effect=[0, 0, MAX_WAIT_SECONDS],
+            side_effect=[0, 0, MAX_WAIT_SECONDS, MAX_WAIT_SECONDS],
         )
 
         SeriesFolderRename(sonarr_cli).process([series])
@@ -253,10 +275,16 @@ class TestSeriesFolderRename:
         )
         fake_observability.record_operation_items.assert_called_once_with(
             "sonarr",
-            "folder_rename",
             "tv",
+            "folder_rename",
             "failed",
             1,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "folder_rename",
+            "failed",
         )
 
     def test_process_records_failed_metric_when_folder_rename_request_fails(
@@ -279,10 +307,16 @@ class TestSeriesFolderRename:
             SeriesFolderRename(sonarr_cli, name="tv").process([series])
 
         assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "folder_rename",
+            "failed",
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "sonarr",
-            "folder_rename",
             "tv",
+            "folder_rename",
             "failed",
             1,
         )

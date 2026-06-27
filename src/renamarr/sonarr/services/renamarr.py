@@ -40,7 +40,7 @@ class SonarrRenamarr:
                             "operation": "analyze_files",
                         },
                     ):
-                        AnalyzeFiles(self.sonarr_cli).process()
+                        AnalyzeFiles(self.sonarr_cli, name=self.name).process()
 
                 series = sorted(
                     self.sonarr_cli.get_serie(), key=lambda show: show.title

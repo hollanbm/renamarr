@@ -1,4 +1,5 @@
 import os
+import time
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from typing import Literal, Protocol, TypeAlias
@@ -6,7 +7,6 @@ from typing import Literal, Protocol, TypeAlias
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
-from opentelemetry.metrics import Counter
 from opentelemetry import trace
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
@@ -19,8 +19,9 @@ SpanAttributes: TypeAlias = Mapping[str, AttributeValue]
 TraceContext: TypeAlias = dict[str, str]
 ServiceName: TypeAlias = Literal["sonarr", "radarr"]
 OperationName: TypeAlias = Literal["rename", "folder_rename"]
-OperationResult: TypeAlias = Literal["accepted", "failed"]
+OperationResult: TypeAlias = Literal["accepted", "failed", "noop"]
 JobResult: TypeAlias = Literal["success", "failed"]
+ArrCommandResult: TypeAlias = Literal["successful", "failed", "timeout"]
 
 OTEL_ENABLED_ENV_VAR = "RENAMARR_OTEL_ENABLED"
 DEFAULT_SERVICE_NAME = "renamarr"
@@ -37,12 +38,58 @@ class Observability(Protocol):
     def record_operation_items(
         self,
         service: ServiceName,
-        operation: OperationName,
         name: str,
+        operation: OperationName,
         result: OperationResult,
         item_count: int,
     ) -> None:
-        """Record accepted or failed rename operation items."""
+        """Record rename operation items."""
+
+    def record_operation_scanned_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Record items scanned by a rename operation."""
+
+    def record_operation_candidate_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Record items selected as rename candidates."""
+
+    def record_operation_run(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        result: OperationResult,
+    ) -> None:
+        """Record a completed rename operation run."""
+
+    def record_arr_command(
+        self,
+        service: ServiceName,
+        name: str,
+        command: str,
+        result: ArrCommandResult,
+        duration_seconds: float,
+    ) -> None:
+        """Record a completed Sonarr or Radarr command."""
+
+    def record_job_started(
+        self,
+        service: ServiceName,
+        name: str,
+        job: str,
+        timestamp_seconds: float,
+    ) -> None:
+        """Record when a scheduled job started."""
 
     def record_job(
         self,
@@ -73,12 +120,58 @@ class DisabledObservability:
     def record_operation_items(
         self,
         service: ServiceName,
-        operation: OperationName,
         name: str,
+        operation: OperationName,
         result: OperationResult,
         item_count: int,
     ) -> None:
         """Ignore operation metrics."""
+
+    def record_operation_scanned_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Ignore operation metrics."""
+
+    def record_operation_candidate_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Ignore operation metrics."""
+
+    def record_operation_run(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        result: OperationResult,
+    ) -> None:
+        """Ignore operation metrics."""
+
+    def record_arr_command(
+        self,
+        service: ServiceName,
+        name: str,
+        command: str,
+        result: ArrCommandResult,
+        duration_seconds: float,
+    ) -> None:
+        """Ignore command metrics."""
+
+    def record_job_started(
+        self,
+        service: ServiceName,
+        name: str,
+        job: str,
+        timestamp_seconds: float,
+    ) -> None:
+        """Ignore job metrics."""
 
     def record_job(
         self,
@@ -111,28 +204,6 @@ class OpenTelemetryObservability:
         self._requests_instrumentor = requests_instrumentor
         self._tracer = tracer_provider.get_tracer(DEFAULT_SERVICE_NAME)
         meter = meter_provider.get_meter(DEFAULT_SERVICE_NAME)
-        self._operation_counters: dict[tuple[ServiceName, OperationName], Counter] = {
-            ("sonarr", "rename"): meter.create_counter(
-                "renamarr.sonarr.rename.items",
-                unit="{item}",
-                description="Sonarr episode file rename items accepted or failed.",
-            ),
-            ("sonarr", "folder_rename"): meter.create_counter(
-                "renamarr.sonarr.folder_rename.items",
-                unit="{item}",
-                description="Sonarr folder rename items accepted or failed.",
-            ),
-            ("radarr", "rename"): meter.create_counter(
-                "renamarr.radarr.rename.items",
-                unit="{item}",
-                description="Radarr movie file rename items accepted or failed.",
-            ),
-            ("radarr", "folder_rename"): meter.create_counter(
-                "renamarr.radarr.folder_rename.items",
-                unit="{item}",
-                description="Radarr folder rename items accepted or failed.",
-            ),
-        }
         self._job_runs = meter.create_counter(
             "renamarr.job.runs",
             unit="{run}",
@@ -142,6 +213,51 @@ class OpenTelemetryObservability:
             "renamarr.job.duration",
             unit="s",
             description="Renamarr job duration.",
+        )
+        self._job_last_started = meter.create_gauge(
+            "renamarr.job.last_started",
+            unit="s",
+            description="Unix timestamp of the latest Renamarr job start.",
+        )
+        self._job_last_completed = meter.create_gauge(
+            "renamarr.job.last_completed",
+            unit="s",
+            description="Unix timestamp of the latest Renamarr job completion.",
+        )
+        self._job_last_success = meter.create_gauge(
+            "renamarr.job.last_success",
+            unit="s",
+            description="Unix timestamp of the latest successful Renamarr job.",
+        )
+        self._operation_runs = meter.create_counter(
+            "renamarr.operation.runs",
+            unit="{run}",
+            description="Renamarr rename operation runs.",
+        )
+        self._operation_items = meter.create_counter(
+            "renamarr.operation.items",
+            unit="{item}",
+            description="Renamarr rename operation items.",
+        )
+        self._operation_scanned_items = meter.create_counter(
+            "renamarr.operation.scanned.items",
+            unit="{item}",
+            description="Items scanned by Renamarr rename operations.",
+        )
+        self._operation_candidate_items = meter.create_counter(
+            "renamarr.operation.candidate.items",
+            unit="{item}",
+            description="Items selected as Renamarr rename candidates.",
+        )
+        self._arr_command_runs = meter.create_counter(
+            "renamarr.arr.command.runs",
+            unit="{run}",
+            description="Sonarr and Radarr commands observed by Renamarr.",
+        )
+        self._arr_command_duration = meter.create_histogram(
+            "renamarr.arr.command.duration",
+            unit="s",
+            description="Sonarr and Radarr command duration observed by Renamarr.",
         )
 
     @classmethod
@@ -173,15 +289,95 @@ class OpenTelemetryObservability:
     def record_operation_items(
         self,
         service: ServiceName,
-        operation: OperationName,
         name: str,
+        operation: OperationName,
         result: OperationResult,
         item_count: int,
     ) -> None:
-        """Record accepted or failed rename operation items."""
-        self._operation_counters[(service, operation)].add(
+        """Record rename operation items."""
+        self._operation_items.add(
             item_count,
-            attributes={"name": name, "result": result},
+            attributes={
+                "service": service,
+                "name": name,
+                "operation": operation,
+                "result": result,
+            },
+        )
+
+    def record_operation_scanned_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Record items scanned by a rename operation."""
+        self._operation_scanned_items.add(
+            item_count,
+            attributes={"service": service, "name": name, "operation": operation},
+        )
+
+    def record_operation_candidate_items(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        item_count: int,
+    ) -> None:
+        """Record items selected as rename candidates."""
+        self._operation_candidate_items.add(
+            item_count,
+            attributes={"service": service, "name": name, "operation": operation},
+        )
+
+    def record_operation_run(
+        self,
+        service: ServiceName,
+        name: str,
+        operation: OperationName,
+        result: OperationResult,
+    ) -> None:
+        """Record a completed rename operation run."""
+        self._operation_runs.add(
+            1,
+            attributes={
+                "service": service,
+                "name": name,
+                "operation": operation,
+                "result": result,
+            },
+        )
+
+    def record_arr_command(
+        self,
+        service: ServiceName,
+        name: str,
+        command: str,
+        result: ArrCommandResult,
+        duration_seconds: float,
+    ) -> None:
+        """Record a completed Sonarr or Radarr command."""
+        attributes = {
+            "service": service,
+            "name": name,
+            "command": command,
+            "result": result,
+        }
+        self._arr_command_runs.add(1, attributes=attributes)
+        self._arr_command_duration.record(duration_seconds, attributes=attributes)
+
+    def record_job_started(
+        self,
+        service: ServiceName,
+        name: str,
+        job: str,
+        timestamp_seconds: float,
+    ) -> None:
+        """Record when a scheduled job started."""
+        self._job_last_started.set(
+            timestamp_seconds,
+            attributes={"service": service, "name": name, "job": job},
         )
 
     def record_job(
@@ -201,6 +397,17 @@ class OpenTelemetryObservability:
         }
         self._job_runs.add(1, attributes=attributes)
         self._job_duration.record(duration_seconds, attributes=attributes)
+        timestamp_seconds = time.time()
+        timestamp_attributes = {"service": service, "name": name, "job": job}
+        self._job_last_completed.set(
+            timestamp_seconds,
+            attributes=timestamp_attributes,
+        )
+        if result == "success":
+            self._job_last_success.set(
+                timestamp_seconds,
+                attributes=timestamp_attributes,
+            )
 
     def force_flush(self) -> None:
         """Flush pending spans and metrics."""

@@ -8,11 +8,15 @@ from renamarr.sonarr.services.series_rename import SeriesRename
 
 class TestSeriesRename:
     def test_process_skips_rename_when_no_episodes_need_rename(
-        self, mock_loguru_debug, mocker
+        self, fake_observability, mock_loguru_debug, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A")
         series_b = SonarrSerieItem(id=2, title="Show B")
+        mocker.patch(
+            "renamarr.sonarr.services.series_rename.get_observability",
+            return_value=fake_observability,
+        )
         request_get = mocker.patch.object(sonarr_cli, "request_get", return_value=[])
         rename_files = mocker.patch.object(sonarr_cli, "rename_files")
 
@@ -29,6 +33,19 @@ class TestSeriesRename:
             call("No episodes to rename"),
         ]
         rename_files.assert_not_called()
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "sonarr",
+            "",
+            "rename",
+            2,
+        )
+        fake_observability.record_operation_candidate_items.assert_not_called()
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "",
+            "rename",
+            "noop",
+        )
 
     def test_process_renames_episodes_per_series(
         self, fake_observability, mock_loguru_info, mock_loguru_debug, mocker
@@ -67,12 +84,30 @@ class TestSeriesRename:
                 "operation": "rename",
             },
         )
+        fake_observability.record_operation_scanned_items.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "rename",
+            1,
+        )
+        fake_observability.record_operation_candidate_items.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "rename",
+            2,
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "sonarr",
-            "rename",
             "tv",
+            "rename",
             "accepted",
             2,
+        )
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "rename",
+            "accepted",
         )
 
     def test_process_records_failed_metric_when_rename_submission_fails(
@@ -97,10 +132,16 @@ class TestSeriesRename:
             SeriesRename(sonarr_cli, name="tv").process([series])
 
         assert excinfo.value is exception
+        fake_observability.record_operation_run.assert_called_once_with(
+            "sonarr",
+            "tv",
+            "rename",
+            "failed",
+        )
         fake_observability.record_operation_items.assert_called_once_with(
             "sonarr",
-            "rename",
             "tv",
+            "rename",
             "failed",
             1,
         )

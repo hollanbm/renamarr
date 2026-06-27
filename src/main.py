@@ -1,9 +1,9 @@
 import os
 from collections.abc import Callable
 from contextlib import contextmanager
-from sys import stdout
 from time import perf_counter
 from time import sleep
+from time import time
 
 import schedule
 from dotenv import load_dotenv
@@ -12,12 +12,8 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
-from renamarr.observability import (
-    ServiceName,
-    configure_observability,
-    enrich_log_record_with_trace,
-    is_otel_enabled,
-)
+from renamarr.logging_config import LoggingConfigurator
+from renamarr.observability import ServiceName, configure_observability
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
@@ -29,76 +25,12 @@ class Main:
     """
 
     RUN_SCHEDULER = True
-    _LOG_FORMAT = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level}</level> | "
-        "{extra[instance]} | "
-        "{extra[item]} | "
-        "<level>{message}</level>"
-    )
-    _DEBUG_LOG_FORMAT = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        "{extra[instance]} | "
-        "{extra[item]} | "
-        "<level>{message}</level>"
-    )
-    _TRACE_LOG_FORMAT = "trace_id={extra[trace_id]} | span_id={extra[span_id]} | "
 
     def __init__(self):
         load_dotenv(".env.local")
-        log_level = os.getenv("LOG_LEVEL", "INFO")
-
-        otel_enabled = is_otel_enabled()
-        base_logger_format = (
-            self._DEBUG_LOG_FORMAT if log_level.upper() == "DEBUG" else self._LOG_FORMAT
-        )
-        self._logger_format = (
-            base_logger_format.replace(
-                "<level>{message}</level>",
-                f"{self._TRACE_LOG_FORMAT}<level>{{message}}</level>",
-            )
-            if otel_enabled
-            else base_logger_format
-        )
-        log_extra = {"instance": "", "item": ""}
-        if otel_enabled:
-            log_extra |= {"trace_id": "", "span_id": ""}
-        logger.configure(
-            extra=log_extra,
-            patcher=enrich_log_record_with_trace if otel_enabled else None,
-        )
-        logger.remove()
-        logger.add(stdout, format=self._logger_format, level=log_level)
+        self._logging_configurator = LoggingConfigurator()
+        self._logging_configurator.configure_stdout()
         self.observability = configure_observability()
-
-    def __configure_file_logging(self, service: str, instance_name: str) -> bool:
-        log_dir = os.getenv("LOG_DIR", "/logs")
-        log_rotation = os.getenv("LOG_ROTATION", "00:00")
-        log_retention = os.getenv("LOG_RETENTION", "7 days")
-        log_path = os.path.join(log_dir, service, f"{instance_name}.log")
-        try:
-            logger.add(
-                log_path,
-                format=self._logger_format,
-                level=os.getenv("LOG_LEVEL", "INFO"),
-                rotation=log_rotation,
-                retention=log_retention,
-                # filter ensures that instance logs go to the correct file
-                filter=lambda record, configured_service=service, configured_name=instance_name: (
-                    record["extra"].get("service") == configured_service
-                    and record["extra"].get("instance") == configured_name
-                ),
-            )
-        except OSError as exc:
-            with logger.contextualize(service=service, instance=instance_name):
-                logger.warning(
-                    f"Unable to write logs to {log_path!r}; continuing with stdout logging only."
-                )
-                logger.warning(exc)
-            return False
-        return True
 
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
@@ -111,6 +43,12 @@ class Main:
         job: Callable[[], None],
     ) -> None:
         start_time = perf_counter()
+        self.observability.record_job_started(
+            service,
+            instance_name,
+            job_name,
+            time(),
+        )
         result = "success"
         try:
             with self.observability.start_span(
@@ -125,6 +63,9 @@ class Main:
         except CliArrError as exc:
             result = "failed"
             logger.error(exc)
+        except Exception:
+            result = "failed"
+            raise
         finally:
             self.observability.record_job(
                 service,
@@ -246,13 +187,17 @@ class Main:
                 self.__schedule_sonarr_series_scanner(sonarr_config)
             if sonarr_config.renamarr.enabled:
                 if sonarr_config.renamarr.log_to_file:
-                    self.__configure_file_logging("sonarr", sonarr_config.name)
+                    self._logging_configurator.configure_instance_file(
+                        "sonarr", sonarr_config.name
+                    )
                 self.__schedule_sonarr_renamarr(sonarr_config)
 
         for radarr_config in config.radarr:
             if radarr_config.renamarr.enabled:
                 if radarr_config.renamarr.log_to_file:
-                    self.__configure_file_logging("radarr", radarr_config.name)
+                    self._logging_configurator.configure_instance_file(
+                        "radarr", radarr_config.name
+                    )
                 self.__schedule_radarr_renamarr(radarr_config)
             else:
                 with logger.contextualize(instance=radarr_config.name):
