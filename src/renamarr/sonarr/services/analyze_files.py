@@ -10,6 +10,7 @@ from renamarr.otel.observability import get_observability
 from renamarr.otel.service_name import ServiceName
 
 MAX_WAIT_SECONDS = 5 * 60
+POLL_INTERVAL_SECONDS = 2
 
 
 class AnalyzeFiles:
@@ -28,15 +29,17 @@ class AnalyzeFiles:
             return
 
         logger.info("Initiated disk scan of library")
-        if self.__analyze_files():
+        result = self.__analyze_files()
+        if result is ArrCommandResult.SUCCESSFUL:
             logger.info("disk scan finished successfully")
         else:
             logger.info("disk scan failed")
 
-    def __analyze_files(self) -> bool:
+    def __analyze_files(self) -> ArrCommandResult:
         observability = get_observability()
         command_name = "RescanSeries"
-        start_time = time.time()
+        start_time = time.monotonic()
+        deadline = start_time + MAX_WAIT_SECONDS
         result = ArrCommandResult.FAILED
         try:
             rescan_command = self.sonarr_cli._sendCommand(
@@ -45,32 +48,34 @@ class AnalyzeFiles:
                     "priority": "high",
                 }
             )
-            resp: json_data = {}
 
-            while resp.get("status") != "completed":
-                if time.time() - start_time >= MAX_WAIT_SECONDS:
+            while True:
+                resp = self.sonarr_cli.get_command(cid=rescan_command["id"])
+                if resp.get("status") == "completed":
+                    break
+
+                remaining_wait_seconds = deadline - time.monotonic()
+                if remaining_wait_seconds <= 0:
                     logger.error(
                         f"Timed out waiting for Sonarr analyze files command {rescan_command['id']} "
                         f"after {MAX_WAIT_SECONDS} seconds"
                     )
                     result = ArrCommandResult.TIMEOUT
-                    return False
-                sleep(10)
-                resp = self.sonarr_cli.get_command(cid=rescan_command["id"])
+                    return result
+                sleep(min(POLL_INTERVAL_SECONDS, remaining_wait_seconds))
 
-            result = (
-                ArrCommandResult.SUCCESSFUL
-                if resp["result"] == ArrCommandResult.SUCCESSFUL
-                else ArrCommandResult.FAILED
-            )
-            return result == ArrCommandResult.SUCCESSFUL
+            if resp["result"] == ArrCommandResult.SUCCESSFUL:
+                result = ArrCommandResult.SUCCESSFUL
+            else:
+                result = ArrCommandResult.FAILED
+            return result
         finally:
             observability.record_arr_command(
                 ServiceName.SONARR,
                 self.name,
                 command_name,
                 result,
-                time.time() - start_time,
+                time.monotonic() - start_time,
             )
 
     def __analyze_files_enabled(self) -> bool:

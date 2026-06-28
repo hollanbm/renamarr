@@ -57,7 +57,7 @@ class TestAnalyzeFiles:
             }
         )
         get_command.assert_has_calls([call(cid=1), call(cid=1)])
-        assert sleep.call_count == 2
+        sleep.assert_called_once_with(2)
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of library"),
@@ -102,7 +102,7 @@ class TestAnalyzeFiles:
             }
         )
         get_command.assert_called_once_with(cid=1)
-        sleep.assert_called_once_with(10)
+        sleep.assert_not_called()
         mock_loguru_info.assert_has_calls(
             [
                 call("Initiated disk scan of library"),
@@ -136,14 +136,14 @@ class TestAnalyzeFiles:
         )
         sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
         mocker.patch(
-            "renamarr.sonarr.services.analyze_files.time.time",
+            "renamarr.sonarr.services.analyze_files.time.monotonic",
             side_effect=[0, 0, 300, 300],
         )
 
         AnalyzeFiles(sonarr_cli, name="tv").process()
 
-        get_command.assert_called_once_with(cid=1)
-        sleep.assert_called_once_with(10)
+        get_command.assert_has_calls([call(cid=1), call(cid=1)])
+        sleep.assert_called_once_with(2)
         mock_loguru_error.assert_called_once_with(
             "Timed out waiting for Sonarr analyze files command 1 after 300 seconds"
         )
