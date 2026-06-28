@@ -1,20 +1,22 @@
 import os
 
-from renamarr.observability import (
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.job_result import JobResult
+from renamarr.otel.observability import (
+    ARR_COMMAND_DURATION_HISTOGRAM_NAME,
+    ARR_COMMAND_DURATION_SECONDS_BUCKETS,
     DEFAULT_SERVICE_NAME,
     OTEL_ENABLED_ENV_VAR,
-    ArrCommandResult,
     DisabledObservability,
-    JobResult,
     OpenTelemetryObservability,
-    OperationName,
-    OperationResult,
-    ServiceName,
     configure_observability,
     enrich_log_record_with_trace,
     get_log_trace_context,
     get_observability,
 )
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 
 
 def test_disabled_observability_noops() -> None:
@@ -26,9 +28,6 @@ def test_disabled_observability_noops() -> None:
     observability.record_job_started(ServiceName.SONARR, "sonarr", "renamarr", 1.0)
     observability.record_job(
         ServiceName.SONARR, "sonarr", "renamarr", JobResult.SUCCESS, 1.0
-    )
-    observability.record_operation_scanned_items(
-        ServiceName.SONARR, "sonarr", OperationName.RENAME, 1
     )
     observability.record_operation_candidate_items(
         ServiceName.SONARR, "sonarr", OperationName.RENAME, 1
@@ -52,7 +51,7 @@ def test_disabled_observability_noops() -> None:
 
 def test_configure_observability_defaults_to_disabled(mocker) -> None:
     mocker.patch.dict(os.environ, {}, clear=True)
-    build = mocker.patch("renamarr.observability.OpenTelemetryObservability.build")
+    build = mocker.patch("renamarr.otel.observability.OpenTelemetryObservability.build")
 
     observability = configure_observability()
 
@@ -64,7 +63,7 @@ def test_configure_observability_defaults_to_disabled(mocker) -> None:
 def test_configure_observability_builds_otel_when_enabled(mocker) -> None:
     otel_observability = mocker.Mock()
     build = mocker.patch(
-        "renamarr.observability.OpenTelemetryObservability.build",
+        "renamarr.otel.observability.OpenTelemetryObservability.build",
         return_value=otel_observability,
     )
     mocker.patch.dict(os.environ, {OTEL_ENABLED_ENV_VAR: "TRUE"})
@@ -84,7 +83,10 @@ def test_get_log_trace_context_returns_active_span_identifiers(mocker) -> None:
     )
     span = mocker.Mock()
     span.get_span_context.return_value = span_context
-    mocker.patch("renamarr.observability.trace.get_current_span", return_value=span)
+    mocker.patch(
+        "renamarr.otel.observability.trace.get_current_span",
+        return_value=span,
+    )
 
     assert get_log_trace_context() == {
         "trace_id": "1234567890abcdef1234567890abcdef",
@@ -96,14 +98,17 @@ def test_get_log_trace_context_returns_empty_values_without_valid_span(mocker) -
     span_context = mocker.Mock(is_valid=False)
     span = mocker.Mock()
     span.get_span_context.return_value = span_context
-    mocker.patch("renamarr.observability.trace.get_current_span", return_value=span)
+    mocker.patch(
+        "renamarr.otel.observability.trace.get_current_span",
+        return_value=span,
+    )
 
     assert get_log_trace_context() == {"trace_id": "", "span_id": ""}
 
 
 def test_enrich_log_record_with_trace_updates_loguru_extra(mocker) -> None:
     mocker.patch(
-        "renamarr.observability.get_log_trace_context",
+        "renamarr.otel.observability.get_log_trace_context",
         return_value={"trace_id": "trace", "span_id": "span"},
     )
     record: dict[str, object] = {"extra": {"instance": "sonarr"}}
@@ -118,7 +123,9 @@ def test_enrich_log_record_with_trace_updates_loguru_extra(mocker) -> None:
 
 
 def test_enrich_log_record_with_trace_ignores_missing_extra(mocker) -> None:
-    get_log_trace_context = mocker.patch("renamarr.observability.get_log_trace_context")
+    get_log_trace_context = mocker.patch(
+        "renamarr.otel.observability.get_log_trace_context"
+    )
 
     enrich_log_record_with_trace({})
 
@@ -135,14 +142,12 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     job_runs = mocker.Mock()
     operation_runs = mocker.Mock()
     operation_items = mocker.Mock()
-    operation_scanned_items = mocker.Mock()
     operation_candidate_items = mocker.Mock()
     arr_command_runs = mocker.Mock()
     meter.create_counter.side_effect = [
         job_runs,
         operation_runs,
         operation_items,
-        operation_scanned_items,
         operation_candidate_items,
         arr_command_runs,
     ]
@@ -160,7 +165,7 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     meter_provider = mocker.Mock()
     meter_provider.get_meter.return_value = meter
     requests_instrumentor = mocker.Mock()
-    mocker.patch("renamarr.observability.time.time", return_value=100.0)
+    mocker.patch("renamarr.otel.observability.time.time", return_value=100.0)
 
     observability = OpenTelemetryObservability(
         tracer_provider,
@@ -172,18 +177,12 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     assert meter.create_counter.call_args_list[1].args == ("renamarr.operation.runs",)
     assert meter.create_counter.call_args_list[2].args == ("renamarr.operation.items",)
     assert meter.create_counter.call_args_list[3].args == (
-        "renamarr.operation.scanned.items",
-    )
-    assert meter.create_counter.call_args_list[4].args == (
         "renamarr.operation.candidate.items",
     )
-    assert meter.create_counter.call_args_list[5].args == ("renamarr.arr.command.runs",)
+    assert meter.create_counter.call_args_list[4].args == ("renamarr.arr.command.runs",)
 
     returned_context = observability.start_span("span", {"service": ServiceName.SONARR})
     observability.record_job_started(ServiceName.SONARR, "tv", "renamarr", 99.0)
-    observability.record_operation_scanned_items(
-        ServiceName.RADARR, "radarr-4k", OperationName.RENAME, 3
-    )
     observability.record_operation_candidate_items(
         ServiceName.RADARR, "radarr-4k", OperationName.RENAME, 2
     )
@@ -222,14 +221,6 @@ def test_open_telemetry_observability_records_metrics_and_spans(mocker) -> None:
     job_last_started.set.assert_called_once_with(
         99.0,
         attributes={"service": ServiceName.SONARR, "name": "tv", "job": "renamarr"},
-    )
-    operation_scanned_items.add.assert_called_once_with(
-        3,
-        attributes={
-            "service": ServiceName.RADARR,
-            "name": "radarr-4k",
-            "operation": OperationName.RENAME,
-        },
     )
     operation_candidate_items.add.assert_called_once_with(
         2,
@@ -313,7 +304,7 @@ def test_open_telemetry_observability_does_not_record_success_timestamp_for_fail
 ) -> None:
     tracer_provider = mocker.Mock()
     meter = mocker.Mock()
-    meter.create_counter.side_effect = [mocker.Mock() for _ in range(6)]
+    meter.create_counter.side_effect = [mocker.Mock() for _ in range(5)]
     meter.create_histogram.side_effect = [mocker.Mock() for _ in range(2)]
     job_last_started = mocker.Mock()
     job_last_completed = mocker.Mock()
@@ -326,7 +317,7 @@ def test_open_telemetry_observability_does_not_record_success_timestamp_for_fail
     meter_provider = mocker.Mock()
     meter_provider.get_meter.return_value = meter
     requests_instrumentor = mocker.Mock()
-    mocker.patch("renamarr.observability.time.time", return_value=100.0)
+    mocker.patch("renamarr.otel.observability.time.time", return_value=100.0)
     observability = OpenTelemetryObservability(
         tracer_provider,
         meter_provider,
@@ -347,49 +338,59 @@ def test_open_telemetry_observability_does_not_record_success_timestamp_for_fail
 def test_open_telemetry_build_uses_standard_otel_configuration(mocker) -> None:
     resource = mocker.Mock()
     resource_create = mocker.patch(
-        "renamarr.observability.Resource.create",
+        "renamarr.otel.observability.Resource.create",
         return_value=resource,
     )
     span_exporter = mocker.Mock()
     span_exporter_class = mocker.patch(
-        "renamarr.observability.OTLPSpanExporter",
+        "renamarr.otel.observability.OTLPSpanExporter",
         return_value=span_exporter,
     )
     span_processor = mocker.Mock()
     span_processor_class = mocker.patch(
-        "renamarr.observability.BatchSpanProcessor",
+        "renamarr.otel.observability.BatchSpanProcessor",
         return_value=span_processor,
     )
     tracer = mocker.Mock()
     tracer_provider = mocker.Mock()
     tracer_provider.get_tracer.return_value = tracer
     tracer_provider_class = mocker.patch(
-        "renamarr.observability.TracerProvider",
+        "renamarr.otel.observability.TracerProvider",
         return_value=tracer_provider,
     )
     metric_exporter = mocker.Mock()
     metric_exporter_class = mocker.patch(
-        "renamarr.observability.OTLPMetricExporter",
+        "renamarr.otel.observability.OTLPMetricExporter",
         return_value=metric_exporter,
     )
     metric_reader = mocker.Mock()
     metric_reader_class = mocker.patch(
-        "renamarr.observability.PeriodicExportingMetricReader",
+        "renamarr.otel.observability.PeriodicExportingMetricReader",
         return_value=metric_reader,
     )
+    histogram_aggregation = mocker.Mock()
+    histogram_aggregation_class = mocker.patch(
+        "renamarr.otel.observability.ExplicitBucketHistogramAggregation",
+        return_value=histogram_aggregation,
+    )
+    metric_view = mocker.Mock()
+    view_class = mocker.patch(
+        "renamarr.otel.observability.View",
+        return_value=metric_view,
+    )
     meter = mocker.Mock()
-    meter.create_counter.side_effect = [mocker.Mock() for _ in range(6)]
+    meter.create_counter.side_effect = [mocker.Mock() for _ in range(5)]
     meter.create_histogram.side_effect = [mocker.Mock() for _ in range(2)]
     meter.create_gauge.side_effect = [mocker.Mock() for _ in range(3)]
     meter_provider = mocker.Mock()
     meter_provider.get_meter.return_value = meter
     meter_provider_class = mocker.patch(
-        "renamarr.observability.MeterProvider",
+        "renamarr.otel.observability.MeterProvider",
         return_value=meter_provider,
     )
     requests_instrumentor = mocker.Mock()
     requests_instrumentor_class = mocker.patch(
-        "renamarr.observability.RequestsInstrumentor",
+        "renamarr.otel.observability.RequestsInstrumentor",
         return_value=requests_instrumentor,
     )
     mocker.patch.dict(os.environ, {"OTEL_SERVICE_NAME": "custom-renamarr"})
@@ -407,10 +408,18 @@ def test_open_telemetry_build_uses_standard_otel_configuration(mocker) -> None:
     tracer_provider.add_span_processor.assert_called_once_with(span_processor)
     metric_exporter_class.assert_called_once_with()
     metric_reader_class.assert_called_once_with(metric_exporter)
+    histogram_aggregation_class.assert_called_once_with(
+        boundaries=ARR_COMMAND_DURATION_SECONDS_BUCKETS
+    )
+    view_class.assert_called_once_with(
+        instrument_name=ARR_COMMAND_DURATION_HISTOGRAM_NAME,
+        aggregation=histogram_aggregation,
+    )
     meter_provider_class.assert_called_once_with(
         resource=resource,
         metric_readers=[metric_reader],
         shutdown_on_exit=False,
+        views=[metric_view],
     )
     requests_instrumentor_class.assert_called_once_with()
     requests_instrumentor.instrument.assert_called_once_with(

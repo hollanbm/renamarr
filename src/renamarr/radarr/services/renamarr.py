@@ -1,7 +1,9 @@
 from loguru import logger
 from pycliarr.api import RadarrCli
 
-from renamarr.observability import OperationName, ServiceName, get_observability
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
 from renamarr.radarr.services.movie_rename import MovieRename

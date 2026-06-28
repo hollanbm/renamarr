@@ -2,7 +2,6 @@ import os
 import time
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
-from enum import StrEnum
 from typing import Protocol, TypeAlias
 
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
@@ -11,55 +10,36 @@ from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry import trace
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.job_result import JobResult
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 
 AttributeValue: TypeAlias = str | bool | int | float
 SpanAttributes: TypeAlias = Mapping[str, AttributeValue]
 TraceContext: TypeAlias = dict[str, str]
 
 
-class ServiceName(StrEnum):
-    """Supported Arr service names."""
-
-    SONARR = "sonarr"
-    RADARR = "radarr"
-
-
-class OperationName(StrEnum):
-    """Telemetry operation names."""
-
-    RENAME = "rename"
-    FOLDER_RENAME = "folder_rename"
-    ANALYZE_FILES = "analyze_files"
-
-
-class OperationResult(StrEnum):
-    """Telemetry operation result labels."""
-
-    ACCEPTED = "accepted"
-    FAILED = "failed"
-    NOOP = "noop"
-
-
-class JobResult(StrEnum):
-    """Telemetry job result labels."""
-
-    SUCCESS = "success"
-    FAILED = "failed"
-
-
-class ArrCommandResult(StrEnum):
-    """Telemetry Arr command result labels."""
-
-    SUCCESSFUL = "successful"
-    FAILED = "failed"
-    TIMEOUT = "timeout"
-
-
 OTEL_ENABLED_ENV_VAR = "RENAMARR_OTEL_ENABLED"
 DEFAULT_SERVICE_NAME = "renamarr"
+ARR_COMMAND_DURATION_HISTOGRAM_NAME = "renamarr.arr.command.duration"
+ARR_COMMAND_DURATION_SECONDS_BUCKETS = (
+    1.0,
+    5.0,
+    10.0,
+    30.0,
+    60.0,
+    120.0,
+    180.0,
+    240.0,
+    300.0,
+)
 
 
 class Observability(Protocol):
@@ -79,15 +59,6 @@ class Observability(Protocol):
         item_count: int,
     ) -> None:
         """Record rename operation items."""
-
-    def record_operation_scanned_items(
-        self,
-        service: ServiceName,
-        name: str,
-        operation: OperationName,
-        item_count: int,
-    ) -> None:
-        """Record items scanned by a rename operation."""
 
     def record_operation_candidate_items(
         self,
@@ -158,15 +129,6 @@ class DisabledObservability:
         name: str,
         operation: OperationName,
         result: OperationResult,
-        item_count: int,
-    ) -> None:
-        """Ignore operation metrics."""
-
-    def record_operation_scanned_items(
-        self,
-        service: ServiceName,
-        name: str,
-        operation: OperationName,
         item_count: int,
     ) -> None:
         """Ignore operation metrics."""
@@ -274,11 +236,6 @@ class OpenTelemetryObservability:
             unit="{item}",
             description="Renamarr rename operation items.",
         )
-        self._operation_scanned_items = meter.create_counter(
-            "renamarr.operation.scanned.items",
-            unit="{item}",
-            description="Items scanned by Renamarr rename operations.",
-        )
         self._operation_candidate_items = meter.create_counter(
             "renamarr.operation.candidate.items",
             unit="{item}",
@@ -290,7 +247,7 @@ class OpenTelemetryObservability:
             description="Sonarr and Radarr commands observed by Renamarr.",
         )
         self._arr_command_duration = meter.create_histogram(
-            "renamarr.arr.command.duration",
+            ARR_COMMAND_DURATION_HISTOGRAM_NAME,
             unit="s",
             description="Sonarr and Radarr command duration observed by Renamarr.",
         )
@@ -309,6 +266,14 @@ class OpenTelemetryObservability:
             resource=resource,
             metric_readers=[metric_reader],
             shutdown_on_exit=False,
+            views=[
+                View(
+                    instrument_name=ARR_COMMAND_DURATION_HISTOGRAM_NAME,
+                    aggregation=ExplicitBucketHistogramAggregation(
+                        boundaries=ARR_COMMAND_DURATION_SECONDS_BUCKETS
+                    ),
+                )
+            ],
         )
 
         requests_instrumentor = RequestsInstrumentor()
@@ -338,19 +303,6 @@ class OpenTelemetryObservability:
                 "operation": operation,
                 "result": result,
             },
-        )
-
-    def record_operation_scanned_items(
-        self,
-        service: ServiceName,
-        name: str,
-        operation: OperationName,
-        item_count: int,
-    ) -> None:
-        """Record items scanned by a rename operation."""
-        self._operation_scanned_items.add(
-            item_count,
-            attributes={"service": service, "name": name, "operation": operation},
         )
 
     def record_operation_candidate_items(

@@ -3,7 +3,10 @@ from sys import stdout
 
 from loguru import logger
 
-from renamarr.observability import enrich_log_record_with_trace, is_otel_enabled
+from renamarr.otel.observability import (
+    enrich_log_record_with_trace,
+    is_otel_enabled,
+)
 
 
 class LoggingConfigurator:

@@ -2,12 +2,10 @@ from loguru import logger
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 
-from renamarr.observability import (
-    OperationName,
-    OperationResult,
-    ServiceName,
-    get_observability,
-)
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.sonarr.models.episode_rename_plan import SonarrEpisodeRenamePlan
 
 
@@ -31,12 +29,6 @@ class SeriesRename:
             },
         ):
             try:
-                observability.record_operation_scanned_items(
-                    ServiceName.SONARR,
-                    self.name,
-                    OperationName.RENAME,
-                    len(series),
-                )
                 found_candidates = False
                 for show in series:
                     with logger.contextualize(item=show.title):

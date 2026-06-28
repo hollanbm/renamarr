@@ -12,7 +12,8 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job, Scheduler
 
-from renamarr.observability import JobResult, ServiceName
+from renamarr.otel.job_result import JobResult
+from renamarr.otel.service_name import ServiceName
 
 # disable config caching
 configparser.hold_an_instance = False

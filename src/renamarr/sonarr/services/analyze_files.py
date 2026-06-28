@@ -5,7 +5,9 @@ from loguru import logger
 from pycliarr.api import SonarrCli
 from pycliarr.api.base_api import json_data
 
-from renamarr.observability import ArrCommandResult, ServiceName, get_observability
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.observability import get_observability
+from renamarr.otel.service_name import ServiceName
 
 MAX_WAIT_SECONDS = 5 * 60
 

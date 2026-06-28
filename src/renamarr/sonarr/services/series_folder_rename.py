@@ -6,13 +6,11 @@ from loguru import logger
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data, json_dict
 
-from renamarr.observability import (
-    ArrCommandResult,
-    OperationName,
-    OperationResult,
-    ServiceName,
-    get_observability,
-)
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.sonarr.models.folder_rename_plan import SonarrFolderRenamePlan
 
 MAX_WAIT_SECONDS = 5 * 60
@@ -42,12 +40,6 @@ class SeriesFolderRename:
             },
         ):
             try:
-                observability.record_operation_scanned_items(
-                    ServiceName.SONARR,
-                    self.name,
-                    OperationName.FOLDER_RENAME,
-                    len(series),
-                )
                 folder_rename_plan = self.__build_folder_rename_plan(series)
                 candidate_count = sum(
                     len(root_folder_rename.series)

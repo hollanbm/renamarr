@@ -1,7 +1,9 @@
 from loguru import logger
 from pycliarr.api import SonarrCli
 
-from renamarr.observability import OperationName, ServiceName, get_observability
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.service_name import ServiceName
 from renamarr.sonarr.services.analyze_files import AnalyzeFiles
 from renamarr.sonarr.services.series_folder_rename import SeriesFolderRename
 from renamarr.sonarr.services.series_rename import SeriesRename

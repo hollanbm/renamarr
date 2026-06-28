@@ -2,7 +2,8 @@ from unittest.mock import ANY, call
 
 from pycliarr.api import RadarrCli
 
-from renamarr.observability import ArrCommandResult, ServiceName
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 
 

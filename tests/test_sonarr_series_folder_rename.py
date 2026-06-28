@@ -4,12 +4,10 @@ from unittest.mock import ANY, call
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
-from renamarr.observability import (
-    ArrCommandResult,
-    OperationName,
-    OperationResult,
-    ServiceName,
-)
+from renamarr.otel.arr_command_result import ArrCommandResult
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.sonarr.services.series_folder_rename import (
     MAX_WAIT_SECONDS,
     SeriesFolderRename,
@@ -146,12 +144,6 @@ class TestSeriesFolderRename:
                     1,
                 ),
             ]
-        )
-        fake_observability.record_operation_scanned_items.assert_called_once_with(
-            ServiceName.SONARR,
-            "tv",
-            OperationName.FOLDER_RENAME,
-            3,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
             ServiceName.SONARR,

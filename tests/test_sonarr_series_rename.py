@@ -3,7 +3,9 @@ from unittest.mock import call
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
-from renamarr.observability import OperationName, OperationResult, ServiceName
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.sonarr.services.series_rename import SeriesRename
 
 
@@ -34,12 +36,6 @@ class TestSeriesRename:
             call("No episodes to rename"),
         ]
         rename_files.assert_not_called()
-        fake_observability.record_operation_scanned_items.assert_called_once_with(
-            ServiceName.SONARR,
-            "",
-            OperationName.RENAME,
-            2,
-        )
         fake_observability.record_operation_candidate_items.assert_not_called()
         fake_observability.record_operation_run.assert_called_once_with(
             ServiceName.SONARR,
@@ -84,12 +80,6 @@ class TestSeriesRename:
                 "name": "tv",
                 "operation": OperationName.RENAME,
             },
-        )
-        fake_observability.record_operation_scanned_items.assert_called_once_with(
-            ServiceName.SONARR,
-            "tv",
-            OperationName.RENAME,
-            1,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
             ServiceName.SONARR,

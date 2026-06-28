@@ -3,7 +3,9 @@ from unittest.mock import call
 import pytest
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
-from renamarr.observability import OperationName, OperationResult, ServiceName
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.services.movie_rename import MovieRename
 
 
@@ -34,12 +36,6 @@ class TestMovieRename:
             call("Nothing to rename"),
         ]
         send_command.assert_not_called()
-        fake_observability.record_operation_scanned_items.assert_called_once_with(
-            ServiceName.RADARR,
-            "",
-            OperationName.RENAME,
-            2,
-        )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
             ServiceName.RADARR,
             "",
@@ -90,12 +86,6 @@ class TestMovieRename:
                 "name": "movies",
                 "operation": OperationName.RENAME,
             },
-        )
-        fake_observability.record_operation_scanned_items.assert_called_once_with(
-            ServiceName.RADARR,
-            "movies",
-            OperationName.RENAME,
-            2,
         )
         fake_observability.record_operation_candidate_items.assert_called_once_with(
             ServiceName.RADARR,

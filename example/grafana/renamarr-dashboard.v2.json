@@ -1454,7 +1454,7 @@
           }
         }
       },
-      "panel-scanned-candidate-items": {
+      "panel-candidate-items": {
         "kind": "Panel",
         "spec": {
           "data": {
@@ -1470,35 +1470,15 @@
                       "kind": "DataQuery",
                       "spec": {
                         "editorMode": "code",
-                        "expr": "sum by (service, name, operation) (rate(renamarr_operation_scanned_items_total[$__rate_interval]))",
+                        "expr": "sum by (service, name, operation) (rate(renamarr_operation_candidate_items_total[$__rate_interval]))",
                         "format": "time_series",
                         "instant": false,
-                        "legendFormat": "scanned {{service}} {{operation}} {{name}}",
+                        "legendFormat": "{{service}} {{operation}} {{name}}",
                         "range": true
                       },
                       "version": "v0"
                     },
                     "refId": "A"
-                  }
-                },
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "group": "prometheus",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "editorMode": "code",
-                        "expr": "sum by (service, name, operation) (rate(renamarr_operation_candidate_items_total[$__rate_interval]))",
-                        "format": "time_series",
-                        "instant": false,
-                        "legendFormat": "candidate {{service}} {{operation}} {{name}}",
-                        "range": true
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "B"
                   }
                 }
               ],
@@ -1506,10 +1486,10 @@
               "transformations": []
             }
           },
-          "description": "Scanned item rate compared with candidate item rate by service, instance, and operation.",
+          "description": "Candidate item rate by service, instance, and operation.",
           "id": 15,
           "links": [],
-          "title": "Scanned and Candidate Items",
+          "title": "Candidate Items",
           "vizConfig": {
             "group": "timeseries",
             "kind": "VizConfig",

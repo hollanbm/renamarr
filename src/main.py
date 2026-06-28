@@ -13,7 +13,9 @@ from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
 from renamarr.logging_config import LoggingConfigurator
-from renamarr.observability import JobResult, ServiceName, configure_observability
+from renamarr.otel.job_result import JobResult
+from renamarr.otel.observability import configure_observability
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner

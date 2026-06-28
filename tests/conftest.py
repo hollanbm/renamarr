@@ -9,8 +9,8 @@ from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 
-import renamarr.observability as observability_module
-from renamarr.observability import DisabledObservability
+import renamarr.otel.observability as observability_module
+from renamarr.otel.observability import DisabledObservability
 
 
 @pytest.fixture(autouse=True)

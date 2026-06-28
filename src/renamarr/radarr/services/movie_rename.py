@@ -2,12 +2,10 @@ from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem
 from pycliarr.api.base_api import json_data
 
-from renamarr.observability import (
-    OperationName,
-    OperationResult,
-    ServiceName,
-    get_observability,
-)
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.operation_result import OperationResult
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.models.movie_rename_plan import RadarrMovieRenamePlan
 
 
@@ -31,12 +29,6 @@ class MovieRename:
             },
         ):
             try:
-                observability.record_operation_scanned_items(
-                    ServiceName.RADARR,
-                    self.name,
-                    OperationName.RENAME,
-                    len(movies),
-                )
                 movie_rename_plan = self.__build_movie_rename_plan(movies)
                 movie_ids = movie_rename_plan.get_movie_ids()
                 observability.record_operation_candidate_items(
