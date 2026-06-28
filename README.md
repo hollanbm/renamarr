@@ -84,10 +84,72 @@ _To avoid permission issues when creating log files, set the user option in dock
 | Environment Variable | Description                                                                                           | Default  |
 | -------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
 | `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. | `INFO`   |
+| `LOG_FORMAT`         | Log format for stdout and file sinks. Set to `json` for Loguru structured JSON logs.                  | `text`   |
 | `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation.                                             | `00:00`  |
 | `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.                                              | `7 days` |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
+
+### Observability
+
+Renamarr can push OpenTelemetry metrics and traces to an OTLP Collector or Grafana Alloy. This is designed for the hourly/one-shot execution model: Renamarr does not expose a `/metrics` endpoint and does not run or require a web framework.
+
+Set `RENAMARR_OTEL_ENABLED=true` and configure the standard OpenTelemetry exporter environment variables for your collector:
+
+```yaml
+environment:
+  RENAMARR_OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAME: renamarr
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+```
+
+Renamarr sends OTLP over HTTP/protobuf. The collector should receive OTLP/HTTP from Renamarr, export the metrics pipeline to a Prometheus-compatible backend with `prometheusremotewrite`, and export the traces pipeline to Tempo with OTLP. A minimal collector/Alloy topology looks like this:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheusremotewrite]
+    traces:
+      receivers: [otlp]
+      exporters: [otlp/tempo]
+```
+
+Renamarr emits job, operation, and Sonarr/Radarr command metrics. The OpenTelemetry instrument names use dots; Prometheus-compatible backends commonly expose them with underscores and `_total`/`_seconds` suffixes:
+
+- `renamarr_job_runs_total`
+- `renamarr_job_duration_seconds`
+- `renamarr_job_last_started_seconds`
+- `renamarr_job_last_completed_seconds`
+- `renamarr_job_last_success_seconds`
+- `renamarr_operation_runs_total`
+- `renamarr_operation_items_total`
+- `renamarr_operation_scanned_items_total`
+- `renamarr_operation_candidate_items_total`
+- `renamarr_arr_command_runs_total`
+- `renamarr_arr_command_duration_seconds`
+
+Job metrics include `service`, `name`, and `job` labels, with `result` on run and duration metrics. Operation metrics include `service`, `name`, `operation`, and `result` where applicable. Command metrics include `service`, `name`, `command`, and `result`.
+
+The old per-service operation metrics (`renamarr_sonarr_rename_items_total`, `renamarr_sonarr_folder_rename_items_total`, `renamarr_radarr_rename_items_total`, and `renamarr_radarr_folder_rename_items_total`) were replaced by the generic `renamarr_operation_*` metrics.
+
+An example Grafana dashboard using the dashboard v2 JSON model is available at [example/grafana/renamarr-dashboard.v2.json](example/grafana/renamarr-dashboard.v2.json). It uses Prometheus-compatible metric queries, Tempo TraceQL queries, and optional Loki log queries. The dashboard is portable by datasource type; if your Grafana instance has multiple Prometheus, Tempo, or Loki datasources, pin the desired datasource name in each dashboard `DataQuery`. If you set `OTEL_SERVICE_NAME` to something other than `renamarr`, update the dashboard's `otel_service_name` variable.
+
+Example Prometheus-style alert rules are available at [example/grafana/renamarr-alerts.yaml](example/grafana/renamarr-alerts.yaml). They cover stale successful jobs, failed jobs, failed or timed-out Arr commands, failed operations, and high job duration.
 
 ### Configuration
 

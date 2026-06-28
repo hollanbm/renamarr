@@ -1,0 +1,47 @@
+groups:
+  - name: renamarr
+    rules:
+      - alert: RenamarrJobStale
+        expr: time() - renamarr_job_last_success_seconds > 7200
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Renamarr job has not succeeded recently
+          description: '{{ $labels.service }}/{{ $labels.name }}/{{ $labels.job }} has not completed successfully in more than 2 hours.'
+
+      - alert: RenamarrJobFailed
+        expr: increase(renamarr_job_runs_total{result="failed"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Renamarr job failed
+          description: '{{ $labels.service }}/{{ $labels.name }}/{{ $labels.job }} recorded at least one failed run in the last hour.'
+
+      - alert: RenamarrArrCommandFailed
+        expr: increase(renamarr_arr_command_runs_total{result=~"failed|timeout"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Renamarr observed a failed Arr command
+          description: '{{ $labels.service }}/{{ $labels.name }} command {{ $labels.command }} ended with result {{ $labels.result }}.'
+
+      - alert: RenamarrOperationFailed
+        expr: increase(renamarr_operation_runs_total{result="failed"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Renamarr operation failed
+          description: '{{ $labels.service }}/{{ $labels.name }} operation {{ $labels.operation }} failed in the last hour.'
+
+      - alert: RenamarrJobDurationHigh
+        expr: histogram_quantile(0.95, sum by (le, service, name, job) (rate(renamarr_job_duration_seconds_bucket[6h]))) > 300
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Renamarr job duration is high
+          description: '{{ $labels.service }}/{{ $labels.name }}/{{ $labels.job }} p95 duration is above 5 minutes.'

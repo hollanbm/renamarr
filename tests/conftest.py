@@ -1,15 +1,28 @@
+from collections.abc import Generator
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
-from typing import List
 
+from mock import Mock
 import pytest
+from pytest_mock import MockerFixture
 from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 
+import renamarr.otel.observability as observability_module
+from renamarr.otel.observability import DisabledObservability
+
+
+@pytest.fixture(autouse=True)
+def reset_observability() -> Generator[None]:
+    observability_module._observability = DisabledObservability()
+    yield
+    observability_module._observability = DisabledObservability()
+
 
 @pytest.fixture
 def get_serie(mocker) -> None:
-    series: List[SonarrSerieItem] = [
+    series: list[SonarrSerieItem] = [
         SonarrSerieItem(id=1, title="test title", status="continuing")
     ]
     mocker.patch.object(SonarrCli, "get_serie").return_value = series
@@ -22,7 +35,7 @@ def get_serie_empty(mocker) -> None:
 
 @pytest.fixture
 def get_movie(mocker) -> None:
-    movies: List[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
+    movies: list[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
     mocker.patch.object(RadarrCli, "get_movie").return_value = movies
 
 
@@ -49,6 +62,13 @@ def mock_loguru_debug(mocker) -> None:
 @pytest.fixture
 def mock_loguru_warning(mocker) -> None:
     return mocker.patch.object(logger, "warning")
+
+
+@pytest.fixture
+def fake_observability(mocker: MockerFixture) -> Mock:
+    observability = mocker.Mock()
+    observability.start_span.side_effect = lambda *args, **kwargs: nullcontext()
+    return observability
 
 
 def episode_data(

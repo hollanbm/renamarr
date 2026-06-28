@@ -1,6 +1,9 @@
 from loguru import logger
 from pycliarr.api import RadarrCli
 
+from renamarr.otel.observability import get_observability
+from renamarr.otel.operation_name import OperationName
+from renamarr.otel.service_name import ServiceName
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
 from renamarr.radarr.services.movie_rename import MovieRename
@@ -22,23 +25,42 @@ class RadarrRenamarr:
 
     def scan(self) -> None:
         """Run the Radarr Renamarr workflow."""
-        with logger.contextualize(instance=self.name):
-            logger.info("Starting Renamarr")
+        observability = get_observability()
+        with observability.start_span(
+            "renamarr.radarr.scan",
+            attributes={
+                "service": ServiceName.RADARR,
+                "name": self.name,
+                "job": "renamarr",
+            },
+        ):
+            with logger.contextualize(instance=self.name):
+                logger.info("Starting Renamarr")
 
-            if self.analyze_files:
-                AnalyzeFiles(self.radarr_cli).process()
+                if self.analyze_files:
+                    with observability.start_span(
+                        "renamarr.radarr.analyze_files",
+                        attributes={
+                            "service": ServiceName.RADARR,
+                            "name": self.name,
+                            "operation": OperationName.ANALYZE_FILES,
+                        },
+                    ):
+                        AnalyzeFiles(self.radarr_cli, name=self.name).process()
 
-            movies = sorted(self.radarr_cli.get_movie(), key=lambda movie: movie.title)
-            if len(movies) == 0:
-                logger.error("Radarr returned empty movie list")
+                movies = sorted(
+                    self.radarr_cli.get_movie(), key=lambda movie: movie.title
+                )
+                if len(movies) == 0:
+                    logger.error("Radarr returned empty movie list")
+                    logger.info("Finished Renamarr")
+                    return
+
+                logger.debug("Retrieved movie list")
+
+                MovieRename(self.radarr_cli, name=self.name).process(movies)
+
+                if self.rename_folders:
+                    MovieFolderRename(self.radarr_cli, name=self.name).process(movies)
+
                 logger.info("Finished Renamarr")
-                return
-
-            logger.debug("Retrieved movie list")
-
-            MovieRename(self.radarr_cli).process(movies)
-
-            if self.rename_folders:
-                MovieFolderRename(self.radarr_cli).process(movies)
-
-            logger.info("Finished Renamarr")
