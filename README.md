@@ -138,16 +138,17 @@ Renamarr emits job, operation, and Sonarr/Radarr command metrics. The OpenTeleme
 - `renamarr_job_last_success_seconds`
 - `renamarr_operation_runs_total`
 - `renamarr_operation_items_total`
-- `renamarr_operation_scanned_items_total`
 - `renamarr_operation_candidate_items_total`
 - `renamarr_arr_command_runs_total`
 - `renamarr_arr_command_duration_seconds`
 
 Job metrics include `service`, `name`, and `job` labels, with `result` on run and duration metrics. Operation metrics include `service`, `name`, `operation`, and `result` where applicable. Command metrics include `service`, `name`, `command`, and `result`.
 
+Arr command duration histograms use explicit buckets up to 300 seconds to match the five-minute command timeout.
+
 The old per-service operation metrics (`renamarr_sonarr_rename_items_total`, `renamarr_sonarr_folder_rename_items_total`, `renamarr_radarr_rename_items_total`, and `renamarr_radarr_folder_rename_items_total`) were replaced by the generic `renamarr_operation_*` metrics.
 
-An example Grafana dashboard using the dashboard v2 JSON model is available at [example/grafana/renamarr-dashboard.v2.json](example/grafana/renamarr-dashboard.v2.json). It uses Prometheus-compatible metric queries, Tempo TraceQL queries, and optional Loki log queries. The dashboard is portable by datasource type; if your Grafana instance has multiple Prometheus, Tempo, or Loki datasources, pin the desired datasource name in each dashboard `DataQuery`. If you set `OTEL_SERVICE_NAME` to something other than `renamarr`, update the dashboard's `otel_service_name` variable.
+An example Grafana dashboard using the dashboard v2 JSON model is available at [example/grafana/renamarr-dashboard.v2.json](example/grafana/renamarr-dashboard.v2.json). It can be pasted directly into Grafana's dashboard JSON Model editor. It uses Prometheus-compatible metric queries, Tempo TraceQL queries, and optional Loki log queries. Prometheus panels can be narrowed with the `instance_name` dropdown variable, which defaults to All configured instances. Tempo TraceQL metric panels omit an explicit step so Grafana and Tempo can choose a valid duration, and those panels override their time range to 24 hours to match Tempo's default `query_frontend.metrics.max_duration` limit. The dashboard is portable by datasource type; if your Grafana instance has multiple Prometheus, Tempo, or Loki datasources, pin the desired datasource name in each dashboard `DataQuery`. If you set `OTEL_SERVICE_NAME` to something other than `renamarr`, update the dashboard's `otel_service_name` variable.
 
 Example Prometheus-style alert rules are available at [example/grafana/renamarr-alerts.yaml](example/grafana/renamarr-alerts.yaml). They cover stale successful jobs, failed jobs, failed or timed-out Arr commands, failed operations, and high job duration.
 
