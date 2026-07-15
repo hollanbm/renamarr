@@ -35,6 +35,7 @@ CONFIG_SCHEMA = {
                         enabled=False,
                         hourly_job=False,
                         hours_before_air=4,
+                        schedule=None,
                     ),
                     ignore_extra_keys=True,
                 ): {
@@ -55,6 +56,7 @@ CONFIG_SCHEMA = {
                         analyze_files=False,
                         rename_folders=False,
                         log_to_file=False,
+                        schedule=None,
                     ),
                     ignore_extra_keys=True,
                 ): {
@@ -107,6 +109,7 @@ CONFIG_SCHEMA = {
                         analyze_files=False,
                         rename_folders=False,
                         log_to_file=False,
+                        schedule=None,
                     ),
                     ignore_extra_keys=True,
                 ): {

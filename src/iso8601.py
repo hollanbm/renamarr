@@ -11,9 +11,15 @@ def parse_duration(duration_str: str) -> timedelta:
     if not match:
         raise ValueError(f"Invalid ISO 8601 duration: {duration_str!r}")
     groups = match.groupdict()
+    has_time = "T" in duration_str
+    time_parts = ("hours", "minutes", "seconds")
     if not any(groups[part] for part in ("days", "hours", "minutes", "seconds")):
         raise ValueError(
             f"ISO 8601 duration must include at least one component: {duration_str!r}"
+        )
+    if has_time and not any(groups[part] for part in time_parts):
+        raise ValueError(
+            f"ISO 8601 duration has T marker but no time components: {duration_str!r}"
         )
     return timedelta(
         days=int(groups["days"] or 0),
