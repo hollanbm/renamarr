@@ -83,16 +83,14 @@ class Main:
         self, job, job_kwargs: dict, duration_str: str, instance_name: str
     ) -> None:
         delta = parse_duration(duration_str)
-        total_minutes = delta.total_seconds() / 60
-        jitter = max(1, round(total_minutes * 0.1))
-        lower = max(1, round(total_minutes - jitter))
-        upper = max(lower + 1, round(total_minutes + jitter))
+        total_minutes = round(delta.total_seconds() / 60)
+        minutes = max(1, total_minutes)
         with logger.contextualize(instance=instance_name):
             logger.info(
                 f"Registered custom schedule: {duration_str} "
-                f"(every {lower}-{upper} minutes)"
+                f"(every {minutes} minutes)"
             )
-        schedule_lib.every(lower).to(upper).minutes.do(job, **job_kwargs)
+        schedule_lib.every(minutes).minutes.do(job, **job_kwargs)
 
     def __sonarr_series_scanner_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):

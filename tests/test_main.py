@@ -727,7 +727,7 @@ class TestMain:
         Main().start()
 
         mock_loguru_info.assert_any_call(
-            "Registered custom schedule: PT1H (every 54-66 minutes)"
+            "Registered custom schedule: PT1H (every 60 minutes)"
         )
 
     def test_register_custom_schedule_rounds_short_duration(
@@ -742,7 +742,7 @@ class TestMain:
         Main().start()
 
         mock_loguru_info.assert_any_call(
-            "Registered custom schedule: PT1M (every 1-2 minutes)"
+            "Registered custom schedule: PT1M (every 1 minutes)"
         )
 
     def test_hourly_job_still_schedules_when_schedule_set(
