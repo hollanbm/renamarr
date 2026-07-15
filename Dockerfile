@@ -27,7 +27,7 @@ RUN mkdir -p /config /logs
 FROM ${RUNTIME_IMAGE} AS runtime
 
 RUN useradd --create-home --shell /bin/bash nonroot
-
+ 
 # Grab python from the builder
 COPY --from=builder --chown=nonroot:nonroot /python /python
 COPY --from=builder --chown=nonroot:nonroot /config /config
