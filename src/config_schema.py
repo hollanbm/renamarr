@@ -1,5 +1,7 @@
 from schema import And, Optional, Use
 
+from iso8601 import parse_duration
+
 CONFIG_SCHEMA = {
     Optional(
         "sonarr",
@@ -39,6 +41,11 @@ CONFIG_SCHEMA = {
                     Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                     Optional("hours_before_air", default=4): int,
+                    Optional("schedule", default=None): And(
+                        Use(str),
+                        lambda s: (parse_duration(s) and True),
+                        error="sonarr[].series_scanner.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
+                    ),
                 },
                 Optional(
                     "renamarr",
@@ -56,6 +63,11 @@ CONFIG_SCHEMA = {
                     Optional("analyze_files", default=False): bool,
                     Optional("rename_folders", default=False): bool,
                     Optional("log_to_file", default=False): bool,
+                    Optional("schedule", default=None): And(
+                        Use(str),
+                        lambda s: (parse_duration(s) and True),
+                        error="sonarr[].renamarr.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
+                    ),
                 },
             }
         ],
@@ -103,6 +115,11 @@ CONFIG_SCHEMA = {
                     Optional("analyze_files", default=False): bool,
                     Optional("rename_folders", default=False): bool,
                     Optional("log_to_file", default=False): bool,
+                    Optional("schedule", default=None): And(
+                        Use(str),
+                        lambda s: (parse_duration(s) and True),
+                        error="radarr[].renamarr.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
+                    ),
                 },
             }
         ],

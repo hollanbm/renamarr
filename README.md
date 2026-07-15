@@ -62,7 +62,7 @@ This should prevent too many API calls to the TVDB, refreshing individual series
 
 ### Usage
 
-The application runs immediately on startup, and then continue to schedule jobs every hour (+- 5 minutes) after the first execution.
+The application runs immediately on startup, and then continues to schedule jobs after the first execution. By default jobs run every hour (+- 5 minutes). Use the `schedule` field with an ISO 8601 duration (e.g. `PT10M` for 10 minutes, `PT6H` for 6 hours) to customize the interval. The legacy `hourly_job` boolean is still supported.
 
 Logs are always written to stdout.
 
@@ -98,15 +98,18 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].url`                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
 | `sonarr[].api_key`                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
 | `sonarr[].series_scanner.enabled`          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
-| `sonarr[].series_scanner.hourly_job`       | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
+| `sonarr[].series_scanner.hourly_job`       | boolean | No       | False         | (legacy) disables hourly job. App will exit after first execution                                                                                |
 | `sonarr[].series_scanner.hours_before_air` | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
+| `sonarr[].series_scanner.schedule`         | string  | No       | None          | ISO 8601 duration for custom schedule (e.g. `PT10M`, `PT1H`, `P1D`). Auto jitter (+-10%) is applied. Overrides `hourly_job`.                     |
 | `sonarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
-| `sonarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
+| `sonarr[].renamarr.hourly_job`             | boolean | No       | False         | (legacy) disables hourly job. App will exit after first execution                                                                                |
+| `sonarr[].renamarr.schedule`               | string  | No       | None          | ISO 8601 duration for custom schedule (e.g. `PT10M`, `PT1H`, `P1D`). Auto jitter (+-10%) is applied. Overrides `hourly_job`.                     |
 | `sonarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `sonarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
 | `sonarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Sonarr instance to `/logs/sonarr/<name>.log` with daily rotation                                                            |
 | `radarr[].renamarr.enabled`                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
-| `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
+| `radarr[].renamarr.hourly_job`             | boolean | No       | False         | (legacy) disables hourly job. App will exit after first execution                                                                                |
+| `radarr[].renamarr.schedule`               | string  | No       | None          | ISO 8601 duration for custom schedule (e.g. `PT10M`, `PT1H`, `P1D`). Auto jitter (+-10%) is applied. Overrides `hourly_job`.                     |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `radarr[].renamarr.rename_folders`         | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
 | `radarr[].renamarr.log_to_file`            | boolean | No       | False         | writes logs for this Radarr instance to `/logs/radarr/<name>.log` with daily rotation                                                            |

@@ -620,3 +620,142 @@ class TestMain:
         )
         contextualize.assert_any_call(service="radarr", instance=config.radarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
+
+    def test_sonarr_renamarr_custom_schedule(self, config, enable_scheduler, mocker) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = False
+        config.sonarr[0].renamarr.schedule = "PT10M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        job_spy = mocker.spy(Job, "do")
+        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        sonarr_renamarr.assert_called_once_with(
+            name=config.sonarr[0].name,
+            url=config.sonarr[0].url,
+            api_key=config.sonarr[0].api_key,
+            analyze_files=config.sonarr[0].renamarr.analyze_files,
+            rename_folders=config.sonarr[0].renamarr.rename_folders,
+        )
+        sonarr_renamarr.return_value.scan.assert_called_once_with()
+        job_spy.assert_called()
+
+    def test_sonarr_series_scanner_custom_schedule(
+        self, config, enable_scheduler, mocker
+    ) -> None:
+        config.sonarr[0].series_scanner.enabled = True
+        config.sonarr[0].series_scanner.hourly_job = False
+        config.sonarr[0].series_scanner.schedule = "PT30M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        job_spy = mocker.spy(Job, "do")
+        sonarr_series_scanner = mocker.patch("main.SonarrSeriesScanner")
+
+        Main().start()
+
+        sonarr_series_scanner.assert_called_once_with(
+            name=config.sonarr[0].name,
+            url=config.sonarr[0].url,
+            api_key=config.sonarr[0].api_key,
+            hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
+        )
+        sonarr_series_scanner.return_value.scan.assert_called_once_with()
+        job_spy.assert_called()
+
+    def test_radarr_renamarr_custom_schedule(
+        self, config, enable_scheduler, mocker
+    ) -> None:
+        config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.hourly_job = False
+        config.radarr[0].renamarr.schedule = "PT1H"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        job_spy = mocker.spy(Job, "do")
+        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+
+        Main().start()
+
+        radarr_renamarr.assert_called_once_with(
+            name=config.radarr[0].name,
+            url=config.radarr[0].url,
+            api_key=config.radarr[0].api_key,
+            analyze_files=config.radarr[0].renamarr.analyze_files,
+            rename_folders=config.radarr[0].renamarr.rename_folders,
+        )
+        radarr_renamarr.return_value.scan.assert_called_once_with()
+        job_spy.assert_called()
+
+    def test_custom_schedule_external_cron(
+        self, config, external_cron, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = False
+        config.sonarr[0].renamarr.schedule = "PT10M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        job = mocker.patch.object(Job, "do")
+        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        sonarr_renamarr.assert_called_once()
+        sonarr_renamarr.return_value.scan.assert_called_once_with()
+        job.assert_not_called()
+
+    def test_hourly_job_warns_when_schedule_also_set(
+        self, config, mock_loguru_warning, enable_scheduler, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = True
+        config.sonarr[0].renamarr.schedule = "PT10M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        mock_loguru_warning.assert_any_call(
+            "hourly_job is enabled; ignoring schedule field"
+        )
+
+    def test_register_custom_schedule_logs_info(
+        self, config, mock_loguru_info, enable_scheduler, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = False
+        config.sonarr[0].renamarr.schedule = "PT1H"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        mock_loguru_info.assert_any_call(
+            "Registered custom schedule: PT1H (every 54-66 minutes)"
+        )
+
+    def test_register_custom_schedule_rounds_short_duration(
+        self, config, mock_loguru_info, enable_scheduler, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = False
+        config.sonarr[0].renamarr.schedule = "PT1M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        mock_loguru_info.assert_any_call(
+            "Registered custom schedule: PT1M (every 1-2 minutes)"
+        )
+
+    def test_hourly_job_still_schedules_when_schedule_set(
+        self, config, enable_scheduler, mocker
+    ) -> None:
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.hourly_job = True
+        config.sonarr[0].renamarr.schedule = "PT10M"
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        job_spy = mocker.spy(Job, "do")
+        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
+
+        Main().start()
+
+        sonarr_renamarr.return_value.scan.assert_called_once_with()
+        job_spy.assert_called()

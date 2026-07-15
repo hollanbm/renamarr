@@ -33,6 +33,7 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
                 "enabled": False,
                 "hourly_job": False,
                 "hours_before_air": 4,
+                "schedule": None,
             },
             "renamarr": {
                 "enabled": False,
@@ -40,6 +41,7 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
                 "analyze_files": False,
                 "rename_folders": False,
                 "log_to_file": False,
+                "schedule": None,
             },
         }
     ]
@@ -60,6 +62,7 @@ def test_minimal_radarr_config_receives_defaults() -> None:
                 "analyze_files": False,
                 "rename_folders": False,
                 "log_to_file": False,
+                "schedule": None,
             },
         }
     ]
@@ -157,6 +160,44 @@ def test_boolean_fields_reject_non_bool_values(
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         section: {field: "true"}
+    }
+
+    with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("section", ["renamarr", "series_scanner"])
+def test_schedule_accepts_valid_iso8601_duration(
+    service: str, section: str
+) -> None:
+    if service == "radarr" and section == "series_scanner":
+        return  # radarr has no series_scanner section
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        section: {"schedule": "PT10M"}
+    }
+    validated = validate_config({service: [instance_config]})
+    assert validated[service][0][section]["schedule"] == "PT10M"
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("section", ["renamarr", "series_scanner"])
+def test_schedule_defaults_to_none(service: str, section: str) -> None:
+    if service == "radarr" and section == "series_scanner":
+        return
+    validated = validate_config({service: [minimal_instance_config()]})
+    assert validated[service][0][section]["schedule"] is None
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("section", ["renamarr", "series_scanner"])
+def test_schedule_rejects_invalid_iso8601_duration(
+    service: str, section: str
+) -> None:
+    if service == "radarr" and section == "series_scanner":
+        return
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        section: {"schedule": "not-valid"}
     }
 
     with pytest.raises(SchemaError):
