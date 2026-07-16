@@ -42,7 +42,7 @@ jobs:
           DHI_PAT: ${{ secrets.DHI_PAT }}
         run: |
           if [ -z "$DHI_PAT" ]; then
-            echo "::error title=Missing secret::DHI_PAT must be configured for this workflow."
+            echo "::error title=Missing secret::DHI_PAT must be configured as an Actions secret and a Dependabot secret."
             exit 1
           fi
       - name: Checkout repository
