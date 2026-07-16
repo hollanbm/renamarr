@@ -2,6 +2,7 @@ import pytest
 from schema import Schema, SchemaError
 
 from config_schema import CONFIG_SCHEMA
+from interval import Interval
 
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:
@@ -36,10 +37,13 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
             },
             "renamarr": {
                 "enabled": False,
-                "hourly_job": False,
                 "analyze_files": False,
                 "rename_folders": False,
                 "log_to_file": False,
+                "schedule": {
+                    "enabled": True,
+                    "interval": Interval(days=0, hours=1, minutes=0),
+                },
             },
         }
     ]
@@ -56,10 +60,13 @@ def test_minimal_radarr_config_receives_defaults() -> None:
             "api_key": "api-key",
             "renamarr": {
                 "enabled": False,
-                "hourly_job": False,
                 "analyze_files": False,
                 "rename_folders": False,
                 "log_to_file": False,
+                "schedule": {
+                    "enabled": True,
+                    "interval": Interval(days=0, hours=1, minutes=0),
+                },
             },
         }
     ]
@@ -141,12 +148,10 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
         ("sonarr", "series_scanner", "enabled"),
         ("sonarr", "series_scanner", "hourly_job"),
         ("sonarr", "renamarr", "enabled"),
-        ("sonarr", "renamarr", "hourly_job"),
         ("sonarr", "renamarr", "analyze_files"),
         ("sonarr", "renamarr", "rename_folders"),
         ("sonarr", "renamarr", "log_to_file"),
         ("radarr", "renamarr", "enabled"),
-        ("radarr", "renamarr", "hourly_job"),
         ("radarr", "renamarr", "analyze_files"),
         ("radarr", "renamarr", "rename_folders"),
         ("radarr", "renamarr", "log_to_file"),
@@ -157,6 +162,70 @@ def test_boolean_fields_reject_non_bool_values(
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         section: {field: "true"}
+    }
+
+    with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ({}, Interval(days=0, hours=1, minutes=0)),
+        ({"minutes": 30}, Interval(days=0, hours=1, minutes=30)),
+        ({"days": 2, "hours": 3, "minutes": 4}, Interval(2, 3, 4)),
+        ({"days": 0, "hours": 0, "minutes": 5}, Interval(0, 0, 5)),
+    ],
+)
+def test_schedule_interval_is_validated(
+    service: str, configured: dict[str, int], expected: Interval
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"schedule": {"interval": configured}}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["schedule"] == {
+        "enabled": True,
+        "interval": expected,
+    }
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "schedule": {
+                "enabled": False,
+                "interval": {"days": 0, "hours": 0, "minutes": 0},
+            }
+        }
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["schedule"]["interval"] == Interval(
+        0, 0, 0
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize(
+    "interval",
+    [
+        {"days": 0, "hours": 0, "minutes": 0},
+        {"days": -1},
+        {"hours": True},
+        {"minutes": 1.5},
+    ],
+)
+def test_enabled_schedule_rejects_invalid_interval(
+    service: str, interval: dict[str, object]
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"schedule": {"enabled": True, "interval": interval}}
     }
 
     with pytest.raises(SchemaError):

@@ -4,10 +4,15 @@ sonarr:
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true
       analyze_files: true
       rename_folders: false
       log_to_file: true
+      schedule:
+        enabled: true
+        interval:
+          days: 0
+          hours: 1
+          minutes: 0
     series_scanner:
       enabled: false
       hourly_job: false
@@ -16,7 +21,6 @@ sonarr:
     api_key: not-a-real-api-key
     renamarr:
       enabled: false
-      hourly_job: false
       analyze_files: false
       rename_folders: false
       log_to_file: false
@@ -30,16 +34,22 @@ radarr:
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true
       analyze_files: false
       rename_folders: false
       log_to_file: true
+      schedule:
+        enabled: false
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true
       analyze_files: true
       rename_folders: false
       log_to_file: false
+      schedule:
+        enabled: true
+        interval:
+          days: 1
+          hours: 0
+          minutes: 5
