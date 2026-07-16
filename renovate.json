@@ -8,7 +8,7 @@
       "hostType": "docker",
       "matchHost": "dhi.io",
       "username": "{{ secrets.DHI_USERNAME }}",
-      "password": "{{ secrets.DHI_TOKEN }}"
+      "password": "{{ secrets.DHI_PAT }}"
     }
   ],
   "packageRules": [
