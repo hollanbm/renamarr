@@ -65,7 +65,7 @@ This should prevent too many API calls to the TVDB. When recurring scans are ena
 
 ### Usage
 
-The application runs enabled jobs immediately on startup. Renamarr jobs repeat every hour by default. Set `renamarr.schedule.enabled` to `false` to run once, or configure the interval in days, hours, and minutes.
+The application runs enabled jobs immediately on startup. Renamarr jobs run once by default. Set `renamarr.schedule.enabled` to `true` to repeat the job, and configure the interval in days, hours, and minutes when needed.
 
 Logs are always written to stdout.
 
@@ -106,7 +106,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].series_scanner.hours_before_air`    | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
 | `sonarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `sonarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `sonarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `sonarr[].renamarr.schedule.enabled`          | boolean | No       | False         | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
 | `sonarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
 | `sonarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
 | `sonarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
@@ -119,7 +119,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `radarr[].api_key`                            | string  | Yes      | N/A           | api_key for radarr instance                                                                                                                      |
 | `radarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `radarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `radarr[].renamarr.schedule.enabled`          | boolean | No       | False         | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
 | `radarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
 | `radarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
 | `radarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
@@ -127,12 +127,14 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `radarr[].renamarr.rename_folders`            | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
 | `radarr[].renamarr.log_to_file`               | boolean | No       | False         | writes logs for this Radarr instance to `LOG_DIR/radarr/<name>.log` with daily rotation                                                          |
 
-Schedule interval values must be non-negative integers. When scheduling is enabled, the combined interval must be greater than zero. A zero interval is valid only when `schedule.enabled` is `false`.
+Schedule interval values must be non-negative integers, and the combined interval cannot exceed 30 days. When scheduling is enabled, the combined interval must be greater than zero. A zero interval is valid only when `schedule.enabled` is `false`.
 
 When `schedule.interval` is omitted or empty, Renamarr uses the default interval of one hour.
 
 ### Local Development
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
+
+CI builds both container variants for every configured workflow trigger. Runs initiated by Renovate or Dependabot validate the build without publishing images. Because these builds use private Docker Hardened Images, `DHI_PAT` must be configured as both an Actions secret and a Dependabot secret.
 
 Dependency audits are run with `uv audit --frozen --preview-features audit`.

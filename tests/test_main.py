@@ -311,10 +311,11 @@ class TestMain:
         )
         sonarr_renamarr.return_value.scan.assert_called_once_with()
 
-    def test_sonarr_renamarr_default_schedule(
+    def test_sonarr_renamarr_enabled_schedule(
         self, config, enable_scheduler, mocker
     ) -> None:
         config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.schedule.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         job = mocker.patch.object(Job, "do")
         run_pending = mocker.spy(Scheduler, "run_pending")
@@ -348,8 +349,8 @@ class TestMain:
         )
         warning_message = (
             "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled "
-            "instead. Alternatively, remove renamarr.hourly_job to use the default "
-            "hourly schedule."
+            "instead. Remove renamarr.hourly_job after migrating the schedule "
+            "configuration."
         )
         events: list[str] = []
 
@@ -542,10 +543,11 @@ class TestMain:
             mock_loguru_warning.call_args_list[-1].args[0], PermissionError
         )
 
-    def test_radarr_renamarr_default_schedule(
+    def test_radarr_renamarr_enabled_schedule(
         self, config, enable_scheduler, mocker
     ) -> None:
         config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.schedule.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         job = mocker.spy(Job, "do")
         run_pending = mocker.spy(Scheduler, "run_pending")
@@ -612,6 +614,7 @@ class TestMain:
 
     def test_renamarr_schedule_uses_total_minutes(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.schedule.enabled = True
         config.radarr[0].renamarr.schedule.interval = mocker.Mock(total_minutes=1504)
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         every = mocker.patch("main.schedule.every")
