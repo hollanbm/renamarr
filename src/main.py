@@ -75,9 +75,6 @@ class Main:
             return False
         return True
 
-    def __external_cron(self) -> bool:
-        return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
-
     def __sonarr_series_scanner_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
             try:
@@ -93,7 +90,7 @@ class Main:
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
 
-        if sonarr_config.series_scanner.hourly_job and not self.__external_cron():
+        if sonarr_config.series_scanner.hourly_job:
             schedule.every(55).to(65).minutes.do(
                 self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
             )
@@ -114,7 +111,7 @@ class Main:
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
 
-        if radarr_config.renamarr.schedule.enabled and not self.__external_cron():
+        if radarr_config.renamarr.schedule.enabled:
             schedule.every(
                 radarr_config.renamarr.schedule.interval.total_minutes
             ).minutes.do(self.__radarr_renamarr_job, radarr_config=radarr_config)
@@ -135,7 +132,7 @@ class Main:
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
 
-        if sonarr_config.renamarr.schedule.enabled and not self.__external_cron():
+        if sonarr_config.renamarr.schedule.enabled:
             schedule.every(
                 sonarr_config.renamarr.schedule.interval.total_minutes
             ).minutes.do(self.__sonarr_renamarr_job, sonarr_config=sonarr_config)

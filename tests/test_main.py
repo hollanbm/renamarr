@@ -28,10 +28,6 @@ class TestMain:
         Main.RUN_SCHEDULER = True
 
     @pytest.fixture
-    def external_cron(self, mocker) -> None:
-        mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
-
-    @pytest.fixture
     def log_dir(self) -> Generator:
         os.environ["LOG_DIR"] = "/tmp/renamarr-logs"
         yield
@@ -588,34 +584,3 @@ class TestMain:
             mocker.ANY, radarr_config=config.radarr[0]
         )
         radarr_renamarr.return_value.scan.assert_called_once_with()
-
-    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
-    def test_external_cron_skips_renamarr_schedule(
-        self, config, external_cron, service, mocker
-    ) -> None:
-        service_config = getattr(config, service)[0]
-        service_config.renamarr.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.spy(Job, "do")
-        renamarr = mocker.patch(
-            "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
-        )
-
-        Main().start()
-
-        renamarr.return_value.scan.assert_called_once_with()
-        job.assert_not_called()
-
-    def test_external_cron_skips_series_scanner_schedule(
-        self, config, external_cron, mocker
-    ) -> None:
-        config.sonarr[0].series_scanner.enabled = True
-        config.sonarr[0].series_scanner.hourly_job = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.spy(Job, "do")
-        series_scanner = mocker.patch("main.SonarrSeriesScanner")
-
-        Main().start()
-
-        series_scanner.return_value.scan.assert_called_once_with()
-        job.assert_not_called()
