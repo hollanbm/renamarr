@@ -336,7 +336,7 @@ class TestMain:
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_deprecated_hourly_job_warns_before_and_after_renamarr_job(
-        self, config, service, mock_loguru_warning, mocker
+        self, config, service: str, mock_loguru_warning, mocker
     ) -> None:
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
@@ -346,22 +346,32 @@ class TestMain:
         renamarr = mocker.patch(
             "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
         )
+        warning_message = (
+            "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled "
+            "instead. Alternatively, remove renamarr.hourly_job to use the default "
+            "hourly schedule."
+        )
+        events: list[str] = []
+
+        def record_warning(message: object) -> None:
+            if message == warning_message:
+                events.append("warning")
+
+        mock_loguru_warning.side_effect = record_warning
+        renamarr.return_value.scan.side_effect = lambda: events.append("scan")
 
         Main().start()
 
         renamarr.return_value.scan.assert_called_once_with()
+        assert events == ["warning", "scan", "warning"]
         deprecation_warnings = [
             call
             for call in mock_loguru_warning.call_args_list
             if "renamarr.hourly_job is deprecated" in call.args[0]
         ]
         assert deprecation_warnings == [
-            mocker.call(
-                "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-            ),
-            mocker.call(
-                "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-            ),
+            mocker.call(warning_message),
+            mocker.call(warning_message),
         ]
 
     def test_sonarr_renamarr_pycliarr_exception(

@@ -6,6 +6,7 @@ import pytest
 from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
+from pytest_mock import MockerFixture
 
 
 @pytest.fixture
@@ -48,7 +49,7 @@ def mock_loguru_debug(mocker) -> None:
 
 
 @pytest.fixture
-def mock_loguru_warning(mocker) -> MagicMock:
+def mock_loguru_warning(mocker: MockerFixture) -> MagicMock:
     return mocker.patch.object(logger, "warning")
 
 
