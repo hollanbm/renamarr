@@ -97,16 +97,27 @@ class Main:
 
     def __sonarr_renamarr_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
+            uses_deprecated_hourly_job = hasattr(sonarr_config.renamarr, "hourly_job")
+            if uses_deprecated_hourly_job:
+                logger.warning(
+                    "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+                )
             try:
-                SonarrRenamarr(
-                    name=sonarr_config.name,
-                    url=sonarr_config.url,
-                    api_key=sonarr_config.api_key,
-                    analyze_files=sonarr_config.renamarr.analyze_files,
-                    rename_folders=sonarr_config.renamarr.rename_folders,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+                try:
+                    SonarrRenamarr(
+                        name=sonarr_config.name,
+                        url=sonarr_config.url,
+                        api_key=sonarr_config.api_key,
+                        analyze_files=sonarr_config.renamarr.analyze_files,
+                        rename_folders=sonarr_config.renamarr.rename_folders,
+                    ).scan()
+                except CliArrError as exc:
+                    logger.error(exc)
+            finally:
+                if uses_deprecated_hourly_job:
+                    logger.warning(
+                        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+                    )
 
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
@@ -118,16 +129,27 @@ class Main:
 
     def __radarr_renamarr_job(self, radarr_config):
         with logger.contextualize(service="radarr", instance=radarr_config.name):
+            uses_deprecated_hourly_job = hasattr(radarr_config.renamarr, "hourly_job")
+            if uses_deprecated_hourly_job:
+                logger.warning(
+                    "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+                )
             try:
-                RadarrRenamarr(
-                    name=radarr_config.name,
-                    url=radarr_config.url,
-                    api_key=radarr_config.api_key,
-                    analyze_files=radarr_config.renamarr.analyze_files,
-                    rename_folders=radarr_config.renamarr.rename_folders,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+                try:
+                    RadarrRenamarr(
+                        name=radarr_config.name,
+                        url=radarr_config.url,
+                        api_key=radarr_config.api_key,
+                        analyze_files=radarr_config.renamarr.analyze_files,
+                        rename_folders=radarr_config.renamarr.rename_folders,
+                    ).scan()
+                except CliArrError as exc:
+                    logger.error(exc)
+            finally:
+                if uses_deprecated_hourly_job:
+                    logger.warning(
+                        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+                    )
 
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)

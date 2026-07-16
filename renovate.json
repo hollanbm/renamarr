@@ -3,6 +3,14 @@
   "extends": ["github>hollanbm/renovate-config"],
   "pinDigests": false,
   "minimumReleaseAge": "14 days",
+  "hostRules": [
+    {
+      "hostType": "docker",
+      "matchHost": "dhi.io",
+      "username": "{{ secrets.DHI_USERNAME }}",
+      "password": "{{ secrets.DHI_TOKEN }}"
+    }
+  ],
   "packageRules": [
     {
       "matchPackageNames": [
