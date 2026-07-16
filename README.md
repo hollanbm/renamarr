@@ -48,6 +48,9 @@ This config option will rename series or movie folders when they no longer match
 
 ### Series Scanner (Sonarr Only)
 
+> [!IMPORTANT]
+> This feature is in maintenance mode and will not receive further development or enhancements. Its usage will be evaluated in the future to determine whether it should be removed completely.
+
 This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
 
 - Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
