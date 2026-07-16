@@ -334,6 +334,36 @@ class TestMain:
         job.assert_called()
         run_pending.assert_called_once()
 
+    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+    def test_deprecated_hourly_job_warns_before_and_after_renamarr_job(
+        self, config, service, mock_loguru_warning, mocker
+    ) -> None:
+        service_config = getattr(config, service)[0]
+        service_config.renamarr.enabled = True
+        service_config.renamarr.hourly_job = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        renamarr = mocker.patch(
+            "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
+        )
+
+        Main().start()
+
+        renamarr.return_value.scan.assert_called_once_with()
+        deprecation_warnings = [
+            call
+            for call in mock_loguru_warning.call_args_list
+            if "renamarr.hourly_job is deprecated" in call.args[0]
+        ]
+        assert deprecation_warnings == [
+            mocker.call(
+                "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+            ),
+            mocker.call(
+                "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+            ),
+        ]
+
     def test_sonarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
     ) -> None:

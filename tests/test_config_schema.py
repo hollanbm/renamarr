@@ -173,7 +173,9 @@ def test_boolean_fields_reject_non_bool_values(
     ("configured", "expected"),
     [
         ({}, Interval(days=0, hours=1, minutes=0)),
-        ({"minutes": 30}, Interval(days=0, hours=1, minutes=30)),
+        ({"minutes": 30}, Interval(days=0, hours=0, minutes=30)),
+        ({"days": 2}, Interval(days=2, hours=0, minutes=0)),
+        ({"hours": 3}, Interval(days=0, hours=3, minutes=0)),
         ({"days": 2, "hours": 3, "minutes": 4}, Interval(2, 3, 4)),
         ({"days": 0, "hours": 0, "minutes": 5}, Interval(0, 0, 5)),
     ],
@@ -208,6 +210,81 @@ def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
 
     assert validated[service][0]["renamarr"]["schedule"]["interval"] == Interval(
         0, 0, 0
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("hourly_job", [True, False])
+def test_deprecated_hourly_job_sets_schedule_enabled(
+    service: str, hourly_job: bool, mock_loguru_warning
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"hourly_job": hourly_job}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["hourly_job"] is hourly_job
+    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is hourly_job
+    mock_loguru_warning.assert_called_once_with(
+        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
+    service: str, mock_loguru_warning
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "hourly_job": False,
+            "schedule": {"interval": {"minutes": 30}},
+        }
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["schedule"] == {
+        "enabled": False,
+        "interval": Interval(days=0, hours=0, minutes=30),
+    }
+    mock_loguru_warning.assert_called_once_with(
+        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
+    service: str, mock_loguru_warning
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "hourly_job": False,
+            "schedule": {"enabled": True},
+        }
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is True
+    mock_loguru_warning.assert_called_once_with(
+        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_deprecated_hourly_job_does_not_hide_invalid_schedule(
+    service: str, mock_loguru_warning
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"hourly_job": True, "schedule": "hourly"}
+    }
+
+    with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+    mock_loguru_warning.assert_called_once_with(
+        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
     )
 
 

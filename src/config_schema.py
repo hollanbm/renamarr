@@ -1,4 +1,5 @@
-from schema import And, Optional, Use
+from loguru import logger
+from schema import And, Optional, Schema, Use
 
 from interval import Interval
 
@@ -10,17 +11,42 @@ NON_NEGATIVE_INTEGER = And(
 
 INTERVAL_SCHEMA = {
     Optional("days", default=0): NON_NEGATIVE_INTEGER,
-    Optional("hours", default=1): NON_NEGATIVE_INTEGER,
+    Optional("hours", default=0): NON_NEGATIVE_INTEGER,
     Optional("minutes", default=0): NON_NEGATIVE_INTEGER,
 }
 
 DEFAULT_INTERVAL = Interval(days=0, hours=1, minutes=0)
 DEFAULT_SCHEDULE = {"enabled": True, "interval": DEFAULT_INTERVAL}
 
+
+def _migrate_hourly_job(renamarr_config: object) -> object:
+    """Map the deprecated hourly job option to the replacement schedule option.
+
+    The deprecated field is retained for runtime warnings. Its value supplies
+    ``schedule.enabled`` only when the replacement option is not explicitly set.
+    """
+    if not isinstance(renamarr_config, dict) or "hourly_job" not in renamarr_config:
+        return renamarr_config
+
+    logger.warning(
+        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
+    )
+    migrated_config = renamarr_config.copy()
+    hourly_job = migrated_config["hourly_job"]
+    schedule = migrated_config.get("schedule")
+    if schedule is None:
+        migrated_config["schedule"] = {"enabled": hourly_job}
+    elif isinstance(schedule, dict) and "enabled" not in schedule:
+        migrated_config["schedule"] = schedule | {"enabled": hourly_job}
+    return migrated_config
+
+
 SCHEDULE_SCHEMA = And(
     {
         Optional("enabled", default=True): bool,
         Optional("interval", default=DEFAULT_INTERVAL): And(
+            dict,
+            Use(lambda value: value or {"hours": 1}),
             INTERVAL_SCHEMA,
             Use(
                 lambda value: Interval(
@@ -85,13 +111,22 @@ CONFIG_SCHEMA = {
                         schedule=DEFAULT_SCHEDULE,
                     ),
                     ignore_extra_keys=True,
-                ): {
-                    Optional("enabled", default=False): bool,
-                    Optional("analyze_files", default=False): bool,
-                    Optional("rename_folders", default=False): bool,
-                    Optional("log_to_file", default=False): bool,
-                    Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
-                },
+                ): And(
+                    Use(_migrate_hourly_job),
+                    Schema(
+                        {
+                            Optional("enabled", default=False): bool,
+                            Optional("hourly_job"): bool,
+                            Optional("analyze_files", default=False): bool,
+                            Optional("rename_folders", default=False): bool,
+                            Optional("log_to_file", default=False): bool,
+                            Optional(
+                                "schedule", default=DEFAULT_SCHEDULE
+                            ): SCHEDULE_SCHEMA,
+                        },
+                        ignore_extra_keys=True,
+                    ),
+                ),
             }
         ],
         ignore_extra_keys=True,
@@ -132,13 +167,22 @@ CONFIG_SCHEMA = {
                         schedule=DEFAULT_SCHEDULE,
                     ),
                     ignore_extra_keys=True,
-                ): {
-                    Optional("enabled", default=False): bool,
-                    Optional("analyze_files", default=False): bool,
-                    Optional("rename_folders", default=False): bool,
-                    Optional("log_to_file", default=False): bool,
-                    Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
-                },
+                ): And(
+                    Use(_migrate_hourly_job),
+                    Schema(
+                        {
+                            Optional("enabled", default=False): bool,
+                            Optional("hourly_job"): bool,
+                            Optional("analyze_files", default=False): bool,
+                            Optional("rename_folders", default=False): bool,
+                            Optional("log_to_file", default=False): bool,
+                            Optional(
+                                "schedule", default=DEFAULT_SCHEDULE
+                            ): SCHEDULE_SCHEMA,
+                        },
+                        ignore_extra_keys=True,
+                    ),
+                ),
             }
         ],
         ignore_extra_keys=True,
