@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from schema import Schema, SchemaError
 
@@ -216,7 +218,7 @@ def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 @pytest.mark.parametrize("hourly_job", [True, False])
 def test_deprecated_hourly_job_sets_schedule_enabled(
-    service: str, hourly_job: bool, mock_loguru_warning
+    service: str, hourly_job: bool, mock_loguru_warning: MagicMock
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {"hourly_job": hourly_job}
@@ -233,7 +235,7 @@ def test_deprecated_hourly_job_sets_schedule_enabled(
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
-    service: str, mock_loguru_warning
+    service: str, mock_loguru_warning: MagicMock
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {
@@ -255,7 +257,7 @@ def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
-    service: str, mock_loguru_warning
+    service: str, mock_loguru_warning: MagicMock
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {
@@ -273,11 +275,12 @@ def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("schedule", [None, "hourly"])
 def test_deprecated_hourly_job_does_not_hide_invalid_schedule(
-    service: str, mock_loguru_warning
+    service: str, schedule: object, mock_loguru_warning: MagicMock
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
-        "renamarr": {"hourly_job": True, "schedule": "hourly"}
+        "renamarr": {"hourly_job": True, "schedule": schedule}
     }
 
     with pytest.raises(SchemaError):

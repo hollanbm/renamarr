@@ -33,10 +33,12 @@ def _migrate_hourly_job(renamarr_config: object) -> object:
     )
     migrated_config = renamarr_config.copy()
     hourly_job = migrated_config["hourly_job"]
-    schedule = migrated_config.get("schedule")
-    if schedule is None:
+    if "schedule" not in migrated_config:
         migrated_config["schedule"] = {"enabled": hourly_job}
-    elif isinstance(schedule, dict) and "enabled" not in schedule:
+    elif (
+        isinstance(schedule := migrated_config["schedule"], dict)
+        and "enabled" not in schedule
+    ):
         migrated_config["schedule"] = schedule | {"enabled": hourly_job}
     return migrated_config
 

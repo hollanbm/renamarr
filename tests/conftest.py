@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import List
+from unittest.mock import MagicMock
 
 import pytest
 from loguru import logger
@@ -47,7 +48,7 @@ def mock_loguru_debug(mocker) -> None:
 
 
 @pytest.fixture
-def mock_loguru_warning(mocker) -> None:
+def mock_loguru_warning(mocker) -> MagicMock:
     return mocker.patch.object(logger, "warning")
 
 
