@@ -135,4 +135,6 @@ When `schedule.interval` is omitted or empty, Renamarr uses the default interval
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
 
+CI builds both container variants for every configured workflow trigger. Runs initiated by Renovate or Dependabot validate the build without publishing images.
+
 Dependency audits are run with `uv audit --frozen --preview-features audit`.
