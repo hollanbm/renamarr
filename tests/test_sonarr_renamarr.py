@@ -6,6 +6,14 @@ from renamarr.sonarr.services.renamarr import SonarrRenamarr
 
 
 class TestSonarrRenamarr:
+    def test_init_creates_trace_capable_client(self, mocker) -> None:
+        sonarr_cli = mocker.patch("renamarr.sonarr.services.renamarr.create_sonarr_cli")
+
+        service = SonarrRenamarr("primary", "http://sonarr", "secret")
+
+        sonarr_cli.assert_called_once_with("http://sonarr", "secret", "primary")
+        assert service.sonarr_cli is sonarr_cli.return_value
+
     def test_no_series_returned(
         self, get_serie_empty, mock_loguru_info, mock_loguru_error, mocker
     ) -> None:

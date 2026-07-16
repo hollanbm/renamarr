@@ -53,7 +53,7 @@ class TestMain:
 
     @pytest.fixture
     def log_level(self) -> Generator:
-        os.environ["LOG_LEVEL"] = "DEBUG"
+        os.environ["LOG_LEVEL"] = "debug"
         yield
         del os.environ["LOG_LEVEL"]
 
@@ -145,6 +145,15 @@ class TestMain:
 
         assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
 
+    def test_stdout_filter_excludes_http_trace_records(self, mocker) -> None:
+        logger_add = mocker.patch.object(logger, "add")
+
+        Main()
+
+        stdout_filter = logger_add.call_args_list[0].kwargs["filter"]
+        assert stdout_filter({"extra": {}})
+        assert not stdout_filter({"extra": {"http_trace": True}})
+
     def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
         mocker.patch("main.load_dotenv")
         mocker.patch.dict(os.environ, {}, clear=True)
@@ -207,7 +216,137 @@ class TestMain:
         assert filter_fn({"extra": {"service": "sonarr", "instance": "sonarr"}})
         assert not filter_fn({"extra": {"service": "radarr", "instance": "sonarr"}})
         assert not filter_fn({"extra": {"service": "sonarr", "instance": "sonarr1"}})
+        assert not filter_fn(
+            {
+                "extra": {
+                    "service": "sonarr",
+                    "instance": "sonarr",
+                    "http_trace": True,
+                }
+            }
+        )
         assert not filter_fn({"extra": {}})
+
+    def test_sonarr_trace_configures_jsonl_sink_without_log_to_file(
+        self, config, log_dir, log_retention, log_rotation, mocker
+    ) -> None:
+        mocker.patch.dict(os.environ, {"LOG_LEVEL": "trace"})
+        config.sonarr[0].renamarr.enabled = True
+        config.sonarr[0].renamarr.log_to_file = False
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.SonarrRenamarr")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        trace_sink_call = next(
+            call
+            for call in logger_add.call_args_list
+            if call.args
+            and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.http.jsonl"
+        )
+        assert trace_sink_call.kwargs["format"] == "{message}"
+        assert trace_sink_call.kwargs["level"] == "TRACE"
+        assert trace_sink_call.kwargs["rotation"] == "12:00"
+        assert trace_sink_call.kwargs["retention"] == "14 days"
+
+        filter_fn = trace_sink_call.kwargs["filter"]
+        assert filter_fn(
+            {
+                "extra": {
+                    "http_trace": True,
+                    "service": "sonarr",
+                    "instance": "sonarr",
+                }
+            }
+        )
+        assert not filter_fn(
+            {
+                "extra": {
+                    "http_trace": False,
+                    "service": "sonarr",
+                    "instance": "sonarr",
+                }
+            }
+        )
+        assert not filter_fn(
+            {
+                "extra": {
+                    "http_trace": True,
+                    "service": "radarr",
+                    "instance": "sonarr",
+                }
+            }
+        )
+        assert not filter_fn(
+            {
+                "extra": {
+                    "http_trace": True,
+                    "service": "sonarr",
+                    "instance": "other",
+                }
+            }
+        )
+
+    def test_sonarr_trace_not_configured_below_trace(
+        self, config, log_dir, mocker
+    ) -> None:
+        mocker.patch.dict(os.environ, {"LOG_LEVEL": "DEBUG"})
+        config.sonarr[0].renamarr.enabled = True
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.SonarrRenamarr")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        assert all(
+            not (call.args and str(call.args[0]).endswith(".http.jsonl"))
+            for call in logger_add.call_args_list
+        )
+
+    def test_sonarr_series_scanner_does_not_configure_trace_sink(
+        self, config, log_dir, mocker
+    ) -> None:
+        mocker.patch.dict(os.environ, {"LOG_LEVEL": "TRACE"})
+        config.sonarr[0].series_scanner.enabled = True
+        config.sonarr[0].renamarr.enabled = False
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.SonarrSeriesScanner")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        assert all(
+            not (call.args and str(call.args[0]).endswith(".http.jsonl"))
+            for call in logger_add.call_args_list
+        )
+
+    def test_http_trace_sink_warns_when_setup_fails(
+        self, log_dir, mock_loguru_warning, mocker
+    ) -> None:
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+        logger_add.side_effect = PermissionError("read-only file system")
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
+
+        configured = main._Main__configure_http_trace_logging("sonarr", "sonarr")
+
+        assert not configured
+        contextualize.assert_called_once_with(service="sonarr", instance="sonarr")
+        mock_loguru_warning.assert_any_call(
+            "Unable to write HTTP traces to '/tmp/renamarr-logs/sonarr/sonarr.http.jsonl'; continuing without HTTP tracing."
+        )
+        assert isinstance(
+            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
+        )
 
     def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
@@ -527,7 +666,35 @@ class TestMain:
         assert filter_fn({"extra": {"service": "radarr", "instance": "radarr"}})
         assert not filter_fn({"extra": {"service": "sonarr", "instance": "radarr"}})
         assert not filter_fn({"extra": {"service": "radarr", "instance": "radarr1"}})
+        assert not filter_fn(
+            {
+                "extra": {
+                    "service": "radarr",
+                    "instance": "radarr",
+                    "http_trace": True,
+                }
+            }
+        )
         assert not filter_fn({"extra": {}})
+
+    def test_radarr_trace_configures_jsonl_sink_without_log_to_file(
+        self, config, log_dir, mocker
+    ) -> None:
+        mocker.patch.dict(os.environ, {"LOG_LEVEL": "TRACE"})
+        config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.log_to_file = False
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        mocker.patch.object(Job, "do")
+        mocker.patch("main.RadarrRenamarr")
+        main = Main()
+        logger_add = mocker.patch.object(logger, "add")
+
+        main.start()
+
+        assert any(
+            call.args and call.args[0] == "/tmp/renamarr-logs/radarr/radarr.http.jsonl"
+            for call in logger_add.call_args_list
+        )
 
     def test_radarr_log_to_file_warns_when_sink_setup_fails(
         self, log_dir, mock_loguru_warning, mocker

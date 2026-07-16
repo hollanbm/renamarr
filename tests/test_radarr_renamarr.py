@@ -6,6 +6,14 @@ from renamarr.radarr.services.renamarr import RadarrRenamarr
 
 
 class TestRadarrRenamarr:
+    def test_init_creates_trace_capable_client(self, mocker) -> None:
+        radarr_cli = mocker.patch("renamarr.radarr.services.renamarr.create_radarr_cli")
+
+        service = RadarrRenamarr("primary", "http://radarr", "secret")
+
+        radarr_cli.assert_called_once_with("http://radarr", "secret", "primary")
+        assert service.radarr_cli is radarr_cli.return_value
+
     def test_no_movies_returned(
         self, get_movie_empty, mock_loguru_info, mock_loguru_error, mocker
     ) -> None:

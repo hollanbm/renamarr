@@ -1,6 +1,7 @@
 from loguru import logger
 from pycliarr.api import RadarrCli
 
+from renamarr.http_trace import create_radarr_cli
 from renamarr.radarr.services.analyze_files import AnalyzeFiles
 from renamarr.radarr.services.movie_folder_rename import MovieFolderRename
 from renamarr.radarr.services.movie_rename import MovieRename
@@ -16,7 +17,7 @@ class RadarrRenamarr:
         rename_folders: bool = False,
     ) -> None:
         self.name = name
-        self.radarr_cli = RadarrCli(url, api_key)
+        self.radarr_cli: RadarrCli = create_radarr_cli(url, api_key, name)
         self.analyze_files = analyze_files
         self.rename_folders = rename_folders
 

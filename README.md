@@ -79,13 +79,34 @@ _Don't forget to mount /logs outside the container to persist log files_
 
 _To avoid permission issues when creating log files, set the user option in docker-compose to match the desired runtime UID/GID._
 
+### HTTP Trace Logging
+
+Set `LOG_LEVEL=TRACE` to write pycliarr HTTP requests, responses, and transport failures as JSON Lines. HTTP tracing is enabled independently of `sonarr[].renamarr.log_to_file` and `radarr[].renamarr.log_to_file`; trace records are not duplicated to stdout or ordinary log files.
+
+Each enabled Renamarr instance writes to one of these paths under `LOG_DIR`:
+
+- `sonarr/<name>.http.jsonl`
+- `radarr/<name>.http.jsonl`
+
+The Sonarr series scanner is not traced. Each JSONL line contains one HTTP exchange with its timestamp, duration, request, response, or transport error. UTF-8 bodies are stored as text and other bodies are Base64 encoded. Redirects are recorded as separate exchanges.
+
+All request and response headers are included, but `Authorization` and `X-Api-Key` values are replaced with `[REDACTED]` regardless of header casing. Request and response bodies are captured in full and may contain sensitive library metadata such as titles and filesystem paths. Review trace files before sharing them.
+
+Trace files use the same `LOG_ROTATION` and `LOG_RETENTION` settings as ordinary file logs. Because full response bodies can be large, enable TRACE only while reproducing a problem.
+
+Example record:
+
+```json
+{"schema_version":1,"timestamp":"2026-07-14T18:42:11.382Z","duration_ms":43.7,"service":"sonarr","instance":"primary","request":{"method":"GET","url":"http://sonarr:8989/api/v3/series","headers":{"X-Api-Key":"[REDACTED]"},"body":null},"response":{"status_code":200,"reason":"OK","headers":{"Content-Type":"application/json"},"body":{"encoding":"utf-8","content":"[{\"id\":1,\"title\":\"Example Series\"}]"}},"error":null}
+```
+
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description                                                                                           | Default  |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
-| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. | `INFO`   |
-| `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation.                                             | `00:00`  |
-| `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.                                              | `7 days` |
+| Environment Variable | Description                                                                                                                        | Default  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `LOG_LEVEL`          | Log level passed to Loguru. `DEBUG` adds source locations; `TRACE` also enables dedicated HTTP JSONL files for Renamarr workflows. | `INFO`   |
+| `LOG_ROTATION`       | Rotation schedule passed to Loguru for ordinary and HTTP trace file rotation.                                                      | `00:00`  |
+| `LOG_RETENTION`      | Retention period passed to Loguru for rotated ordinary and HTTP trace files.                                                       | `7 days` |
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 

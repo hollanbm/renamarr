@@ -1,6 +1,7 @@
 from loguru import logger
 from pycliarr.api import SonarrCli
 
+from renamarr.http_trace import create_sonarr_cli
 from renamarr.sonarr.services.analyze_files import AnalyzeFiles
 from renamarr.sonarr.services.series_folder_rename import SeriesFolderRename
 from renamarr.sonarr.services.series_rename import SeriesRename
@@ -16,7 +17,7 @@ class SonarrRenamarr:
         rename_folders: bool = False,
     ) -> None:
         self.name = name
-        self.sonarr_cli = SonarrCli(url, api_key)
+        self.sonarr_cli: SonarrCli = create_sonarr_cli(url, api_key, name)
         self.analyze_files = analyze_files
         self.rename_folders = rename_folders
 
