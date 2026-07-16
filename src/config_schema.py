@@ -1,4 +1,3 @@
-from loguru import logger
 from schema import And, Optional, Schema, Use
 
 from interval import Interval
@@ -16,7 +15,8 @@ INTERVAL_SCHEMA = {
 }
 
 DEFAULT_INTERVAL = Interval(days=0, hours=1, minutes=0)
-DEFAULT_SCHEDULE = {"enabled": True, "interval": DEFAULT_INTERVAL}
+DEFAULT_SCHEDULE = {"enabled": False, "interval": DEFAULT_INTERVAL}
+MAX_INTERVAL_DAYS = 30
 
 
 def _migrate_hourly_job(renamarr_config: object) -> object:
@@ -28,9 +28,6 @@ def _migrate_hourly_job(renamarr_config: object) -> object:
     if not isinstance(renamarr_config, dict) or "hourly_job" not in renamarr_config:
         return renamarr_config
 
-    logger.warning(
-        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-    )
     migrated_config = renamarr_config.copy()
     hourly_job = migrated_config["hourly_job"]
     if "schedule" not in migrated_config:
@@ -45,7 +42,7 @@ def _migrate_hourly_job(renamarr_config: object) -> object:
 
 SCHEDULE_SCHEMA = And(
     {
-        Optional("enabled", default=True): bool,
+        Optional("enabled", default=False): bool,
         Optional("interval", default=DEFAULT_INTERVAL): And(
             dict,
             Use(lambda value: value or {"hours": 1}),
@@ -59,8 +56,14 @@ SCHEDULE_SCHEMA = And(
             ),
         ),
     },
-    lambda value: not value["enabled"] or value["interval"].total_minutes > 0,
-    error="renamarr.schedule.interval must be greater than zero when scheduling is enabled",
+    And(
+        lambda value: not value["enabled"] or value["interval"].total_minutes > 0,
+        error="renamarr.schedule.interval must be greater than zero when scheduling is enabled",
+    ),
+    And(
+        lambda value: value["interval"].total_minutes <= MAX_INTERVAL_DAYS * 1440,
+        error=f"renamarr.schedule.interval must not exceed {MAX_INTERVAL_DAYS} days",
+    ),
 )
 
 CONFIG_SCHEMA = {

@@ -15,6 +15,12 @@ from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 
+_DEPRECATED_HOURLY_JOB_WARNING = (
+    "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
+    "Remove renamarr.hourly_job after migrating the schedule configuration."
+)
+
+
 class Main:
     """
     This class handles config parsing, and job scheduling
@@ -99,9 +105,7 @@ class Main:
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
             uses_deprecated_hourly_job = hasattr(sonarr_config.renamarr, "hourly_job")
             if uses_deprecated_hourly_job:
-                logger.warning(
-                    "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-                )
+                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
             try:
                 try:
                     SonarrRenamarr(
@@ -115,9 +119,7 @@ class Main:
                     logger.error(exc)
             finally:
                 if uses_deprecated_hourly_job:
-                    logger.warning(
-                        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-                    )
+                    logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
@@ -131,9 +133,7 @@ class Main:
         with logger.contextualize(service="radarr", instance=radarr_config.name):
             uses_deprecated_hourly_job = hasattr(radarr_config.renamarr, "hourly_job")
             if uses_deprecated_hourly_job:
-                logger.warning(
-                    "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-                )
+                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
             try:
                 try:
                     RadarrRenamarr(
@@ -147,9 +147,7 @@ class Main:
                     logger.error(exc)
             finally:
                 if uses_deprecated_hourly_job:
-                    logger.warning(
-                        "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. Alternatively, remove renamarr.hourly_job to use the default hourly schedule."
-                    )
+                    logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
