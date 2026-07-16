@@ -1,5 +1,5 @@
 ARG UV_VERSION=0.11.28
-ARG RUNTIME_IMAGE=debian:trixie-slim
+ARG RUNTIME_IMAGE=dhi.io/debian-base:trixie
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}-debian AS builder
 
@@ -24,10 +24,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 RUN mkdir -p /config /logs
 
+# Docker Hardened Images Debian runtime base image
 FROM ${RUNTIME_IMAGE} AS runtime
 
-RUN useradd --create-home --shell /bin/bash nonroot
- 
 # Grab python from the builder
 COPY --from=builder --chown=nonroot:nonroot /python /python
 COPY --from=builder --chown=nonroot:nonroot /config /config

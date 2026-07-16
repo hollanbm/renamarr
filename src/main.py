@@ -3,14 +3,13 @@ from contextlib import contextmanager
 from sys import stdout
 from time import sleep
 
-import schedule as schedule_lib
+import schedule
 from dotenv import load_dotenv
 from loguru import logger
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
-from iso8601 import parse_duration
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
@@ -79,19 +78,6 @@ class Main:
     def __external_cron(self) -> bool:
         return os.getenv("EXTERNAL_CRON", "false").lower() == "true"
 
-    def __register_custom_schedule(
-        self, job, job_kwargs: dict, duration_str: str, instance_name: str
-    ) -> None:
-        delta = parse_duration(duration_str)
-        total_minutes = round(delta.total_seconds() / 60)
-        minutes = max(1, total_minutes)
-        with logger.contextualize(instance=instance_name):
-            logger.info(
-                f"Registered custom schedule: {duration_str} "
-                f"(every {minutes} minutes)"
-            )
-        schedule_lib.every(minutes).minutes.do(job, **job_kwargs)
-
     def __sonarr_series_scanner_job(self, sonarr_config):
         with logger.contextualize(service="sonarr", instance=sonarr_config.name):
             try:
@@ -107,23 +93,9 @@ class Main:
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
 
-        if self.__external_cron():
-            return
-        if sonarr_config.series_scanner.hourly_job:
-            if sonarr_config.series_scanner.schedule:
-                with logger.contextualize(instance=sonarr_config.name):
-                    logger.warning(
-                        "hourly_job is enabled; ignoring schedule field"
-                    )
-            schedule_lib.every(55).to(65).minutes.do(
+        if sonarr_config.series_scanner.hourly_job and not self.__external_cron():
+            schedule.every(55).to(65).minutes.do(
                 self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
-            )
-        elif sonarr_config.series_scanner.schedule:
-            self.__register_custom_schedule(
-                job=self.__sonarr_series_scanner_job,
-                job_kwargs={"sonarr_config": sonarr_config},
-                duration_str=sonarr_config.series_scanner.schedule,
-                instance_name=sonarr_config.name,
             )
 
     def __sonarr_renamarr_job(self, sonarr_config):
@@ -142,24 +114,10 @@ class Main:
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
 
-        if self.__external_cron():
-            return
-        if radarr_config.renamarr.hourly_job:
-            if radarr_config.renamarr.schedule:
-                with logger.contextualize(instance=radarr_config.name):
-                    logger.warning(
-                        "hourly_job is enabled; ignoring schedule field"
-                    )
-            schedule_lib.every(55).to(65).minutes.do(
-                self.__radarr_renamarr_job, radarr_config=radarr_config
-            )
-        elif radarr_config.renamarr.schedule:
-            self.__register_custom_schedule(
-                job=self.__radarr_renamarr_job,
-                job_kwargs={"radarr_config": radarr_config},
-                duration_str=radarr_config.renamarr.schedule,
-                instance_name=radarr_config.name,
-            )
+        if radarr_config.renamarr.schedule.enabled and not self.__external_cron():
+            schedule.every(
+                radarr_config.renamarr.schedule.interval.total_minutes
+            ).minutes.do(self.__radarr_renamarr_job, radarr_config=radarr_config)
 
     def __radarr_renamarr_job(self, radarr_config):
         with logger.contextualize(service="radarr", instance=radarr_config.name):
@@ -177,24 +135,10 @@ class Main:
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)
 
-        if self.__external_cron():
-            return
-        if sonarr_config.renamarr.hourly_job:
-            if sonarr_config.renamarr.schedule:
-                with logger.contextualize(instance=sonarr_config.name):
-                    logger.warning(
-                        "hourly_job is enabled; ignoring schedule field"
-                    )
-            schedule_lib.every(55).to(65).minutes.do(
-                self.__sonarr_renamarr_job, sonarr_config=sonarr_config
-            )
-        elif sonarr_config.renamarr.schedule:
-            self.__register_custom_schedule(
-                job=self.__sonarr_renamarr_job,
-                job_kwargs={"sonarr_config": sonarr_config},
-                duration_str=sonarr_config.renamarr.schedule,
-                instance_name=sonarr_config.name,
-            )
+        if sonarr_config.renamarr.schedule.enabled and not self.__external_cron():
+            schedule.every(
+                sonarr_config.renamarr.schedule.interval.total_minutes
+            ).minutes.do(self.__sonarr_renamarr_job, sonarr_config=sonarr_config)
 
     def start(self) -> None:
         config_dir = os.getenv("CONFIG_DIR", "/")
@@ -253,9 +197,9 @@ class Main:
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
                     )
 
-        if schedule_lib.get_jobs():
+        if schedule.get_jobs():
             while self.RUN_SCHEDULER:
-                schedule_lib.run_pending()
+                schedule.run_pending()
                 sleep(1)
 
 

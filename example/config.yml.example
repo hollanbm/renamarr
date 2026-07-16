@@ -4,48 +4,52 @@ sonarr:
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true  # legacy, prefer schedule instead
       analyze_files: true
       rename_folders: false
       log_to_file: true
-      # schedule: "PT1H"  # ISO 8601 duration; runs every ~1 hour with auto jitter
+      schedule:
+        enabled: true
+        interval:
+          days: 0
+          hours: 1
+          minutes: 0
     series_scanner:
       enabled: false
       hourly_job: false
-      # schedule: "PT6H"  # ISO 8601 duration; runs every ~6 hours with auto jitter
   - name: anime
     url: https://sonarr-anime.tld:8989
     api_key: not-a-real-api-key
     renamarr:
       enabled: false
-      hourly_job: false
       analyze_files: false
       rename_folders: false
       log_to_file: false
-      # schedule: "PT30M"
     series_scanner:
       enabled: true
-      hourly_job: true  # legacy, prefer schedule instead
+      hourly_job: true
       hours_before_air: 1 # optional, defaults to 4
-      # schedule: "PT1H"
 radarr:
   - name: radarr
     url: https://radarr.tld:7878
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true  # legacy, prefer schedule instead
       analyze_files: false
       rename_folders: false
       log_to_file: true
-      # schedule: "PT1H"
+      schedule:
+        enabled: false
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
     api_key: not-a-real-api-key
     renamarr:
       enabled: true
-      hourly_job: true  # legacy, prefer schedule instead
       analyze_files: true
       rename_folders: false
       log_to_file: false
-      # schedule: "PT1H"
+      schedule:
+        enabled: true
+        interval:
+          days: 1
+          hours: 0
+          minutes: 5

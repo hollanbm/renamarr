@@ -1,6 +1,39 @@
 from schema import And, Optional, Use
 
-from iso8601 import parse_duration
+from interval import Interval
+
+
+NON_NEGATIVE_INTEGER = And(
+    lambda value: type(value) is int,
+    lambda value: value >= 0,
+)
+
+INTERVAL_SCHEMA = {
+    Optional("days", default=0): NON_NEGATIVE_INTEGER,
+    Optional("hours", default=1): NON_NEGATIVE_INTEGER,
+    Optional("minutes", default=0): NON_NEGATIVE_INTEGER,
+}
+
+DEFAULT_INTERVAL = Interval(days=0, hours=1, minutes=0)
+DEFAULT_SCHEDULE = {"enabled": True, "interval": DEFAULT_INTERVAL}
+
+SCHEDULE_SCHEMA = And(
+    {
+        Optional("enabled", default=True): bool,
+        Optional("interval", default=DEFAULT_INTERVAL): And(
+            INTERVAL_SCHEMA,
+            Use(
+                lambda value: Interval(
+                    days=value["days"],
+                    hours=value["hours"],
+                    minutes=value["minutes"],
+                )
+            ),
+        ),
+    },
+    lambda value: not value["enabled"] or value["interval"].total_minutes > 0,
+    error="renamarr.schedule.interval must be greater than zero when scheduling is enabled",
+)
 
 CONFIG_SCHEMA = {
     Optional(
@@ -35,41 +68,29 @@ CONFIG_SCHEMA = {
                         enabled=False,
                         hourly_job=False,
                         hours_before_air=4,
-                        schedule=None,
                     ),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
                     Optional("hourly_job", default=False): bool,
                     Optional("hours_before_air", default=4): int,
-                    Optional("schedule", default=None): And(
-                        Use(str),
-                        lambda s: (parse_duration(s) and True),
-                        error="sonarr[].series_scanner.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
-                    ),
                 },
                 Optional(
                     "renamarr",
                     default=dict(
                         enabled=False,
-                        hourly_job=False,
                         analyze_files=False,
                         rename_folders=False,
                         log_to_file=False,
-                        schedule=None,
+                        schedule=DEFAULT_SCHEDULE,
                     ),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
-                    Optional("hourly_job", default=False): bool,
                     Optional("analyze_files", default=False): bool,
                     Optional("rename_folders", default=False): bool,
                     Optional("log_to_file", default=False): bool,
-                    Optional("schedule", default=None): And(
-                        Use(str),
-                        lambda s: (parse_duration(s) and True),
-                        error="sonarr[].renamarr.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
-                    ),
+                    Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
                 },
             }
         ],
@@ -105,24 +126,18 @@ CONFIG_SCHEMA = {
                     "renamarr",
                     default=dict(
                         enabled=False,
-                        hourly_job=False,
                         analyze_files=False,
                         rename_folders=False,
                         log_to_file=False,
-                        schedule=None,
+                        schedule=DEFAULT_SCHEDULE,
                     ),
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
-                    Optional("hourly_job", default=False): bool,
                     Optional("analyze_files", default=False): bool,
                     Optional("rename_folders", default=False): bool,
                     Optional("log_to_file", default=False): bool,
-                    Optional("schedule", default=None): And(
-                        Use(str),
-                        lambda s: (parse_duration(s) and True),
-                        error="radarr[].renamarr.schedule must be a valid ISO 8601 duration (e.g. PT10M)",
-                    ),
+                    Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
                 },
             }
         ],
