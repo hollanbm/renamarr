@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>hollanbm/renovate-config"],
-  "pinDigests": false,
+  "ignorePresets": ["docker:pinDigests"],
   "minimumReleaseAge": "14 days",
   "hostRules": [
     {
