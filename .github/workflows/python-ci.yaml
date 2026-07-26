@@ -10,6 +10,7 @@ jobs:
   python-ci:
     runs-on: ubuntu-latest
     permissions:
+      code-quality: write
       contents: read
     env:
       CI: true
@@ -20,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7
         with:
@@ -33,6 +35,14 @@ jobs:
         run: uv sync --frozen --group dev --group test
       - name: Test with pytest
         run: uv run pytest --junitxml=junit.xml -o junit_family=legacy
+      - name: Upload coverage to GitHub
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/upload-code-coverage@1c15be36fc3733ba839b1dd643bd9556e4426dc1  # v1.4.1
+        with:
+          file: coverage.xml
+          language: Python
+          label: code-coverage/pytest
+          fail-on-error: false
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
       - name: Audit dependencies with uv
