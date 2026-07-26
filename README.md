@@ -21,7 +21,7 @@ Each invocation runs every enabled job once and exits without restarting.
 
 1. Copy/Rename [config.yml.example](example/external-scheduler/config.yml.example) to `config.yml`
 2. Update `config.yml` as needed
-   - _Reminder to set `renamarr[].schedule.enabled: false`_
+   - _Set `sonarr[].renamarr.schedule.enabled: false` and/or `radarr[].renamarr.schedule.enabled: false` for every configured instance._
 3. Invoke the app from your scheduler using the provided [docker-compose.yml](example/external-scheduler/docker-compose.yml)
 
 #### Troubleshooting
