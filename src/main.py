@@ -10,7 +10,7 @@ from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
-from healthcheck import HealthReporter
+from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner

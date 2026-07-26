@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from healthcheck import HealthReporter, HealthState, check_health, main
+from healthcheck import check_health, main
+from renamarr.healthcheck.health_reporter import HealthReporter
+from renamarr.healthcheck.health_state import HealthState
 
 
 def write_health(path: Path, payload: object) -> None:
@@ -46,7 +48,7 @@ def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
 
 def test_running_job_starts_and_joins_heartbeat_thread(tmp_path: Path, mocker) -> None:
     path = tmp_path / "health.json"
-    thread = mocker.patch("healthcheck.Thread")
+    thread = mocker.patch("renamarr.healthcheck.health_reporter.Thread")
     reporter = HealthReporter(path=path, clock=mocker.Mock(side_effect=[0.0, 1.0, 2.0]))
 
     with reporter.running_job():

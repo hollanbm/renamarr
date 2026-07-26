@@ -131,6 +131,18 @@ Schedule interval values must be non-negative integers, and the combined interva
 
 When `schedule.interval` is omitted or empty, Renamarr uses the default interval of one hour.
 
+### Docker Heartbeat
+
+The container publishes application health through Docker's native health status. Renamarr refreshes an internal heartbeat while the scheduler is idle and from a background thread while a job is running. The health check is observational: Docker Compose's `restart` policy does not restart a running container solely because it becomes unhealthy. A logically stuck job can remain healthy while its heartbeat thread continues running.
+
+The heartbeat is stored under `/tmp`. One-shot containers may finish before Docker runs a health check. For these runs, use the container’s completion status and Renamarr logs rather than Docker health status.
+
+#### Read-only Root Filesystem
+
+The included Compose configurations run Renamarr with a read-only root filesystem. The heartbeat is written to `/tmp`, so that path is mounted as a writable `tmpfs`.
+
+When file logging is enabled, `/logs` must also be mounted as a writable volume; otherwise, Renamarr warns and continues with stdout logging.
+
 ### Local Development
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.

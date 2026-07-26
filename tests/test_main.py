@@ -7,10 +7,10 @@ from unittest.mock import PropertyMock
 import pytest
 from loguru import logger
 from config_schema import CONFIG_SCHEMA
-from healthcheck import HealthReporter
 from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
+from renamarr.healthcheck.health_reporter import HealthReporter
 from schedule import Job, Scheduler
 
 # disable config caching
