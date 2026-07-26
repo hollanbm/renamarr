@@ -78,8 +78,8 @@ jobs:
             latest=false
             suffix=${{ matrix.variant.tag_suffix }},onlatest=true
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }},priority=900
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }},priority=200
             type=raw,value=pr-${{ github.event.pull_request.number }}-{{sha}},enable=${{ github.event_name == 'pull_request' }}
             type=raw,value={{branch}},enable=${{ github.event_name == 'push' }}
           labels: |
@@ -90,12 +90,23 @@ jobs:
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.revision={{sha}}
-            org.opencontainers.image.version={{version}}
             org.opencontainers.image.created={{commit_date 'YYYY-MM-DDTHH:mm:ss[Z]'}}
           annotations: |
             org.opencontainers.image.description=${{ github.event.repository.description }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+      - name: Verify release image version metadata
+        if: ${{ github.event_name == 'release' }}
+        env:
+          EXPECTED_VERSION: ${{ format('{0}{1}', github.event.release.tag_name, matrix.variant.tag_suffix) }}
+          LABEL_VERSION: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          METADATA_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if [ "$METADATA_VERSION" != "$EXPECTED_VERSION" ] || [ "$LABEL_VERSION" != "$EXPECTED_VERSION" ]; then
+            printf '::error title=Incorrect image version::Expected %s; metadata version is %s; OCI label version is %s.\n' \
+              "$EXPECTED_VERSION" "$METADATA_VERSION" "$LABEL_VERSION"
+            exit 1
+          fi
       - name: Build Docker image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
         with:

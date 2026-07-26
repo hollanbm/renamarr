@@ -275,6 +275,36 @@ class TestMain:
         self.health_reporter.idle.assert_called_once_with()
         self.health_reporter.heartbeat.assert_called_once_with()
 
+    def test_recurring_series_scanner_keeps_scheduler_running_with_one_shot_renamarr(
+        self, config, enable_scheduler, mocker
+    ) -> None:
+        sonarr_config = config.sonarr[0]
+        sonarr_config.series_scanner.enabled = True
+        sonarr_config.series_scanner.hourly_job = True
+        sonarr_config.renamarr.enabled = True
+        sonarr_config.renamarr.schedule.enabled = False
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        run_pending = mocker.spy(Scheduler, "run_pending")
+        series_scanner = mocker.patch("main.SonarrSeriesScanner")
+        renamarr = mocker.patch("main.SonarrRenamarr")
+        clear()
+
+        try:
+            Main().start()
+
+            series_scanner.return_value.scan.assert_called_once_with()
+            renamarr.return_value.scan.assert_called_once_with()
+            jobs = get_jobs()
+            assert len(jobs) == 1
+            assert jobs[0].interval == 55
+            assert jobs[0].latest == 65
+            assert jobs[0].unit == "minutes"
+            run_pending.assert_called_once()
+            self.health_reporter.idle.assert_called_once_with()
+            self.health_reporter.heartbeat.assert_called_once_with()
+        finally:
+            clear()
+
     def test_sonarr_series_scanner_pycliarr_exception(
         self, config, mock_loguru_error, mocker
     ) -> None:

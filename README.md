@@ -17,11 +17,13 @@ This is the default deployment mode. Enabled Renamarr jobs run immediately, repe
 
 #### External scheduler
 
-Each invocation runs every enabled job once and exits without restarting.
+Each invocation runs every enabled job once and exits without restarting when no recurring jobs are configured.
 
 1. Copy/Rename [config.yml.example](example/external-scheduler/config.yml.example) to `config.yml`
 2. Update `config.yml` as needed
-   - _Set `sonarr[].renamarr.schedule.enabled: false` and/or `radarr[].renamarr.schedule.enabled: false` for every configured instance._
+   - _Set `sonarr[].renamarr.schedule.enabled` to `false` for every enabled Renamarr instance._
+   - _Set `radarr[].renamarr.schedule.enabled` to `false` for every enabled Renamarr instance._
+   - _Set `sonarr[].series_scanner.hourly_job` to `false` for every enabled series scanner._
 3. Invoke the app from your scheduler using the provided [docker-compose.yml](example/external-scheduler/docker-compose.yml)
 
 #### Troubleshooting
@@ -81,7 +83,7 @@ This should prevent too many API calls to the TVDB. When recurring scans are ena
 
 The application runs enabled jobs immediately on startup. Renamarr jobs repeat every hour by default. Set `renamarr.schedule.enabled` to `false` to run once, or configure the interval in days, hours, and minutes.
 
-The process remains running while at least one recurring job is registered. It exits after the initial run when all enabled jobs are configured for an external scheduler.
+The process remains running while at least one recurring job is registered. It exits after the initial run only when every enabled Renamarr job has `schedule.enabled` set to `false` and every enabled Sonarr series scanner has `hourly_job` set to `false`.
 
 Logs are always written to stdout.
 
