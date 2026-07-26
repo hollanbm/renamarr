@@ -7,6 +7,7 @@ from unittest.mock import PropertyMock
 import pytest
 from loguru import logger
 from config_schema import CONFIG_SCHEMA
+from healthcheck import HealthReporter
 from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
@@ -17,6 +18,12 @@ configparser.hold_an_instance = False
 
 
 class TestMain:
+    @pytest.fixture(autouse=True)
+    def health_reporter(self, mocker) -> None:
+        self.health_reporter = mocker.Mock(spec=HealthReporter)
+        self.health_reporter.running_job.side_effect = nullcontext
+        mocker.patch("main.HealthReporter", return_value=self.health_reporter)
+
     @pytest.fixture
     def enable_scheduler(self, mocker) -> Generator:
         """
@@ -100,6 +107,7 @@ class TestMain:
             hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
         )
         sonarr_series_scanner.return_value.scan.assert_called_once_with()
+        self.health_reporter.running_job.assert_called_once_with()
 
     def test_start_uses_config_dir_env_var(self, config_dir, mocker) -> None:
         config = configparser.get_config(
@@ -264,6 +272,8 @@ class TestMain:
         sonarr_series_scanner.return_value.scan.assert_called_once_with()
         job.assert_called()
         run_pending.assert_called_once()
+        self.health_reporter.idle.assert_called_once_with()
+        self.health_reporter.heartbeat.assert_called_once_with()
 
     def test_sonarr_series_scanner_pycliarr_exception(
         self, config, mock_loguru_error, mocker
@@ -290,6 +300,7 @@ class TestMain:
         )
         contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
+        self.health_reporter.running_job.assert_called_once_with()
 
     def test_sonarr_renamarr_scan(self, config, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
@@ -310,6 +321,7 @@ class TestMain:
             rename_folders=True,
         )
         sonarr_renamarr.return_value.scan.assert_called_once_with()
+        self.health_reporter.running_job.assert_called_once_with()
 
     def test_sonarr_renamarr_enabled_schedule(
         self, config, enable_scheduler, mocker
@@ -401,6 +413,7 @@ class TestMain:
         )
         contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
+        self.health_reporter.running_job.assert_called_once_with()
 
     def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
         exception = ConfigError("BOOM!")
@@ -470,6 +483,7 @@ class TestMain:
             rename_folders=config.radarr[0].renamarr.rename_folders,
         )
         radarr_renamarr.return_value.scan.assert_called_once_with()
+        self.health_reporter.running_job.assert_called_once_with()
 
     def test_radarr_renamarr_rename_folders_defaults_false(self, config) -> None:
         assert config.radarr[0].renamarr.rename_folders is False
@@ -593,6 +607,7 @@ class TestMain:
         )
         contextualize.assert_any_call(service="radarr", instance=config.radarr[0].name)
         mock_loguru_error.assert_called_once_with(exception)
+        self.health_reporter.running_job.assert_called_once_with()
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_disabled_renamarr_schedule_runs_once(

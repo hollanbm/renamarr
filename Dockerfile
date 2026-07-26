@@ -46,4 +46,7 @@ ENV LOG_DIR="/logs"
 # activate venv
 ENV PATH="/renamarr/.venv/bin:$PATH"
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["python", "src/healthcheck.py"]
+
 ENTRYPOINT ["python", "src/main.py"]
