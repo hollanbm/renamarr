@@ -7,7 +7,10 @@ services:
       dockerfile: Dockerfile
     environment:
       LOG_LEVEL: DEBUG
+    read_only: true  # Restrict writes to explicit mounts.
     restart: 'no'
+    tmpfs:
+      - /tmp  # Required for the heartbeat with read_only enabled.
     volumes:
       - ./config/config.yml:/config/config.yml:ro
       - ./logs:/logs:rw
