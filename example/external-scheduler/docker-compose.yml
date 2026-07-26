@@ -1,0 +1,12 @@
+services:
+  renamarr:
+    container_name: renamarr
+    image: ghcr.io/hollanbm/renamarr:latest
+    # user: 1000:1000  # If file logging is enabled, match the host user to avoid permission issues.
+    read_only: true
+    restart: 'no'
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+      # - ./logs:/logs:rw  # Create this directory before enabling persistent file logs.

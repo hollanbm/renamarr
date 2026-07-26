@@ -11,7 +11,7 @@ from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from renamarr.healthcheck.health_reporter import HealthReporter
-from schedule import Job, Scheduler
+from schedule import Job, Scheduler, clear, get_jobs
 
 # disable config caching
 configparser.hold_an_instance = False
@@ -323,29 +323,61 @@ class TestMain:
         sonarr_renamarr.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
-    def test_sonarr_renamarr_enabled_schedule(
+    @pytest.mark.parametrize(
+        ("service", "renamarr_class"),
+        [
+            ("sonarr", "main.SonarrRenamarr"),
+            ("radarr", "main.RadarrRenamarr"),
+        ],
+    )
+    def test_default_renamarr_schedule_runs_immediately_and_hourly(
+        self, config, enable_scheduler, service, renamarr_class, mocker
+    ) -> None:
+        service_config = getattr(config, service)[0]
+        service_config.renamarr.enabled = True
+        assert service_config.renamarr.schedule.enabled is True
+        assert service_config.renamarr.schedule.interval.total_minutes == 60
+        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
+        run_pending = mocker.spy(Scheduler, "run_pending")
+        renamarr = mocker.patch(renamarr_class)
+        clear()
+
+        try:
+            Main().start()
+
+            renamarr.return_value.scan.assert_called_once_with()
+            jobs = get_jobs()
+            assert len(jobs) == 1
+            assert jobs[0].interval == 60
+            assert jobs[0].unit == "minutes"
+            run_pending.assert_called_once()
+            self.health_reporter.idle.assert_called_once_with()
+            self.health_reporter.heartbeat.assert_called_once_with()
+        finally:
+            clear()
+
+    def test_external_cron_does_not_disable_explicit_renamarr_schedule(
         self, config, enable_scheduler, mocker
     ) -> None:
-        config.sonarr[0].renamarr.enabled = True
-        config.sonarr[0].renamarr.schedule.enabled = True
+        config.radarr[0].renamarr.enabled = True
+        config.radarr[0].renamarr.schedule.enabled = True
+        mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
         run_pending = mocker.spy(Scheduler, "run_pending")
+        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        clear()
 
-        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
+        try:
+            Main().start()
 
-        Main().start()
-
-        sonarr_renamarr.assert_called_once_with(
-            name=config.sonarr[0].name,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
-            analyze_files=config.sonarr[0].renamarr.analyze_files,
-            rename_folders=config.sonarr[0].renamarr.rename_folders,
-        )
-        sonarr_renamarr.return_value.scan.assert_called_once_with()
-        job.assert_called()
-        run_pending.assert_called_once()
+            radarr_renamarr.return_value.scan.assert_called_once_with()
+            jobs = get_jobs()
+            assert len(jobs) == 1
+            assert jobs[0].interval == 60
+            assert jobs[0].unit == "minutes"
+            run_pending.assert_called_once()
+        finally:
+            clear()
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_deprecated_hourly_job_warns_before_and_after_renamarr_job(
@@ -557,30 +589,6 @@ class TestMain:
             mock_loguru_warning.call_args_list[-1].args[0], PermissionError
         )
 
-    def test_radarr_renamarr_enabled_schedule(
-        self, config, enable_scheduler, mocker
-    ) -> None:
-        config.radarr[0].renamarr.enabled = True
-        config.radarr[0].renamarr.schedule.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.spy(Job, "do")
-        run_pending = mocker.spy(Scheduler, "run_pending")
-
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
-
-        Main().start()
-
-        radarr_renamarr.assert_called_once_with(
-            name=config.radarr[0].name,
-            url=config.radarr[0].url,
-            api_key=config.radarr[0].api_key,
-            analyze_files=config.radarr[0].renamarr.analyze_files,
-            rename_folders=config.radarr[0].renamarr.rename_folders,
-        )
-        radarr_renamarr.return_value.scan.assert_called_once_with()
-        job.assert_called()
-        run_pending.assert_called_once()
-
     def test_radarr_renamarr_pycliarr_exception(
         self, config, mock_loguru_error, mocker
     ) -> None:
@@ -617,15 +625,21 @@ class TestMain:
         service_config.renamarr.enabled = True
         service_config.renamarr.schedule.enabled = False
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.patch.object(Job, "do")
+        run_pending = mocker.spy(Scheduler, "run_pending")
         renamarr = mocker.patch(
             "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
         )
+        clear()
 
-        Main().start()
+        try:
+            Main().start()
 
-        renamarr.return_value.scan.assert_called_once_with()
-        job.assert_not_called()
+            renamarr.return_value.scan.assert_called_once_with()
+            assert get_jobs() == []
+            run_pending.assert_not_called()
+            self.health_reporter.idle.assert_not_called()
+        finally:
+            clear()
 
     def test_renamarr_schedule_uses_total_minutes(self, config, mocker) -> None:
         config.radarr[0].renamarr.enabled = True

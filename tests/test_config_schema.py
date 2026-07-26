@@ -43,7 +43,7 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
                 "rename_folders": False,
                 "log_to_file": False,
                 "schedule": {
-                    "enabled": False,
+                    "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
             },
@@ -66,7 +66,7 @@ def test_minimal_radarr_config_receives_defaults() -> None:
                 "rename_folders": False,
                 "log_to_file": False,
                 "schedule": {
-                    "enabled": False,
+                    "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
             },
@@ -193,7 +193,7 @@ def test_schedule_interval_is_validated(
     validated = validate_config({service: [instance_config]})
 
     assert validated[service][0]["renamarr"]["schedule"] == {
-        "enabled": False,
+        "enabled": True,
         "interval": expected,
     }
 
@@ -252,19 +252,23 @@ def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize(
+    ("hourly_job", "schedule_enabled"),
+    [(False, True), (True, False)],
+)
 def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
-    service: str,
+    service: str, hourly_job: bool, schedule_enabled: bool
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {
-            "hourly_job": False,
-            "schedule": {"enabled": True},
+            "hourly_job": hourly_job,
+            "schedule": {"enabled": schedule_enabled},
         }
     }
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is True
+    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is schedule_enabled
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])

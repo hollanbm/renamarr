@@ -16,7 +16,7 @@ INTERVAL_SCHEMA = {
 
 DEFAULT_INTERVAL = Interval(days=0, hours=1, minutes=0)
 DEFAULT_SCHEDULE: dict[str, object] = {
-    "enabled": False,
+    "enabled": True,
     "interval": DEFAULT_INTERVAL,
 }
 MAX_INTERVAL_DAYS: int = 30
@@ -45,7 +45,7 @@ def _migrate_hourly_job(renamarr_config: object) -> object:
 
 SCHEDULE_SCHEMA = And(
     {
-        Optional("enabled", default=False): bool,
+        Optional("enabled", default=True): bool,
         Optional("interval", default=DEFAULT_INTERVAL): And(
             dict,
             Use(lambda value: value or {"hours": 1}),
