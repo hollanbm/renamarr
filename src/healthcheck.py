@@ -1,6 +1,7 @@
 import json
 import math
 from collections.abc import Callable
+from json import JSONDecodeError
 from pathlib import Path
 from time import monotonic
 
@@ -20,7 +21,11 @@ def check_health(
     """Validate the application heartbeat and return a concise result."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, UnicodeError, json.JSONDecodeError:
+    except (
+        OSError,
+        UnicodeError,
+        JSONDecodeError,
+    ):
         return False, "heartbeat is unavailable"
 
     if not isinstance(payload, dict) or set(payload) != {
@@ -33,7 +38,10 @@ def check_health(
         return False, "heartbeat version is unsupported"
     try:
         HealthState(payload["state"])
-    except TypeError, ValueError:
+    except (
+        TypeError,
+        ValueError,
+    ):
         return False, "heartbeat state is invalid"
 
     heartbeat = payload["heartbeat"]
