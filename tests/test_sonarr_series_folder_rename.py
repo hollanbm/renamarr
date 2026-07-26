@@ -3,6 +3,7 @@ from unittest.mock import call
 
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
+from pycliarr.api.exceptions import CliServerError
 
 from renamarr.sonarr.services.series_folder_rename import (
     MAX_WAIT_SECONDS,
@@ -33,7 +34,7 @@ class TestSeriesFolderRename:
             not in mock_loguru_debug.mock_calls
         )
 
-    def test_process_batches_series_folder_renames_by_root(
+    def test_process_batches_and_rescans_when_rename_returns_json_lists(
         self, mock_loguru_info, mock_loguru_debug, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
@@ -53,7 +54,10 @@ class TestSeriesFolderRename:
         request_put = mocker.patch.object(
             sonarr_cli,
             "request_put",
-            side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=299)],
+            side_effect=[
+                [dict(id=1), dict(id=3)],
+                [dict(id=2)],
+            ],
         )
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
         send_command.side_effect = [dict(id=10), dict(id=20)]
@@ -140,9 +144,7 @@ class TestSeriesFolderRename:
             sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
-        )
+        mocker.patch.object(sonarr_cli, "request_put", return_value=[dict(id=1)])
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(
             sonarr_cli,
@@ -169,9 +171,7 @@ class TestSeriesFolderRename:
             sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
-        )
+        mocker.patch.object(sonarr_cli, "request_put", return_value=[dict(id=1)])
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         get_command = mocker.patch.object(
             sonarr_cli,
@@ -198,8 +198,8 @@ class TestSeriesFolderRename:
             ]
         )
 
-    def test_process_skips_rescan_when_folder_rename_status_is_unsuccessful(
-        self, mock_loguru_error, mock_loguru_info, mocker
+    def test_process_propagates_folder_rename_server_error_without_rescan(
+        self, mock_loguru_info, mocker
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
@@ -207,18 +207,24 @@ class TestSeriesFolderRename:
             sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        server_error = CliServerError(
+            "Sonarr series folder rename failed",
+            status_code=500,
+            response="Internal Server Error",
+        )
         mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=300)
+            sonarr_cli,
+            "request_put",
+            side_effect=server_error,
         )
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
 
-        SeriesFolderRename(sonarr_cli).process([series])
+        with pytest.raises(CliServerError) as raised_error:
+            SeriesFolderRename(sonarr_cli).process([series])
 
+        assert raised_error.value is server_error
         send_command.assert_not_called()
         mock_loguru_info.assert_any_call("Renaming Series folder for: Show")
-        mock_loguru_error.assert_called_once_with(
-            "Series folder rename failed for series: Show: status code 300"
-        )
         assert (
             call("Series folder rename successful for series: Show")
             not in mock_loguru_info.mock_calls
@@ -243,7 +249,7 @@ class TestSeriesFolderRename:
             sonarr_cli, "request_get", return_value=dict(folder="New")
         )
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+            sonarr_cli, "request_put", return_value=[dict(id=2)]
         )
         send_command = mocker.patch.object(
             sonarr_cli, "_sendCommand", return_value=dict(id=10)
@@ -304,7 +310,7 @@ class TestSeriesFolderRename:
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+            sonarr_cli, "request_put", return_value=[dict(id=1)]
         )
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(
@@ -358,7 +364,7 @@ class TestSeriesFolderRename:
         )
         mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=mocker.Mock(status_code=200)
+            sonarr_cli, "request_put", return_value=[dict(id=1)]
         )
         mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
         mocker.patch.object(

@@ -38,7 +38,7 @@ class SeriesFolderRename:
                 f"Renaming Series {'folders' if multiple_series else 'folder'} "
                 f"for: {series_titles}"
             )
-            folder_rename_response = self.sonarr_cli.request_put(
+            self.sonarr_cli.request_put(
                 path="/api/v3/series/editor",
                 json_data=dict(
                     rootFolderPath=root_folder_rename.root_folder_path,
@@ -46,12 +46,6 @@ class SeriesFolderRename:
                     moveFiles=root_folder_rename.move_files,
                 ),
             )
-            if not 200 <= folder_rename_response.status_code <= 299:
-                logger.error(
-                    f"Series folder rename failed for series: {series_titles}: "
-                    f"status code {folder_rename_response.status_code}"
-                )
-                continue
 
             logger.info(f"Series folder rename successful for series: {series_titles}")
             logger.info("Initiated disk scan of updated series")
