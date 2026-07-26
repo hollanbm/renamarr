@@ -4,12 +4,26 @@
 
 ## Quick Start
 
-### docker
+### Docker
+
+#### Recurring job
+
+This is the default deployment mode. Enabled Renamarr jobs run immediately, repeat every hour unless configured otherwise, and the container remains running with `restart: unless-stopped`.
 
 1. Copy/Rename [config.yml.example](example/config.yml.example) to `config.yml`
 2. Update `config.yml` as needed.
    - See [Configuration](#configuration) for further explanation
 3. Bring up app using provided [docker-compose.yml](example/docker-compose.yml)
+
+#### External scheduler
+
+Each invocation runs every enabled job once and exits without restarting.
+
+1. Copy/Rename [config.yml.example](example/external-scheduler/config.yml.example) to `config.yml`
+2. Update `config.yml` as needed
+    - _Reminder to set `renamarr[].schedule.enabled: false`_
+3. Invoke the app from your scheduler using the provided [docker-compose.yml](example/external-scheduler/docker-compose.yml)
+
 
 #### Troubleshooting
 
@@ -43,6 +57,7 @@ This config option will rename series or movie folders when they no longer match
 - uses [/api/v3/movie/{id}/folder](https://radarr.video/docs/api/#/MovieFolder/get_api_v3_movie__id__folder) endpoint to determine if the movie folder requires an update
 - uses [/api/v3/movie/editor](https://radarr.video/docs/api/#/MovieEditor/put_api_v3_movie_editor) endpoint to update movie rootFolderPath to it's current value
   - moving the folder in place
+- sends a Sonarr `RescanSeries` command to rescan series after successful folder moves
 - sends a Radarr `RefreshMovie` command to rescan movies after successful folder moves
 - Series and movies are processed in bulk at the end of the run, **per root folder**
 
@@ -65,7 +80,10 @@ This should prevent too many API calls to the TVDB. When recurring scans are ena
 
 ### Usage
 
-The application runs enabled jobs immediately on startup. Renamarr jobs run once by default. Set `renamarr.schedule.enabled` to `true` to repeat the job, and configure the interval in days, hours, and minutes when needed.
+The application runs enabled jobs immediately on startup. Renamarr jobs repeat every hour by default. Set `renamarr.schedule.enabled` to `false` to run once, or configure the interval in days, hours, and minutes.
+
+The process remains running while at least one recurring job is registered. It exits after the initial run when all enabled jobs are configured for an external scheduler.
+
 
 Logs are always written to stdout.
 
@@ -106,7 +124,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].series_scanner.hours_before_air`    | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
 | `sonarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `sonarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `sonarr[].renamarr.schedule.enabled`          | boolean | No       | False         | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `sonarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
 | `sonarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
 | `sonarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
 | `sonarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
@@ -119,7 +137,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `radarr[].api_key`                            | string  | Yes      | N/A           | api_key for radarr instance                                                                                                                      |
 | `radarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `radarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `radarr[].renamarr.schedule.enabled`          | boolean | No       | False         | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `radarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
 | `radarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
 | `radarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
 | `radarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
@@ -135,7 +153,7 @@ When `schedule.interval` is omitted or empty, Renamarr uses the default interval
 
 The container publishes application health through Docker's native health status. Renamarr refreshes an internal heartbeat while the scheduler is idle and from a background thread while a job is running. The health check is observational: Docker Compose's `restart` policy does not restart a running container solely because it becomes unhealthy. A logically stuck job can remain healthy while its heartbeat thread continues running.
 
-The heartbeat is stored under `/tmp`. One-shot containers may finish before Docker runs a health check. For these runs, use the container’s completion status and Renamarr logs rather than Docker health status.
+The heartbeat is stored under `/tmp`. Containers invoked by an external scheduler may finish before Docker runs a health check. For these runs, use the container’s completion status and Renamarr logs rather than Docker health status.
 
 #### Read-only Root Filesystem
 

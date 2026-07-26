@@ -38,7 +38,7 @@ radarr:
       rename_folders: false
       log_to_file: true
       schedule:
-        enabled: false
+        enabled: true
   - name: radarr-4k
     url: https://radarr-4k.tld:7878
     api_key: not-a-real-api-key
