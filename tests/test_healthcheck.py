@@ -63,9 +63,8 @@ def test_running_job_returns_to_idle_after_exception(tmp_path: Path) -> None:
     path = tmp_path / "health.json"
     reporter = HealthReporter(path=path, heartbeat_interval=60.0)
 
-    with pytest.raises(RuntimeError, match="job failed"):
-        with reporter.running_job():
-            raise RuntimeError("job failed")
+    with pytest.raises(RuntimeError, match="job failed"), reporter.running_job():
+        raise RuntimeError("job failed")
 
     assert json.loads(path.read_text(encoding="utf-8"))["state"] == "idle"
 

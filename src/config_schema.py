@@ -2,7 +2,6 @@ from schema import And, Optional, Schema, Use
 
 from interval import Interval
 
-
 NON_NEGATIVE_INTEGER = And(
     lambda value: type(value) is int,
     lambda value: value >= 0,

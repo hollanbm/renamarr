@@ -1,15 +1,14 @@
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
-from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
-
 from tests.conftest import episode_data
 
-FIXED_NOW = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
+
+FIXED_NOW = datetime(2026, 1, 1, 12, tzinfo=UTC)
 
 
 def tba_episode_at(air_date_utc: datetime) -> json_data:
@@ -63,7 +62,7 @@ class TestSeriesScanner:
         assert "Error fetching episode list" in caplog.text
 
     def test_when_show_status_not_continuuing(self, caplog, mocker) -> None:
-        series: List[SonarrSerieItem] = [
+        series: list[SonarrSerieItem] = [
             SonarrSerieItem(id=1, title="test title", status="ended")
         ]
         mocker.patch.object(SonarrCli, "get_serie").return_value = series
@@ -77,7 +76,7 @@ class TestSeriesScanner:
         assert not get_episode.called
 
     def test_when_multiple_shows_continuing_and_ended(self, caplog, mocker) -> None:
-        series: List[SonarrSerieItem] = [
+        series: list[SonarrSerieItem] = [
             SonarrSerieItem(id=1, title="title 1", status="continuing"),
             SonarrSerieItem(id=2, title="title 2", status="ended"),
         ]
@@ -92,7 +91,7 @@ class TestSeriesScanner:
         get_episode.assert_called_once_with(1)
 
     def test_when_episodes_filtered_out(self, get_serie, caplog, mocker) -> None:
-        episodes: List[json_data] = [
+        episodes: list[json_data] = [
             episode_data(
                 id=1,
                 title="TBA",
@@ -127,7 +126,7 @@ class TestSeriesScanner:
         assert not refresh_serie.called
 
     def test_when_tba_episode_is_airing_soon(self, get_serie, caplog, mocker) -> None:
-        episodes: List[json_data] = [
+        episodes: list[json_data] = [
             episode_data(
                 id=1,
                 title="TBA",
@@ -149,7 +148,7 @@ class TestSeriesScanner:
     def test_when_tba_episode_has_already_aired(
         self, get_serie, caplog, mocker
     ) -> None:
-        episodes: List[json_data] = [
+        episodes: list[json_data] = [
             episode_data(
                 id=1,
                 title="TBA",

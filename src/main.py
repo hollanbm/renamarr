@@ -15,7 +15,6 @@ from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
-
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
     "Remove renamarr.hourly_job after migrating the schedule configuration."

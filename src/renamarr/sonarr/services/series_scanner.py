@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from dateutil import parser
 from loguru import logger
@@ -40,13 +40,12 @@ class SonarrSeriesScanner:
                         if len(episode_list) == 0:
                             logger.error("Error fetching episode list")
                             continue
-                        else:
-                            logger.debug("Retrieved episode list")
+                        logger.debug("Retrieved episode list")
 
                         for episode in self.__filter_episode_list(episode_list):
                             episode_air_date_utc = parser.parse(
                                 episode["airDateUtc"]
-                            ).astimezone(timezone.utc)
+                            ).astimezone(UTC)
 
                             if self.__is_episode_airing_soon(episode_air_date_utc):
                                 logger.info(
@@ -55,7 +54,7 @@ class SonarrSeriesScanner:
                                 self.sonarr_cli.refresh_serie(show.id)
                                 logger.info("Series rescan triggered")
                                 break
-                            elif self.__has_episode_already_aired(episode_air_date_utc):
+                            if self.__has_episode_already_aired(episode_air_date_utc):
                                 logger.info(
                                     "Found previously aired episode with TBA title"
                                 )
@@ -95,7 +94,7 @@ class SonarrSeriesScanner:
         """
 
         hours_till_airing = (
-            episode_air_date_utc - datetime.now(timezone.utc)
+            episode_air_date_utc - datetime.now(UTC)
         ).total_seconds() / 3600
 
         return 0 < hours_till_airing <= self.hours_before_air
@@ -109,4 +108,4 @@ class SonarrSeriesScanner:
         bool True if episode has already aired
         """
 
-        return (datetime.now(timezone.utc) - episode_air_date_utc).total_seconds() > 0
+        return (datetime.now(UTC) - episode_air_date_utc).total_seconds() > 0
