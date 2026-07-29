@@ -165,6 +165,4 @@ When file logging is enabled, `/logs` must also be mounted as a writable volume;
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
 
-CI builds both container variants for every configured workflow trigger. Runs initiated by Renovate or Dependabot validate the build without publishing images. Because these builds use private Docker Hardened Images, `DHI_PAT` must be configured as both an Actions secret and a Dependabot secret. A standalone Hadolint workflow validates Dockerfile and Hadolint configuration changes without requiring Docker Hardened Images credentials.
-
 Dependency audits are run with `uv audit --frozen --preview-features audit`.

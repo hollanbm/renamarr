@@ -25,6 +25,7 @@ jobs:
     name: Prune registry
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
       pull-requests: read
     steps:
@@ -35,6 +36,7 @@ jobs:
           INCLUDE_LEGACY_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_legacy_tags }}
         with:
           script: |
+            // Confirm GitHub exposes complete registry pagination before allowing cleanup.
             const {data: packageVersions, headers: packageHeaders} = await github.request(
               "GET /users/{username}/packages/{package_type}/{package_name}/versions",
               {
@@ -44,6 +46,7 @@ jobs:
                 per_page: 100,
               },
             )
+            // A multi-page response must identify its final page so no versions are missed.
             const packageLinkHeader = packageHeaders.link ?? ""
             const hasNextPage = packageLinkHeader.includes('rel="next"')
             const hasLastPage = packageLinkHeader.includes('rel="last"')
@@ -54,18 +57,32 @@ jobs:
               return
             }
 
+            // Preserve every image associated with a pull request that is still open.
             const openPullRequests = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: "open",
               per_page: 100,
             })
-            const excludeSelectors = openPullRequests.flatMap(({number}) => [
-              `pr-${number}`,
-              `pr-${number}-*`,
+            // Use every Git tag, not a version pattern, as the source of protected releases.
+            const repositoryTags = await github.paginate(github.rest.repos.listTags, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            })
+            // Protect release and development variants, plus exact and SHA-suffixed PR tags.
+            // A Set removes any duplicate selectors produced by overlapping tag names.
+            const excludeSelectors = new Set([
+              ...repositoryTags.flatMap(({name}) => [name, `${name}-dev`]),
+              ...openPullRequests.flatMap(({number}) => [
+                `pr-${number}`,
+                `pr-${number}-*`,
+              ]),
             ])
+            // All PR images are candidates; the exclusions above retain images for open PRs.
             const deleteSelectors = ["pr-*"]
             if (process.env.INCLUDE_LEGACY_TAGS === "true") {
+              // These verified obsolete tags are opt-in to keep scheduled cleanup conservative.
               deleteSelectors.push(
                 "199-4b3ea20",
                 "bug-139-redundant-error",
@@ -80,12 +97,13 @@ jobs:
               )
             }
 
+            // The cleanup action accepts selectors as comma-delimited output strings.
             core.info(
               `Generated ${deleteSelectors.length} delete selectors and ` +
-                `${excludeSelectors.length} open pull request exclusions.`,
+                `${excludeSelectors.size} exclusions.`,
             )
             core.setOutput("delete_tags", deleteSelectors.join(","))
-            core.setOutput("exclude_tags", excludeSelectors.join(","))
+            core.setOutput("exclude_tags", [...excludeSelectors].join(","))
       - name: Cleanup images
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1.2.2
         with:
