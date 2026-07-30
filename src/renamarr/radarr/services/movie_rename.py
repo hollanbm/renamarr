@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from loguru import logger
-from pycliarr.api import RadarrCli, RadarrMovieItem
-from pycliarr.api.base_api import json_data
 
 from renamarr.radarr.models.movie_rename_plan import RadarrMovieRenamePlan
+
+if TYPE_CHECKING:
+    from pycliarr.api import RadarrCli, RadarrMovieItem
+    from pycliarr.api.base_api import json_data
 
 
 class MovieRename:

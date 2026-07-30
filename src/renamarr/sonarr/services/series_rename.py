@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from loguru import logger
-from pycliarr.api import SonarrCli, SonarrSerieItem
-from pycliarr.api.base_api import json_data
 
 from renamarr.sonarr.models.episode_rename_plan import SonarrEpisodeRenamePlan
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrCli, SonarrSerieItem
+    from pycliarr.api.base_api import json_data
 
 
 class SeriesRename:

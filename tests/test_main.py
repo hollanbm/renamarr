@@ -1,18 +1,27 @@
+from __future__ import annotations
+
 import os
-from collections.abc import Generator
 from contextlib import nullcontext
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import PropertyMock
 
 import pytest
 from loguru import logger
 from pycliarr.api import CliArrError
-from pyconfigparser import Config, ConfigError, ConfigFileNotFoundError, configparser
+from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job, Scheduler, clear, get_jobs
 
 from config_schema import CONFIG_SCHEMA
 from main import Main
 from renamarr.healthcheck.health_reporter import HealthReporter
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from unittest.mock import MagicMock
+
+    from pyconfigparser import Config
+    from pytest_mock import MockerFixture
 
 # disable config caching
 configparser.hold_an_instance = False
@@ -20,13 +29,13 @@ configparser.hold_an_instance = False
 
 class TestMain:
     @pytest.fixture(autouse=True)
-    def health_reporter(self, mocker) -> None:
+    def health_reporter(self, mocker: MockerFixture) -> None:
         self.health_reporter = mocker.Mock(spec=HealthReporter)
         self.health_reporter.running_job.side_effect = nullcontext
         mocker.patch("main.HealthReporter", return_value=self.health_reporter)
 
     @pytest.fixture
-    def enable_scheduler(self, mocker) -> Generator:
+    def enable_scheduler(self, mocker: MockerFixture) -> Generator[None]:
         """
         Allows scheduler loop to enter, exactly one time, and then exit
         """
@@ -36,31 +45,31 @@ class TestMain:
         Main.RUN_SCHEDULER = True
 
     @pytest.fixture
-    def log_dir(self) -> Generator:
+    def log_dir(self) -> Generator[None]:
         os.environ["LOG_DIR"] = "/tmp/renamarr-logs"
         yield
         del os.environ["LOG_DIR"]
 
     @pytest.fixture
-    def log_retention(self) -> Generator:
+    def log_retention(self) -> Generator[None]:
         os.environ["LOG_RETENTION"] = "14 days"
         yield
         del os.environ["LOG_RETENTION"]
 
     @pytest.fixture
-    def log_rotation(self) -> Generator:
+    def log_rotation(self) -> Generator[None]:
         os.environ["LOG_ROTATION"] = "12:00"
         yield
         del os.environ["LOG_ROTATION"]
 
     @pytest.fixture
-    def log_level(self) -> Generator:
+    def log_level(self) -> Generator[None]:
         os.environ["LOG_LEVEL"] = "DEBUG"
         yield
         del os.environ["LOG_LEVEL"]
 
     @pytest.fixture
-    def config_dir(self) -> Generator:
+    def config_dir(self) -> Generator[None]:
         os.environ["CONFIG_DIR"] = "tests/fixtures"
         yield
         del os.environ["CONFIG_DIR"]
@@ -77,7 +86,7 @@ class TestMain:
             file_name="disabled.yml",
         )
 
-    def test_all_disabled(self, config, mocker) -> None:
+    def test_all_disabled(self, config: Config, mocker: MockerFixture) -> None:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
 
         series_scanner = mocker.patch("main.SonarrSeriesScanner")
@@ -92,7 +101,9 @@ class TestMain:
         radarr_renamarr.assert_not_called()
         job.assert_not_called()
 
-    def test_sonarr_series_scanner_scan(self, config, mocker) -> None:
+    def test_sonarr_series_scanner_scan(
+        self, config: Config, mocker: MockerFixture
+    ) -> None:
         config.sonarr[0].series_scanner.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
@@ -110,7 +121,10 @@ class TestMain:
         sonarr_series_scanner.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
-    def test_start_uses_config_dir_env_var(self, config_dir, mocker) -> None:
+    def test_start_uses_config_dir_env_var(
+        self, config_dir: None, mocker: MockerFixture
+    ) -> None:
+        del config_dir
         config = configparser.get_config(
             CONFIG_SCHEMA,
             config_dir="tests/fixtures",
@@ -126,7 +140,9 @@ class TestMain:
         set_directory.assert_called_once_with("tests/fixtures")
         get_config.assert_called_once_with(CONFIG_SCHEMA)
 
-    def test_start_supports_absolute_config_dir(self, tmp_path, mocker):
+    def test_start_supports_absolute_config_dir(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
         config_directory = tmp_path / "config"
         config_directory.mkdir()
         config_path = config_directory / "config.yml"
@@ -141,14 +157,19 @@ class TestMain:
         finally:
             del os.environ["CONFIG_DIR"]
 
-    def test_init_uses_log_level_env_var(self, log_level, mocker) -> None:
+    def test_init_uses_log_level_env_var(
+        self, log_level: None, mocker: MockerFixture
+    ) -> None:
+        del log_level
         logger_add = mocker.patch.object(logger, "add")
 
         Main()
 
         assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
 
-    def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
+    def test_init_hides_logger_source_location_by_default(
+        self, mocker: MockerFixture
+    ) -> None:
         mocker.patch("main.load_dotenv")
         mocker.patch.dict(os.environ, {}, clear=True)
         logger_add = mocker.patch.object(logger, "add")
@@ -162,7 +183,7 @@ class TestMain:
         assert source_location_format not in logger_format
 
     def test_init_shows_logger_name_and_source_location_when_log_level_is_debug(
-        self, mocker
+        self, mocker: MockerFixture
     ) -> None:
         mocker.patch.dict(os.environ, {"LOG_LEVEL": "debug"})
         logger_add = mocker.patch.object(logger, "add")
@@ -174,7 +195,7 @@ class TestMain:
         source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
         assert f"{logger_name_format}:{source_location_format}" in logger_format
 
-    def test_init_loads_local_dotenv_file(self, mocker) -> None:
+    def test_init_loads_local_dotenv_file(self, mocker: MockerFixture) -> None:
         logger_add = mocker.patch.object(logger, "add")
         load_dotenv = mocker.patch("main.load_dotenv")
 
@@ -185,8 +206,15 @@ class TestMain:
         assert logger_add.called
 
     def test_sonarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+        self,
+        config: Config,
+        log_dir: None,
+        log_retention: None,
+        log_rotation: None,
+        log_level: None,
+        mocker: MockerFixture,
     ) -> None:
+        del log_dir, log_retention, log_rotation, log_level
         config.sonarr[0].renamarr.enabled = True
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -213,8 +241,15 @@ class TestMain:
         assert not filter_fn({"extra": {}})
 
     def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+        self,
+        config: Config,
+        log_dir: None,
+        log_retention: None,
+        log_rotation: None,
+        log_level: None,
+        mocker: MockerFixture,
     ) -> None:
+        del log_dir, log_retention, log_rotation, log_level
         config.sonarr[0].renamarr.enabled = False
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -230,8 +265,12 @@ class TestMain:
         )
 
     def test_sonarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
+        self,
+        log_dir: None,
+        mock_loguru_warning: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
+        del log_dir
         main = Main()
         logger_add = mocker.patch.object(logger, "add")
         logger_add.side_effect = PermissionError("read-only file system")
@@ -251,8 +290,9 @@ class TestMain:
         )
 
     def test_sonarr_series_scanner_hourly_job(
-        self, config, enable_scheduler, mocker
+        self, config: Config, enable_scheduler: None, mocker: MockerFixture
     ) -> None:
+        del enable_scheduler
         config.sonarr[0].series_scanner.enabled = True
         config.sonarr[0].series_scanner.hourly_job = True
 
@@ -277,8 +317,9 @@ class TestMain:
         self.health_reporter.heartbeat.assert_called_once_with()
 
     def test_recurring_series_scanner_keeps_scheduler_running_with_one_shot_renamarr(
-        self, config, enable_scheduler, mocker
+        self, config: Config, enable_scheduler: None, mocker: MockerFixture
     ) -> None:
+        del enable_scheduler
         sonarr_config = config.sonarr[0]
         sonarr_config.series_scanner.enabled = True
         sonarr_config.series_scanner.hourly_job = True
@@ -307,7 +348,10 @@ class TestMain:
             clear()
 
     def test_sonarr_series_scanner_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
+        self,
+        config: Config,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         config.sonarr[0].series_scanner.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -333,7 +377,7 @@ class TestMain:
         mock_loguru_error.assert_called_once_with(exception)
         self.health_reporter.running_job.assert_called_once_with()
 
-    def test_sonarr_renamarr_scan(self, config, mocker) -> None:
+    def test_sonarr_renamarr_scan(self, config: Config, mocker: MockerFixture) -> None:
         config.sonarr[0].renamarr.enabled = True
         config.sonarr[0].renamarr.analyze_files = True
         config.sonarr[0].renamarr.rename_folders = True
@@ -362,8 +406,14 @@ class TestMain:
         ],
     )
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
-        self, config, enable_scheduler, service, renamarr_class, mocker
+        self,
+        config: Config,
+        enable_scheduler: None,
+        service: str,
+        renamarr_class: str,
+        mocker: MockerFixture,
     ) -> None:
+        del enable_scheduler
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
         assert service_config.renamarr.schedule.enabled is True
@@ -388,8 +438,9 @@ class TestMain:
             clear()
 
     def test_external_cron_does_not_disable_explicit_renamarr_schedule(
-        self, config, enable_scheduler, mocker
+        self, config: Config, enable_scheduler: None, mocker: MockerFixture
     ) -> None:
+        del enable_scheduler
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.schedule.enabled = True
         mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
@@ -412,7 +463,11 @@ class TestMain:
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_deprecated_hourly_job_warns_before_and_after_renamarr_job(
-        self, config, service: str, mock_loguru_warning, mocker
+        self,
+        config: Config,
+        service: str,
+        mock_loguru_warning: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
@@ -451,7 +506,10 @@ class TestMain:
         ]
 
     def test_sonarr_renamarr_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
+        self,
+        config: Config,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         config.sonarr[0].renamarr.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -478,7 +536,13 @@ class TestMain:
         mock_loguru_error.assert_called_once_with(exception)
         self.health_reporter.running_job.assert_called_once_with()
 
-    def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
+    def test_config_parser_error(
+        self,
+        mock_loguru_error: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+        mocker: MockerFixture,
+    ) -> None:
+        del capsys
         exception = ConfigError("BOOM!")
         mocker.patch("pyconfigparser.configparser.get_config").side_effect = exception
 
@@ -493,8 +557,12 @@ class TestMain:
         )
 
     def test_config_file_not_found_error(
-        self, mock_loguru_error, capsys, mocker
+        self,
+        mock_loguru_error: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+        mocker: MockerFixture,
     ) -> None:
+        del capsys
         exception = ConfigFileNotFoundError("BOOM!")
         mocker.patch("pyconfigparser.configparser.get_config").side_effect = exception
 
@@ -509,7 +577,10 @@ class TestMain:
         )
 
     def test_config_dir_not_found_error(
-        self, tmp_path, mock_loguru_error, mocker
+        self,
+        tmp_path: Path,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         missing_config_dir = tmp_path / "missing-config-dir"
         os.environ["CONFIG_DIR"] = str(missing_config_dir)
@@ -528,7 +599,7 @@ class TestMain:
         assert isinstance(mock_loguru_error.call_args_list[-1].args[0], OSError)
         assert excinfo.value.code == 1
 
-    def test_radarr_renamarr_scan(self, config, mocker) -> None:
+    def test_radarr_renamarr_scan(self, config: Config, mocker: MockerFixture) -> None:
         config.radarr[0].renamarr.enabled = True
 
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -548,10 +619,14 @@ class TestMain:
         radarr_renamarr.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
-    def test_radarr_renamarr_rename_folders_defaults_false(self, config) -> None:
+    def test_radarr_renamarr_rename_folders_defaults_false(
+        self, config: Config
+    ) -> None:
         assert config.radarr[0].renamarr.rename_folders is False
 
-    def test_radarr_renamarr_passes_rename_folders(self, config, mocker) -> None:
+    def test_radarr_renamarr_passes_rename_folders(
+        self, config: Config, mocker: MockerFixture
+    ) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.analyze_files = True
         config.radarr[0].renamarr.rename_folders = True
@@ -572,8 +647,15 @@ class TestMain:
         radarr_renamarr.return_value.scan.assert_called_once_with()
 
     def test_radarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+        self,
+        config: Config,
+        log_dir: None,
+        log_retention: None,
+        log_rotation: None,
+        log_level: None,
+        mocker: MockerFixture,
     ) -> None:
+        del log_dir, log_retention, log_rotation, log_level
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -600,8 +682,12 @@ class TestMain:
         assert not filter_fn({"extra": {}})
 
     def test_radarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
+        self,
+        log_dir: None,
+        mock_loguru_warning: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
+        del log_dir
         main = Main()
         logger_add = mocker.patch.object(logger, "add")
         logger_add.side_effect = PermissionError("read-only file system")
@@ -621,7 +707,10 @@ class TestMain:
         )
 
     def test_radarr_renamarr_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
+        self,
+        config: Config,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         config.radarr[0].renamarr.enabled = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
@@ -650,7 +739,7 @@ class TestMain:
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_disabled_renamarr_schedule_runs_once(
-        self, config, service, mocker
+        self, config: Config, service: str, mocker: MockerFixture
     ) -> None:
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
@@ -672,7 +761,9 @@ class TestMain:
         finally:
             clear()
 
-    def test_renamarr_schedule_uses_total_minutes(self, config, mocker) -> None:
+    def test_renamarr_schedule_uses_total_minutes(
+        self, config: Config, mocker: MockerFixture
+    ) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.schedule.enabled = True
         config.radarr[0].renamarr.schedule.interval = mocker.Mock(total_minutes=1504)

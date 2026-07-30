@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import time
 from pathlib import PurePosixPath
 from time import sleep
+from typing import TYPE_CHECKING
 
 from loguru import logger
-from pycliarr.api import SonarrCli, SonarrSerieItem
-from pycliarr.api.base_api import json_data, json_dict
 
 from renamarr.sonarr.models.folder_rename_plan import SonarrFolderRenamePlan
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrCli, SonarrSerieItem
+    from pycliarr.api.base_api import json_data, json_dict
 
 MAX_WAIT_SECONDS = 5 * 60
 

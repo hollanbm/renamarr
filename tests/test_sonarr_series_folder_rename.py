@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import PurePosixPath
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 import pytest
@@ -11,10 +14,15 @@ from renamarr.sonarr.services.series_folder_rename import (
     SeriesRootFolderNotFoundError,
 )
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestSeriesFolderRename:
     def test_process_skips_already_correct_series_folder(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Show")
@@ -35,7 +43,10 @@ class TestSeriesFolderRename:
         )
 
     def test_process_batches_and_rescans_when_rename_returns_json_lists(
-        self, mock_loguru_info, mock_loguru_debug, mocker
+        self,
+        mock_loguru_info: MagicMock,
+        mock_loguru_debug: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A", path="/rootA/OldA")
@@ -114,7 +125,9 @@ class TestSeriesFolderRename:
             ]
         )
 
-    def test_process_sorts_root_folders_before_matching_series(self, mocker) -> None:
+    def test_process_sorts_root_folders_before_matching_series(
+        self, mocker: MockerFixture
+    ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/rootA/Show")
         mocker.patch.object(
@@ -136,7 +149,7 @@ class TestSeriesFolderRename:
         ]
 
     def test_process_logs_when_series_rescan_fails(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
@@ -163,7 +176,10 @@ class TestSeriesFolderRename:
         )
 
     def test_process_logs_when_series_rescan_times_out(
-        self, mock_loguru_error, mock_loguru_info, mocker
+        self,
+        mock_loguru_error: MagicMock,
+        mock_loguru_info: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
@@ -199,7 +215,7 @@ class TestSeriesFolderRename:
         )
 
     def test_process_propagates_folder_rename_server_error_without_rescan(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
@@ -235,7 +251,7 @@ class TestSeriesFolderRename:
         )
 
     def test_process_logs_error_and_continues_after_series_without_matching_root_folder(
-        self, mock_loguru_error, mocker
+        self, mock_loguru_error: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         unmatched_series = SonarrSerieItem(
@@ -292,7 +308,7 @@ class TestSeriesFolderRename:
             )
 
     def test_process_uses_path_matching_for_overlapping_root_names(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(
@@ -350,10 +366,10 @@ class TestSeriesFolderRename:
     )
     def test_process_uses_deepest_matching_root_folder(
         self,
-        series_path,
-        root_folders,
-        expected_root_folder,
-        mocker,
+        series_path: str,
+        root_folders: list[dict[str, str]],
+        expected_root_folder: str,
+        mocker: MockerFixture,
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path=series_path)

@@ -1,14 +1,27 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestSonarrRenamarr:
     def test_no_series_returned(
-        self, get_serie_empty, mock_loguru_info, mock_loguru_error, mocker
+        self,
+        get_serie_empty: None,
+        mock_loguru_info: MagicMock,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
+        del get_serie_empty
         analyze_files = mocker.patch("renamarr.sonarr.services.renamarr.AnalyzeFiles")
         series_rename = mocker.patch("renamarr.sonarr.services.renamarr.SeriesRename")
         series_folder_rename = mocker.patch(
@@ -26,7 +39,7 @@ class TestSonarrRenamarr:
         series_folder_rename.assert_not_called()
 
     def test_scan_sorts_series_and_runs_series_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         series_b = SonarrSerieItem(id=2, title="B Show")
         series_a = SonarrSerieItem(id=1, title="A Show")
@@ -53,7 +66,10 @@ class TestSonarrRenamarr:
         series_rename.return_value.process.assert_called_once_with([series_a, series_b])
         series_folder_rename.assert_not_called()
 
-    def test_scan_runs_folder_rename_when_enabled(self, get_serie, mocker) -> None:
+    def test_scan_runs_folder_rename_when_enabled(
+        self, get_serie: None, mocker: MockerFixture
+    ) -> None:
+        del get_serie
         analyze_files = mocker.patch("renamarr.sonarr.services.renamarr.AnalyzeFiles")
         series_rename = mocker.patch("renamarr.sonarr.services.renamarr.SeriesRename")
         series_folder_rename = mocker.patch(
@@ -72,7 +88,10 @@ class TestSonarrRenamarr:
         series_rename.return_value.process.assert_called_once()
         series_folder_rename.return_value.process.assert_called_once()
 
-    def test_scan_runs_analyze_files_before_processing(self, get_serie, mocker) -> None:
+    def test_scan_runs_analyze_files_before_processing(
+        self, get_serie: None, mocker: MockerFixture
+    ) -> None:
+        del get_serie
         analyze_files = mocker.patch("renamarr.sonarr.services.renamarr.AnalyzeFiles")
         series_rename = mocker.patch("renamarr.sonarr.services.renamarr.SeriesRename")
         series_folder_rename = mocker.patch(
@@ -106,7 +125,10 @@ class TestSonarrRenamarr:
         series_rename.return_value.process.assert_called_once()
         series_folder_rename.return_value.process.assert_called_once()
 
-    def test_scan_skips_folder_rename_when_disabled(self, get_serie, mocker) -> None:
+    def test_scan_skips_folder_rename_when_disabled(
+        self, get_serie: None, mocker: MockerFixture
+    ) -> None:
+        del get_serie
         analyze_files = mocker.patch("renamarr.sonarr.services.renamarr.AnalyzeFiles")
         series_rename = mocker.patch("renamarr.sonarr.services.renamarr.SeriesRename")
         series_folder_rename = mocker.patch(
@@ -126,8 +148,9 @@ class TestSonarrRenamarr:
         series_folder_rename.assert_not_called()
 
     def test_scan_with_analyze_files_returns_after_empty_series_list(
-        self, get_serie_empty, mocker
+        self, get_serie_empty: None, mocker: MockerFixture
     ) -> None:
+        del get_serie_empty
         analyze_files = mocker.patch("renamarr.sonarr.services.renamarr.AnalyzeFiles")
         series_rename = mocker.patch("renamarr.sonarr.services.renamarr.SeriesRename")
         series_folder_rename = mocker.patch(

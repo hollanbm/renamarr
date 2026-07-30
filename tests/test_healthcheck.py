@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from healthcheck import check_health, main
 from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.healthcheck.health_state import HealthState
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pytest_mock import MockerFixture
 
 
 def write_health(path: Path, payload: object) -> None:
@@ -31,7 +38,9 @@ def test_reporter_writes_initializing_state_atomically(tmp_path: Path) -> None:
     assert not (tmp_path / ".health.json.tmp").exists()
 
 
-def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
+def test_reporter_throttles_idle_heartbeat(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
     clock = mocker.Mock(side_effect=[0.0, 1.0, 5.0, 11.0])
     reporter = HealthReporter(path=path, clock=clock, heartbeat_interval=10.0)
@@ -46,7 +55,9 @@ def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
     )
 
 
-def test_running_job_starts_and_joins_heartbeat_thread(tmp_path: Path, mocker) -> None:
+def test_running_job_starts_and_joins_heartbeat_thread(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
     thread = mocker.patch("renamarr.healthcheck.health_reporter.Thread")
     reporter = HealthReporter(path=path, clock=mocker.Mock(side_effect=[0.0, 1.0, 2.0]))
@@ -69,7 +80,9 @@ def test_running_job_returns_to_idle_after_exception(tmp_path: Path) -> None:
     assert json.loads(path.read_text(encoding="utf-8"))["state"] == "idle"
 
 
-def test_job_heartbeat_refreshes_until_stopped(tmp_path: Path, mocker) -> None:
+def test_job_heartbeat_refreshes_until_stopped(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
     stopped = mocker.Mock()
     stopped.wait.side_effect = [False, True]
@@ -182,14 +195,18 @@ def test_check_health_rejects_invalid_fields(
     assert check_health(path=path, clock=lambda: 100.0) == (False, expected)
 
 
-def test_main_returns_success_without_output(mocker, capsys) -> None:
+def test_main_returns_success_without_output(
+    mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
     mocker.patch("healthcheck.check_health", return_value=(True, "healthy"))
 
     assert main() == 0
     assert capsys.readouterr().out == ""
 
 
-def test_main_prints_failure(mocker, capsys) -> None:
+def test_main_prints_failure(
+    mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
     mocker.patch("healthcheck.check_health", return_value=(False, "heartbeat is stale"))
 
     assert main() == 1

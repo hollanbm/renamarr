@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
 from renamarr.sonarr.services.series_rename import SeriesRename
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestSeriesRename:
     def test_process_skips_rename_when_no_episodes_need_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A")
@@ -30,7 +38,10 @@ class TestSeriesRename:
         rename_files.assert_not_called()
 
     def test_process_renames_episodes_per_series(
-        self, mock_loguru_info, mock_loguru_debug, mocker
+        self,
+        mock_loguru_info: MagicMock,
+        mock_loguru_debug: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show")
@@ -56,7 +67,7 @@ class TestSeriesRename:
         rename_files.assert_called_once_with([10, 20], 1)
 
     def test_process_batches_each_series_independently(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A")

@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import os
 from contextlib import contextmanager
-from sys import exit, stdout
+from pathlib import Path
+from sys import exit as sys_exit
+from sys import stdout
 from time import sleep
+from typing import TYPE_CHECKING, Protocol
 
 import schedule
 from dotenv import load_dotenv
@@ -14,6 +19,39 @@ from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from interval import Interval
+
+
+class _ScheduleConfig(Protocol):
+    enabled: bool
+    interval: Interval
+
+
+class _RenamarrConfig(Protocol):
+    analyze_files: bool
+    rename_folders: bool
+    schedule: _ScheduleConfig
+
+
+class _ArrConfig(Protocol):
+    name: str
+    url: str
+    api_key: str
+    renamarr: _RenamarrConfig
+
+
+class _SeriesScannerConfig(Protocol):
+    hourly_job: bool
+    hours_before_air: int
+
+
+class _SonarrConfig(_ArrConfig, Protocol):
+    series_scanner: _SeriesScannerConfig
+
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
@@ -59,7 +97,7 @@ class Main:
         log_dir = os.getenv("LOG_DIR", "/logs")
         log_rotation = os.getenv("LOG_ROTATION", "00:00")
         log_retention = os.getenv("LOG_RETENTION", "7 days")
-        log_path = os.path.join(log_dir, service, f"{instance_name}.log")
+        log_path = str(Path(log_dir) / service / f"{instance_name}.log")
         try:
             logger.add(
                 log_path,
@@ -82,7 +120,7 @@ class Main:
             return False
         return True
 
-    def __sonarr_series_scanner_job(self, sonarr_config):
+    def __sonarr_series_scanner_job(self, sonarr_config: _SonarrConfig) -> None:
         with (
             self._health_reporter.running_job(),
             logger.contextualize(service="sonarr", instance=sonarr_config.name),
@@ -97,7 +135,7 @@ class Main:
             except CliArrError as exc:
                 logger.error(exc)
 
-    def __schedule_sonarr_series_scanner(self, sonarr_config):
+    def __schedule_sonarr_series_scanner(self, sonarr_config: _SonarrConfig) -> None:
         self.__sonarr_series_scanner_job(sonarr_config)
 
         if sonarr_config.series_scanner.hourly_job:
@@ -105,7 +143,7 @@ class Main:
                 self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
             )
 
-    def __sonarr_renamarr_job(self, sonarr_config):
+    def __sonarr_renamarr_job(self, sonarr_config: _ArrConfig) -> None:
         with (
             self._health_reporter.running_job(),
             logger.contextualize(service="sonarr", instance=sonarr_config.name),
@@ -128,7 +166,7 @@ class Main:
                 if uses_deprecated_hourly_job:
                     logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
-    def __schedule_radarr_renamarr(self, radarr_config):
+    def __schedule_radarr_renamarr(self, radarr_config: _ArrConfig) -> None:
         self.__radarr_renamarr_job(radarr_config)
 
         if radarr_config.renamarr.schedule.enabled:
@@ -136,7 +174,7 @@ class Main:
                 radarr_config.renamarr.schedule.interval.total_minutes
             ).minutes.do(self.__radarr_renamarr_job, radarr_config=radarr_config)
 
-    def __radarr_renamarr_job(self, radarr_config):
+    def __radarr_renamarr_job(self, radarr_config: _ArrConfig) -> None:
         with (
             self._health_reporter.running_job(),
             logger.contextualize(service="radarr", instance=radarr_config.name),
@@ -159,7 +197,7 @@ class Main:
                 if uses_deprecated_hourly_job:
                     logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
-    def __schedule_sonarr_renamarr(self, sonarr_config):
+    def __schedule_sonarr_renamarr(self, sonarr_config: _ArrConfig) -> None:
         self.__sonarr_renamarr_job(sonarr_config)
 
         if sonarr_config.renamarr.schedule.enabled:
@@ -177,19 +215,19 @@ class Main:
                 f"Unable to access config directory {config_dir!r}; please check volume mount paths or set $CONFIG_DIR."
             )
             logger.error(exc)
-            exit(1)
+            sys_exit(1)
         except ConfigFileNotFoundError as exc:
             logger.error(
                 "Unable to locate config file, please check volume mount paths or set $CONFIG_DIR. The default config directory is /config/."
             )
             logger.error(exc)
-            exit(1)
+            sys_exit(1)
         except ConfigError as exc:
             logger.error(
                 "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
             )
             logger.error(exc)
-            exit(1)
+            sys_exit(1)
 
         for sonarr_config in config.sonarr:
             if not (
@@ -233,8 +271,8 @@ class Main:
 
 
 @contextmanager
-def set_directory(path):
-    oldpwd = os.getcwd()
+def set_directory(path: str | Path) -> Iterator[None]:
+    oldpwd = Path.cwd()
     os.chdir(path)
     try:
         yield

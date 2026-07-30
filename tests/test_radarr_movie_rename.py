@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
 from renamarr.radarr.services.movie_rename import MovieRename
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestMovieRename:
     def test_process_skips_command_when_no_movies_need_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A")
@@ -30,7 +38,7 @@ class TestMovieRename:
         send_command.assert_not_called()
 
     def test_process_sends_one_rename_movie_command_with_movie_ids(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A")

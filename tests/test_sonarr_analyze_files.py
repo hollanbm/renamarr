@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli
 
 from renamarr.sonarr.services.analyze_files import AnalyzeFiles
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestAnalyzeFiles:
     def test_process_logs_warning_when_media_info_analysis_is_disabled(
-        self, mock_loguru_warning, mocker
+        self, mock_loguru_warning: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(
@@ -23,7 +31,7 @@ class TestAnalyzeFiles:
         send_command.assert_not_called()
 
     def test_process_logs_success_when_rescan_succeeds(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(
@@ -60,7 +68,7 @@ class TestAnalyzeFiles:
         )
 
     def test_process_logs_failure_when_rescan_fails(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(

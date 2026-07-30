@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import json
 import math
-from collections.abc import Callable
 from json import JSONDecodeError
-from pathlib import Path
 from time import monotonic
+from typing import TYPE_CHECKING
 
 from renamarr.healthcheck.health_state import HealthState
 from renamarr.healthcheck.settings import (
@@ -11,6 +12,10 @@ from renamarr.healthcheck.settings import (
     MAX_HEARTBEAT_AGE_SECONDS,
     SCHEMA_VERSION,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 
 def check_health(

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import PurePosixPath
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 import pytest
@@ -10,10 +13,15 @@ from renamarr.radarr.services.movie_folder_rename import (
     MovieRootFolderNotFoundError,
 )
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestMovieFolderRename:
     def test_process_skips_already_correct_movie_folder(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Movie")
@@ -34,7 +42,10 @@ class TestMovieFolderRename:
         )
 
     def test_process_batches_movie_folder_renames_by_root(
-        self, mock_loguru_info, mock_loguru_debug, mocker
+        self,
+        mock_loguru_info: MagicMock,
+        mock_loguru_debug: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A", path="/rootA/OldA")
@@ -120,7 +131,7 @@ class TestMovieFolderRename:
         ],
     )
     def test_process_matches_movies_to_overlapping_root_folder_names(
-        self, movie_a_root, movie_b_root, mocker
+        self, movie_a_root: str, movie_b_root: str, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A", path=f"{movie_a_root}/OldA")
@@ -182,7 +193,9 @@ class TestMovieFolderRename:
             ]
         )
 
-    def test_process_sorts_root_folders_before_matching_movies(self, mocker) -> None:
+    def test_process_sorts_root_folders_before_matching_movies(
+        self, mocker: MockerFixture
+    ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/rootA/Movie")
         mocker.patch.object(
@@ -204,7 +217,7 @@ class TestMovieFolderRename:
         ]
 
     def test_process_logs_when_updated_movie_rescan_fails(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
@@ -233,7 +246,10 @@ class TestMovieFolderRename:
         )
 
     def test_process_logs_when_updated_movie_rescan_times_out(
-        self, mock_loguru_error, mock_loguru_info, mocker
+        self,
+        mock_loguru_error: MagicMock,
+        mock_loguru_info: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
@@ -271,7 +287,10 @@ class TestMovieFolderRename:
         )
 
     def test_process_skips_rescan_when_folder_rename_status_is_unsuccessful(
-        self, mock_loguru_error, mock_loguru_info, mocker
+        self,
+        mock_loguru_error: MagicMock,
+        mock_loguru_info: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
@@ -301,7 +320,7 @@ class TestMovieFolderRename:
         )
 
     def test_process_logs_error_and_continues_after_movie_without_matching_root_folder(
-        self, mock_loguru_error, mocker
+        self, mock_loguru_error: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         unmatched_movie = RadarrMovieItem(
@@ -376,10 +395,10 @@ class TestMovieFolderRename:
     )
     def test_process_uses_deepest_matching_root_folder(
         self,
-        movie_path,
-        root_folders,
-        expected_root_folder,
-        mocker,
+        movie_path: str,
+        root_folders: list[dict[str, str]],
+        expected_root_folder: str,
+        mocker: MockerFixture,
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path=movie_path)

@@ -94,17 +94,17 @@ class TestSeriesScanner:
     def test_when_episodes_filtered_out(self, get_serie, caplog, mocker) -> None:
         episodes: List[json_data] = [
             episode_data(
-                id=1,
+                episode_id=1,
                 title="TBA",
                 airDateDelta=timedelta(hours=8),
             ),
             episode_data(
-                id=2,
+                episode_id=2,
                 title="title",
                 airDateDelta=timedelta(hours=-2),
             ),
             episode_data(
-                id=3,
+                episode_id=3,
                 title="TBA",
                 airDateDelta=timedelta(hours=2),
                 seasonNumber=0,
@@ -129,7 +129,7 @@ class TestSeriesScanner:
     def test_when_tba_episode_is_airing_soon(self, get_serie, caplog, mocker) -> None:
         episodes: List[json_data] = [
             episode_data(
-                id=1,
+                episode_id=1,
                 title="TBA",
                 airDateDelta=timedelta(hours=2),
                 seasonNumber=1,
@@ -151,7 +151,7 @@ class TestSeriesScanner:
     ) -> None:
         episodes: List[json_data] = [
             episode_data(
-                id=1,
+                episode_id=1,
                 title="TBA",
                 airDateDelta=timedelta(days=-1),
                 seasonNumber=1,
