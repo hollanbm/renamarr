@@ -1,17 +1,23 @@
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.32
+    rev: 0.12.0
     hooks:
       - id: uv-lock
         files: ^(pyproject\.toml|uv\.lock)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.15.22
+    rev: v0.16.0
     hooks:
       - id: ruff-check
         args:
           - --fix
       - id: ruff-format
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.65
+    hooks:
+      - id: ty
+        args:
+          - --isolated
   - repo: https://github.com/hadolint/hadolint
     rev: v2.14.0
     hooks:
@@ -40,7 +46,7 @@ repos:
         exclude: \.md$
       - id: end-of-file-fixer
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 43.278.5
+    rev: 44.2.3
     hooks:
       - id: renovate-config-validator
         args:

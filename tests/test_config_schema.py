@@ -1,10 +1,15 @@
-from unittest.mock import MagicMock
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from schema import Schema, SchemaError
 
 from config_schema import CONFIG_SCHEMA
 from interval import Interval
+
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
 
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:
@@ -302,7 +307,7 @@ def test_schedule_rejects_intervals_over_thirty_days(
 
     with pytest.raises(
         SchemaError,
-        match="renamarr.schedule.interval must not exceed 30 days",
+        match=r"renamarr\.schedule\.interval must not exceed 30 days",
     ):
         validate_config({service: [instance_config]})
 

@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
 from renamarr.radarr.services.movie_rename import MovieRename
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestMovieRename:
     def test_process_skips_command_when_no_movies_need_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A")
@@ -19,8 +27,8 @@ class TestMovieRename:
 
         request_get.assert_has_calls(
             [
-                call(path="/api/v3/rename", url_params=dict(movieId=1)),
-                call(path="/api/v3/rename", url_params=dict(movieId=2)),
+                call(path="/api/v3/rename", url_params={"movieId": 1}),
+                call(path="/api/v3/rename", url_params={"movieId": 2}),
             ]
         )
         assert mock_loguru_debug.call_args_list == [
@@ -30,14 +38,14 @@ class TestMovieRename:
         send_command.assert_not_called()
 
     def test_process_sends_one_rename_movie_command_with_movie_ids(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie_a = RadarrMovieItem(id=1, title="Movie A")
         movie_b = RadarrMovieItem(id=2, title="Movie B")
         mocker.patch.object(radarr_cli, "request_get").side_effect = [
-            [dict(movieId=1, movieFileId=10), dict(movieId=1, movieFileId=11)],
-            [dict(movieId=2, movieFileId=20)],
+            [{"movieId": 1, "movieFileId": 10}, {"movieId": 1, "movieFileId": 11}],
+            [{"movieId": 2, "movieFileId": 20}],
         ]
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 

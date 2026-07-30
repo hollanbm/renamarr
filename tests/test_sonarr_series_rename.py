@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import SonarrCli, SonarrSerieItem
 
 from renamarr.sonarr.services.series_rename import SeriesRename
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestSeriesRename:
     def test_process_skips_rename_when_no_episodes_need_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A")
@@ -19,8 +27,8 @@ class TestSeriesRename:
 
         request_get.assert_has_calls(
             [
-                call(path="/api/v3/rename", url_params=dict(seriesId=1)),
-                call(path="/api/v3/rename", url_params=dict(seriesId=2)),
+                call(path="/api/v3/rename", url_params={"seriesId": 1}),
+                call(path="/api/v3/rename", url_params={"seriesId": 2}),
             ]
         )
         assert mock_loguru_debug.call_args_list == [
@@ -30,7 +38,10 @@ class TestSeriesRename:
         rename_files.assert_not_called()
 
     def test_process_renames_episodes_per_series(
-        self, mock_loguru_info, mock_loguru_debug, mocker
+        self,
+        mock_loguru_info: MagicMock,
+        mock_loguru_debug: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show")
@@ -38,8 +49,8 @@ class TestSeriesRename:
             sonarr_cli,
             "request_get",
             return_value=[
-                dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=10),
-                dict(seasonNumber=1, episodeNumbers=[2], episodeFileId=20),
+                {"seasonNumber": 1, "episodeNumbers": [1], "episodeFileId": 10},
+                {"seasonNumber": 1, "episodeNumbers": [2], "episodeFileId": 20},
             ],
         )
         rename_files = mocker.patch.object(sonarr_cli, "rename_files")
@@ -56,14 +67,14 @@ class TestSeriesRename:
         rename_files.assert_called_once_with([10, 20], 1)
 
     def test_process_batches_each_series_independently(
-        self, mock_loguru_info, mocker
+        self, mock_loguru_info: MagicMock, mocker: MockerFixture
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series_a = SonarrSerieItem(id=1, title="Show A")
         series_b = SonarrSerieItem(id=2, title="Show B")
         mocker.patch.object(sonarr_cli, "request_get").side_effect = [
-            [dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=10)],
-            [dict(seasonNumber=2, episodeNumbers=[1, 2], episodeFileId=20)],
+            [{"seasonNumber": 1, "episodeNumbers": [1], "episodeFileId": 10}],
+            [{"seasonNumber": 2, "episodeNumbers": [1, 2], "episodeFileId": 20}],
         ]
         rename_files = mocker.patch.object(sonarr_cli, "rename_files")
 

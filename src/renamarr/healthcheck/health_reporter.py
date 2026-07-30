@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import json
-from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from pathlib import Path
 from threading import Event, Lock, Thread
 from time import monotonic
+from typing import TYPE_CHECKING
 
 from renamarr.healthcheck.health_state import HealthState
 from renamarr.healthcheck.settings import (
@@ -11,6 +12,10 @@ from renamarr.healthcheck.settings import (
     HEARTBEAT_INTERVAL_SECONDS,
     SCHEMA_VERSION,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+    from pathlib import Path
 
 
 class HealthReporter:

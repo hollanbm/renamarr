@@ -1,14 +1,27 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call
 
 from pycliarr.api import RadarrCli, RadarrMovieItem
 
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
 
 class TestRadarrRenamarr:
     def test_no_movies_returned(
-        self, get_movie_empty, mock_loguru_info, mock_loguru_error, mocker
+        self,
+        get_movie_empty: None,
+        mock_loguru_info: MagicMock,
+        mock_loguru_error: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
+        del get_movie_empty
         analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
         movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
         movie_folder_rename = mocker.patch(
@@ -26,7 +39,7 @@ class TestRadarrRenamarr:
         movie_folder_rename.assert_not_called()
 
     def test_scan_sorts_movies_and_runs_movie_rename(
-        self, mock_loguru_debug, mocker
+        self, mock_loguru_debug: MagicMock, mocker: MockerFixture
     ) -> None:
         movie_b = RadarrMovieItem(id=2, title="B Movie")
         movie_a = RadarrMovieItem(id=1, title="A Movie")
@@ -50,7 +63,10 @@ class TestRadarrRenamarr:
         movie_rename.return_value.process.assert_called_once_with([movie_a, movie_b])
         movie_folder_rename.assert_not_called()
 
-    def test_scan_runs_folder_rename_when_enabled(self, get_movie, mocker) -> None:
+    def test_scan_runs_folder_rename_when_enabled(
+        self, get_movie: None, mocker: MockerFixture
+    ) -> None:
+        del get_movie
         analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
         movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
         movie_folder_rename = mocker.patch(
@@ -69,7 +85,10 @@ class TestRadarrRenamarr:
         movie_rename.return_value.process.assert_called_once()
         movie_folder_rename.return_value.process.assert_called_once()
 
-    def test_scan_runs_analyze_files_before_processing(self, get_movie, mocker) -> None:
+    def test_scan_runs_analyze_files_before_processing(
+        self, get_movie: None, mocker: MockerFixture
+    ) -> None:
+        del get_movie
         analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
         movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
         movie_folder_rename = mocker.patch(
@@ -104,8 +123,9 @@ class TestRadarrRenamarr:
         movie_folder_rename.return_value.process.assert_called_once()
 
     def test_scan_skips_post_analyze_when_folder_rename_is_disabled(
-        self, get_movie, mocker
+        self, get_movie: None, mocker: MockerFixture
     ) -> None:
+        del get_movie
         analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
         movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
         movie_folder_rename = mocker.patch(
@@ -125,8 +145,9 @@ class TestRadarrRenamarr:
         movie_folder_rename.assert_not_called()
 
     def test_scan_with_analyze_files_returns_after_empty_movie_list(
-        self, get_movie_empty, mocker
+        self, get_movie_empty: None, mocker: MockerFixture
     ) -> None:
+        del get_movie_empty
         analyze_files = mocker.patch("renamarr.radarr.services.renamarr.AnalyzeFiles")
         movie_rename = mocker.patch("renamarr.radarr.services.renamarr.MovieRename")
         movie_folder_rename = mocker.patch(

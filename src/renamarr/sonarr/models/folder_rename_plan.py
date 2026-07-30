@@ -1,6 +1,10 @@
-from dataclasses import dataclass
+from __future__ import annotations
 
-from pycliarr.api import SonarrSerieItem
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrSerieItem
 
 
 @dataclass()

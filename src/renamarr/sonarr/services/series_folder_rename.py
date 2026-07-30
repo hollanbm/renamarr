@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import time
 from pathlib import PurePosixPath
 from time import sleep
+from typing import TYPE_CHECKING
 
 from loguru import logger
-from pycliarr.api import SonarrCli, SonarrSerieItem
-from pycliarr.api.base_api import json_data, json_dict
 
 from renamarr.sonarr.models.folder_rename_plan import SonarrFolderRenamePlan
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrCli, SonarrSerieItem
+    from pycliarr.api.base_api import json_data, json_dict
 
 MAX_WAIT_SECONDS = 5 * 60
 
@@ -40,11 +45,11 @@ class SeriesFolderRename:
             )
             self.sonarr_cli.request_put(
                 path="/api/v3/series/editor",
-                json_data=dict(
-                    rootFolderPath=root_folder_rename.root_folder_path,
-                    seriesIds=series_ids,
-                    moveFiles=root_folder_rename.move_files,
-                ),
+                json_data={
+                    "rootFolderPath": root_folder_rename.root_folder_path,
+                    "seriesIds": series_ids,
+                    "moveFiles": root_folder_rename.move_files,
+                },
             )
 
             logger.info(f"Series folder rename successful for series: {series_titles}")

@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from time import sleep
+from typing import TYPE_CHECKING
 
 from loguru import logger
-from pycliarr.api import SonarrCli
-from pycliarr.api.base_api import json_data
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrCli
+    from pycliarr.api.base_api import json_data
 
 
 class AnalyzeFiles:

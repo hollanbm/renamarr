@@ -1,50 +1,55 @@
-from datetime import datetime, timedelta, timezone
-from typing import List
-from unittest.mock import MagicMock
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
 from loguru import logger
 from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
-from pycliarr.api.base_api import json_data
-from pytest_mock import MockerFixture
+
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pycliarr.api.base_api import json_data
+    from pytest_mock import MockerFixture
 
 
 @pytest.fixture
-def get_serie(mocker) -> None:
-    series: List[SonarrSerieItem] = [
+def get_serie(mocker: MockerFixture) -> None:
+    series: list[SonarrSerieItem] = [
         SonarrSerieItem(id=1, title="test title", status="continuing")
     ]
     mocker.patch.object(SonarrCli, "get_serie").return_value = series
 
 
 @pytest.fixture
-def get_serie_empty(mocker) -> None:
+def get_serie_empty(mocker: MockerFixture) -> None:
     mocker.patch.object(SonarrCli, "get_serie").return_value = []
 
 
 @pytest.fixture
-def get_movie(mocker) -> None:
-    movies: List[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
+def get_movie(mocker: MockerFixture) -> None:
+    movies: list[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
     mocker.patch.object(RadarrCli, "get_movie").return_value = movies
 
 
 @pytest.fixture
-def get_movie_empty(mocker) -> None:
+def get_movie_empty(mocker: MockerFixture) -> None:
     mocker.patch.object(RadarrCli, "get_movie").return_value = []
 
 
 @pytest.fixture
-def mock_loguru_error(mocker) -> None:
+def mock_loguru_error(mocker: MockerFixture) -> MagicMock:
     return mocker.patch.object(logger, "error")
 
 
 @pytest.fixture
-def mock_loguru_info(mocker) -> None:
+def mock_loguru_info(mocker: MockerFixture) -> MagicMock:
     return mocker.patch.object(logger, "info")
 
 
 @pytest.fixture
-def mock_loguru_debug(mocker) -> None:
+def mock_loguru_debug(mocker: MockerFixture) -> MagicMock:
     return mocker.patch.object(logger, "debug")
 
 
@@ -54,7 +59,7 @@ def mock_loguru_warning(mocker: MockerFixture) -> MagicMock:
 
 
 def episode_data(
-    id: int,
+    episode_id: int,
     title: str,
     airDateDelta: timedelta,
     seasonNumber: str = 1,
@@ -62,12 +67,12 @@ def episode_data(
     hasFile: bool = True,
     episodeFileId: int = 1,
 ) -> json_data:
-    return dict(
-        id=id,
-        title=title,
-        airDateUtc=(datetime.now(timezone.utc) + airDateDelta).isoformat(),
-        seasonNumber=seasonNumber,
-        episodeNumber=episodeNumber,
-        hasFile=hasFile,
-        episodeFileId=episodeFileId,
-    )
+    return {
+        "id": episode_id,
+        "title": title,
+        "airDateUtc": (datetime.now(UTC) + airDateDelta).isoformat(),
+        "seasonNumber": seasonNumber,
+        "episodeNumber": episodeNumber,
+        "hasFile": hasFile,
+        "episodeFileId": episodeFileId,
+    }

@@ -14,9 +14,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-  "ruff==0.15.22",
-]
+dev = ["ruff==0.16.0", "ty==0.0.65"]
 test = [
   "pytest>=9.0.1,<10",
   "pytest-cov>=7.0.0,<8",
@@ -27,13 +25,61 @@ test = [
 
 # Treat this repo as an application, so uv installs dependencies without packaging renamarr itself.
 [tool.uv]
-required-version = "==0.11.32"
+required-version = "==0.12.0"
 package = false
 exclude-dependencies = ["m2r2"]
-environments = [
-  "sys_platform == 'darwin'",
-  "sys_platform == 'linux'",
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
+
+[tool.ruff]
+target-version = "py314"
+extend-exclude = [
+  "src/renamarr/sonarr/services/series_scanner.py",
+  "tests/test_sonarr_series_scanner.py",
 ]
+force-exclude = true
+
+[tool.ruff.lint]
+# Add these rule families to Ruff's default rule set.
+extend-select = [
+  "A",    # Built-in name shadowing
+  "ARG",  # Unused function arguments
+  "ANN",  # Missing or overly broad type annotations
+  "B",    # Common bugs and design footguns
+  "C4",   # Unnecessary or suboptimal comprehensions
+  "I",    # Import sorting and grouping
+  "PERF", # Performance anti-patterns
+  "PT",   # Pytest style and best practices
+  "PTH",  # Prefer pathlib over os.path
+  "RET",  # Unnecessary or inconsistent returns
+  "RSE",  # Unnecessary exception parentheses
+  "RUF",  # Ruff-specific correctness checks
+  "S",    # Common security issues
+  "SIM",  # Simplifiable control flow and expressions
+  "TC",   # Typing-only import placement
+  "UP",   # Modern Python syntax
+]
+
+[tool.ruff.lint.per-file-ignores]
+"!src/**.py" = [
+  "S"  # Security checks only apply to application code
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "config_schema",
+  "healthcheck",
+  "interval",
+  "main",
+  "renamarr",
+  "tests",
+]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.analysis]
+# These dependencies expose incomplete or overly broad type information.
+replace-imports-with-any = ["pycliarr.**", "schema.**"]
 
 [tool.pytest]
 pythonpath = ["./src"]
@@ -47,7 +93,5 @@ addopts = [
   "--cov-report=html",
   "--import-mode=importlib",
 ]
-filterwarnings = [
-  "error",
-]
+filterwarnings = ["error"]
 mock_use_standalone_module = "True"

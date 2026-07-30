@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from loguru import logger
-from pycliarr.api import SonarrCli, SonarrSerieItem
-from pycliarr.api.base_api import json_data
 
 from renamarr.sonarr.models.episode_rename_plan import SonarrEpisodeRenamePlan
+
+if TYPE_CHECKING:
+    from pycliarr.api import SonarrCli, SonarrSerieItem
+    from pycliarr.api.base_api import json_data
 
 
 class SeriesRename:
@@ -17,7 +23,7 @@ class SeriesRename:
             with logger.contextualize(item=show.title):
                 episodes_to_rename: list[json_data] = self.sonarr_cli.request_get(
                     path="/api/v3/rename",
-                    url_params=dict(seriesId=show.id),
+                    url_params={"seriesId": show.id},
                 )
 
                 if len(episodes_to_rename) == 0:
