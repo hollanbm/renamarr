@@ -302,7 +302,7 @@ def test_schedule_rejects_intervals_over_thirty_days(
 
     with pytest.raises(
         SchemaError,
-        match="renamarr.schedule.interval must not exceed 30 days",
+        match=r"renamarr\.schedule\.interval must not exceed 30 days",
     ):
         validate_config({service: [instance_config]})
 

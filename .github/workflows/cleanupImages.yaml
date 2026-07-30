@@ -10,11 +10,6 @@ on:
         required: true
         default: true
         type: boolean
-      include_legacy_tags:
-        description: Include the verified one-time legacy tag list
-        required: true
-        default: false
-        type: boolean
 
 concurrency:
   group: ghcr-renamarr-registry
@@ -32,8 +27,6 @@ jobs:
       - name: Build cleanup selectors
         id: cleanup-selectors
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
-        env:
-          INCLUDE_LEGACY_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_legacy_tags }}
         with:
           script: |
             // Confirm GitHub exposes complete registry pagination before allowing cleanup.
@@ -81,21 +74,6 @@ jobs:
             ])
             // All PR images are candidates; the exclusions above retain images for open PRs.
             const deleteSelectors = ["pr-*"]
-            if (process.env.INCLUDE_LEGACY_TAGS === "true") {
-              // These verified obsolete tags are opt-in to keep scheduled cleanup conservative.
-              deleteSelectors.push(
-                "199-4b3ea20",
-                "bug-139-redundant-error",
-                "bug-fix-python-ci",
-                "feat-173-python-314",
-                "feat-83-folder-renaming",
-                "feat-better_config_error_messages",
-                "feat-fix-66-multistage-build",
-                "feat-fix-72-upgrade-python",
-                "feat-poetry2.x",
-                "feat-radarr_support",
-              )
-            }
 
             // The cleanup action accepts selectors as comma-delimited output strings.
             core.info(

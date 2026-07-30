@@ -14,12 +14,15 @@
   "packageRules": [
     {
       "matchPackageNames": [
+        "astral-sh/ty-pre-commit",
         "astral-sh/uv",
         "astral-sh/uv-pre-commit",
         "ghcr.io/astral-sh/uv",
+        "ty",
         "uv"
       ],
-      "groupName": "uv"
+      "groupName": "uv",
+      "minimumGroupSize": 2
     },
     {
       "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],

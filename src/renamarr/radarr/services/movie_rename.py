@@ -37,7 +37,7 @@ class MovieRename:
             with logger.contextualize(item=movie.title):
                 files_to_rename: json_data = self.radarr_cli.request_get(
                     path="/api/v3/rename",
-                    url_params=dict(movieId=movie.id),
+                    url_params={"movieId": movie.id},
                 )
 
                 if len(files_to_rename) == 0:

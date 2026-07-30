@@ -41,11 +41,11 @@ class MovieFolderRename:
             folder_rename_response = self.radarr_cli._session.request(
                 "PUT",
                 f"{self.radarr_cli.host_url}/api/v3/movie/editor",
-                json=dict(
-                    rootFolderPath=root_folder_rename.root_folder_path,
-                    movieIds=movie_ids,
-                    moveFiles=root_folder_rename.move_files,
-                ),
+                json={
+                    "rootFolderPath": root_folder_rename.root_folder_path,
+                    "movieIds": movie_ids,
+                    "moveFiles": root_folder_rename.move_files,
+                },
             )
             if not 200 <= folder_rename_response.status_code <= 299:
                 logger.error(

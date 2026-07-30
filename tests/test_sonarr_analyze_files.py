@@ -11,7 +11,7 @@ class TestAnalyzeFiles:
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(
-            sonarr_cli, "request_get", return_value=dict(enableMediaInfo=False)
+            sonarr_cli, "request_get", return_value={"enableMediaInfo": False}
         )
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
 
@@ -27,17 +27,17 @@ class TestAnalyzeFiles:
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(
-            sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
+            sonarr_cli, "request_get", return_value={"enableMediaInfo": True}
         )
         send_command = mocker.patch.object(
-            sonarr_cli, "_sendCommand", return_value=dict(id=1)
+            sonarr_cli, "_sendCommand", return_value={"id": 1}
         )
         get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
             side_effect=[
-                dict(status="started"),
-                dict(status="completed", result="successful"),
+                {"status": "started"},
+                {"status": "completed", "result": "successful"},
             ],
         )
         sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
@@ -64,15 +64,15 @@ class TestAnalyzeFiles:
     ) -> None:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         mocker.patch.object(
-            sonarr_cli, "request_get", return_value=dict(enableMediaInfo=True)
+            sonarr_cli, "request_get", return_value={"enableMediaInfo": True}
         )
         send_command = mocker.patch.object(
-            sonarr_cli, "_sendCommand", return_value=dict(id=1)
+            sonarr_cli, "_sendCommand", return_value={"id": 1}
         )
         get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="failed"),
+            return_value={"status": "completed", "result": "failed"},
         )
         sleep = mocker.patch("renamarr.sonarr.services.analyze_files.sleep")
 

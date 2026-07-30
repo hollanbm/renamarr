@@ -8,6 +8,7 @@
         "ms-python.vscode-python-envs",
         "oderwat.indent-rainbow",
         "redhat.vscode-yaml",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "astral-sh.ty"
     ]
 }

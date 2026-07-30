@@ -15,7 +15,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ruff==0.15.22",
+  "ruff==0.16.0",
+  "ty==0.0.65",
 ]
 test = [
   "pytest>=9.0.1,<10",
@@ -27,12 +28,59 @@ test = [
 
 # Treat this repo as an application, so uv installs dependencies without packaging renamarr itself.
 [tool.uv]
-required-version = "==0.11.32"
+required-version = "==0.12.0"
 package = false
 exclude-dependencies = ["m2r2"]
 environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux'",
+]
+
+[tool.ruff]
+target-version = "py314"
+extend-exclude = [
+  "src/renamarr/sonarr/services/series_scanner.py",
+  "tests/test_sonarr_series_scanner.py",
+]
+force-exclude = true
+
+[tool.ruff.lint]
+extend-select = [
+  "B",
+  "BLE",
+  "DTZ",
+  "G",
+  "I",
+  "LOG",
+  "PERF",
+  "PIE",
+  "PT",
+  "RET",
+  "RSE",
+  "RUF",
+  "SIM",
+  "T10",
+  "UP",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "config_schema",
+  "healthcheck",
+  "interval",
+  "main",
+  "renamarr",
+  "tests",
+]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.analysis]
+# These dependencies expose incomplete or overly broad type information.
+replace-imports-with-any = [
+  "pycliarr.**",
+  "schema.**",
 ]
 
 [tool.pytest]

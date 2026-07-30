@@ -19,9 +19,9 @@ class TestSeriesFolderRename:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Show")
         mocker.patch.object(
-            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            sonarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="Show"))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "Show"})
         request_put = mocker.patch.object(sonarr_cli, "request_put")
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
 
@@ -44,29 +44,29 @@ class TestSeriesFolderRename:
         mocker.patch.object(
             sonarr_cli,
             "get_root_folder",
-            return_value=[dict(path="/rootA"), dict(path="/rootB")],
+            return_value=[{"path": "/rootA"}, {"path": "/rootB"}],
         )
         mocker.patch.object(sonarr_cli, "request_get").side_effect = [
-            dict(folder="NewA"),
-            dict(folder="NewB"),
-            dict(folder="NewC"),
+            {"folder": "NewA"},
+            {"folder": "NewB"},
+            {"folder": "NewC"},
         ]
         request_put = mocker.patch.object(
             sonarr_cli,
             "request_put",
             side_effect=[
-                [dict(id=1), dict(id=3)],
-                [dict(id=2)],
+                [{"id": 1}, {"id": 3}],
+                [{"id": 2}],
             ],
         )
         send_command = mocker.patch.object(sonarr_cli, "_sendCommand")
-        send_command.side_effect = [dict(id=10), dict(id=20)]
+        send_command.side_effect = [{"id": 10}, {"id": 20}]
         get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
             side_effect=[
-                dict(status="completed", result="successful"),
-                dict(status="completed", result="successful"),
+                {"status": "completed", "result": "successful"},
+                {"status": "completed", "result": "successful"},
             ],
         )
         mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
@@ -78,27 +78,27 @@ class TestSeriesFolderRename:
             [
                 call(
                     path="/api/v3/series/editor",
-                    json_data=dict(
-                        rootFolderPath="/rootA",
-                        seriesIds=[1, 3],
-                        moveFiles=True,
-                    ),
+                    json_data={
+                        "rootFolderPath": "/rootA",
+                        "seriesIds": [1, 3],
+                        "moveFiles": True,
+                    },
                 ),
                 call(
                     path="/api/v3/series/editor",
-                    json_data=dict(
-                        rootFolderPath="/rootB",
-                        seriesIds=[2],
-                        moveFiles=True,
-                    ),
+                    json_data={
+                        "rootFolderPath": "/rootB",
+                        "seriesIds": [2],
+                        "moveFiles": True,
+                    },
                 ),
             ]
         )
         get_command.assert_has_calls([call(cid=10), call(cid=20)])
         send_command.assert_has_calls(
             [
-                call(dict(name="RescanSeries", priority="high", seriesIds=[1, 3])),
-                call(dict(name="RescanSeries", priority="high", seriesIds=[2])),
+                call({"name": "RescanSeries", "priority": "high", "seriesIds": [1, 3]}),
+                call({"name": "RescanSeries", "priority": "high", "seriesIds": [2]}),
             ]
         )
         mock_loguru_info.assert_has_calls(
@@ -120,9 +120,9 @@ class TestSeriesFolderRename:
         mocker.patch.object(
             sonarr_cli,
             "get_root_folder",
-            return_value=[dict(path="/rootB"), dict(path="/rootA")],
+            return_value=[{"path": "/rootB"}, {"path": "/rootA"}],
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="Show"))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "Show"})
         service = SeriesFolderRename(sonarr_cli)
         find_series_root_folder = mocker.spy(
             service, "_SeriesFolderRename__find_series_root_folder"
@@ -131,8 +131,8 @@ class TestSeriesFolderRename:
         service.process([series])
 
         assert find_series_root_folder.call_args.args[1] == [
-            dict(path="/rootA"),
-            dict(path="/rootB"),
+            {"path": "/rootA"},
+            {"path": "/rootB"},
         ]
 
     def test_process_logs_when_series_rescan_fails(
@@ -141,15 +141,15 @@ class TestSeriesFolderRename:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
         mocker.patch.object(
-            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            sonarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(sonarr_cli, "request_put", return_value=[dict(id=1)])
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "New"})
+        mocker.patch.object(sonarr_cli, "request_put", return_value=[{"id": 1}])
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value={"id": 10})
         mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="failed"),
+            return_value={"status": "completed", "result": "failed"},
         )
         mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
 
@@ -168,15 +168,15 @@ class TestSeriesFolderRename:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
         mocker.patch.object(
-            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            sonarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
-        mocker.patch.object(sonarr_cli, "request_put", return_value=[dict(id=1)])
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "New"})
+        mocker.patch.object(sonarr_cli, "request_put", return_value=[{"id": 1}])
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value={"id": 10})
         get_command = mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="started"),
+            return_value={"status": "started"},
         )
         sleep = mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
         mocker.patch(
@@ -204,9 +204,9 @@ class TestSeriesFolderRename:
         sonarr_cli = SonarrCli("test.tld", "test-api-key")
         series = SonarrSerieItem(id=1, title="Show", path="/root/Old")
         mocker.patch.object(
-            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            sonarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "New"})
         server_error = CliServerError(
             "Sonarr series folder rename failed",
             status_code=500,
@@ -243,21 +243,21 @@ class TestSeriesFolderRename:
         )
         matched_series = SonarrSerieItem(id=2, title="Matched Show", path="/root/Old")
         mocker.patch.object(
-            sonarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            sonarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
         request_get = mocker.patch.object(
-            sonarr_cli, "request_get", return_value=dict(folder="New")
+            sonarr_cli, "request_get", return_value={"folder": "New"}
         )
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=[dict(id=2)]
+            sonarr_cli, "request_put", return_value=[{"id": 2}]
         )
         send_command = mocker.patch.object(
-            sonarr_cli, "_sendCommand", return_value=dict(id=10)
+            sonarr_cli, "_sendCommand", return_value={"id": 10}
         )
         mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            return_value={"status": "completed", "result": "successful"},
         )
         mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
 
@@ -269,10 +269,10 @@ class TestSeriesFolderRename:
         request_get.assert_called_once_with(path="/api/v3/series/2/folder")
         request_put.assert_called_once_with(
             path="/api/v3/series/editor",
-            json_data=dict(rootFolderPath="/root", seriesIds=[2], moveFiles=True),
+            json_data={"rootFolderPath": "/root", "seriesIds": [2], "moveFiles": True},
         )
         send_command.assert_called_once_with(
-            dict(name="RescanSeries", priority="high", seriesIds=[2])
+            {"name": "RescanSeries", "priority": "high", "seriesIds": [2]}
         )
 
     def test_find_series_root_folder_raises_when_no_root_folder_matches(self) -> None:
@@ -288,7 +288,7 @@ class TestSeriesFolderRename:
         ):
             service._SeriesFolderRename__find_series_root_folder(
                 PurePosixPath("/unmatched/Show"),
-                [dict(path="/root")],
+                [{"path": "/root"}],
             )
 
     def test_process_uses_path_matching_for_overlapping_root_names(
@@ -304,19 +304,19 @@ class TestSeriesFolderRename:
             sonarr_cli,
             "get_root_folder",
             return_value=[
-                dict(path="/data/media/tv"),
-                dict(path="/data/media/tv-anime"),
+                {"path": "/data/media/tv"},
+                {"path": "/data/media/tv-anime"},
             ],
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "New"})
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=[dict(id=1)]
+            sonarr_cli, "request_put", return_value=[{"id": 1}]
         )
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value={"id": 10})
         mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            return_value={"status": "completed", "result": "successful"},
         )
         mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
 
@@ -325,11 +325,11 @@ class TestSeriesFolderRename:
         mock_loguru_debug.assert_any_call("Processing pending series folder renames")
         request_put.assert_called_once_with(
             path="/api/v3/series/editor",
-            json_data=dict(
-                rootFolderPath="/data/media/tv-anime",
-                seriesIds=[1],
-                moveFiles=True,
-            ),
+            json_data={
+                "rootFolderPath": "/data/media/tv-anime",
+                "seriesIds": [1],
+                "moveFiles": True,
+            },
         )
 
     @pytest.mark.parametrize(
@@ -337,12 +337,12 @@ class TestSeriesFolderRename:
         [
             (
                 "/data/media/tv/OldName",
-                [dict(path="/data/media"), dict(path="/data/media/tv")],
+                [{"path": "/data/media"}, {"path": "/data/media/tv"}],
                 "/data/media/tv",
             ),
             (
                 "/data/media/tv",
-                [dict(path="/data/media"), dict(path="/data/media/tv")],
+                [{"path": "/data/media"}, {"path": "/data/media/tv"}],
                 "/data/media/tv",
             ),
         ],
@@ -362,15 +362,15 @@ class TestSeriesFolderRename:
             "get_root_folder",
             return_value=root_folders,
         )
-        mocker.patch.object(sonarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(sonarr_cli, "request_get", return_value={"folder": "New"})
         request_put = mocker.patch.object(
-            sonarr_cli, "request_put", return_value=[dict(id=1)]
+            sonarr_cli, "request_put", return_value=[{"id": 1}]
         )
-        mocker.patch.object(sonarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(sonarr_cli, "_sendCommand", return_value={"id": 10})
         mocker.patch.object(
             sonarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            return_value={"status": "completed", "result": "successful"},
         )
         mocker.patch("renamarr.sonarr.services.series_folder_rename.sleep")
 
@@ -378,9 +378,9 @@ class TestSeriesFolderRename:
 
         request_put.assert_called_once_with(
             path="/api/v3/series/editor",
-            json_data=dict(
-                rootFolderPath=expected_root_folder,
-                seriesIds=[1],
-                moveFiles=True,
-            ),
+            json_data={
+                "rootFolderPath": expected_root_folder,
+                "seriesIds": [1],
+                "moveFiles": True,
+            },
         )
