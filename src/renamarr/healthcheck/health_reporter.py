@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from contextlib import contextmanager
 from threading import Event, Lock, Thread

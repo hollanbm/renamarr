@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 from unittest.mock import call
