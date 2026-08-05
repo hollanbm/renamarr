@@ -18,11 +18,9 @@ class TestMovieFolderRename:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Movie")
         mocker.patch.object(
-            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            radarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(
-            radarr_cli, "request_get", return_value=dict(folder="Movie")
-        )
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "Movie"})
         request = mocker.patch.object(radarr_cli._session, "request")
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 
@@ -45,12 +43,12 @@ class TestMovieFolderRename:
         mocker.patch.object(
             radarr_cli,
             "get_root_folder",
-            return_value=[dict(path="/rootA"), dict(path="/rootB")],
+            return_value=[{"path": "/rootA"}, {"path": "/rootB"}],
         )
         mocker.patch.object(radarr_cli, "request_get").side_effect = [
-            dict(folder="NewA"),
-            dict(folder="NewB"),
-            dict(folder="NewC"),
+            {"folder": "NewA"},
+            {"folder": "NewB"},
+            {"folder": "NewC"},
         ]
         request = mocker.patch.object(
             radarr_cli._session,
@@ -58,13 +56,13 @@ class TestMovieFolderRename:
             side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=299)],
         )
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
-        send_command.side_effect = [dict(id=10), dict(id=20)]
+        send_command.side_effect = [{"id": 10}, {"id": 20}]
         get_command = mocker.patch.object(
             radarr_cli,
             "get_command",
             side_effect=[
-                dict(status="completed", result="successful"),
-                dict(status="completed", result="successful"),
+                {"status": "completed", "result": "successful"},
+                {"status": "completed", "result": "successful"},
             ],
         )
         mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
@@ -77,28 +75,28 @@ class TestMovieFolderRename:
                 call(
                     "PUT",
                     "test.tld/api/v3/movie/editor",
-                    json=dict(
-                        rootFolderPath="/rootA",
-                        movieIds=[1, 3],
-                        moveFiles=True,
-                    ),
+                    json={
+                        "rootFolderPath": "/rootA",
+                        "movieIds": [1, 3],
+                        "moveFiles": True,
+                    },
                 ),
                 call(
                     "PUT",
                     "test.tld/api/v3/movie/editor",
-                    json=dict(
-                        rootFolderPath="/rootB",
-                        movieIds=[2],
-                        moveFiles=True,
-                    ),
+                    json={
+                        "rootFolderPath": "/rootB",
+                        "movieIds": [2],
+                        "moveFiles": True,
+                    },
                 ),
             ]
         )
         get_command.assert_has_calls([call(cid=10), call(cid=20)])
         send_command.assert_has_calls(
             [
-                call(dict(priority="high", name="RefreshMovie", movieIds=[1, 3])),
-                call(dict(priority="high", name="RefreshMovie", movieIds=[2])),
+                call({"priority": "high", "name": "RefreshMovie", "movieIds": [1, 3]}),
+                call({"priority": "high", "name": "RefreshMovie", "movieIds": [2]}),
             ]
         )
         mock_loguru_info.assert_has_calls(
@@ -130,11 +128,11 @@ class TestMovieFolderRename:
         mocker.patch.object(
             radarr_cli,
             "get_root_folder",
-            return_value=[dict(path="/movies"), dict(path="/movies-4k")],
+            return_value=[{"path": "/movies"}, {"path": "/movies-4k"}],
         )
         mocker.patch.object(radarr_cli, "request_get").side_effect = [
-            dict(folder="NewA"),
-            dict(folder="NewB"),
+            {"folder": "NewA"},
+            {"folder": "NewB"},
         ]
         request = mocker.patch.object(
             radarr_cli._session,
@@ -142,13 +140,13 @@ class TestMovieFolderRename:
             side_effect=[mocker.Mock(status_code=200), mocker.Mock(status_code=200)],
         )
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
-        send_command.side_effect = [dict(id=10), dict(id=20)]
+        send_command.side_effect = [{"id": 10}, {"id": 20}]
         mocker.patch.object(
             radarr_cli,
             "get_command",
             side_effect=[
-                dict(status="completed", result="successful"),
-                dict(status="completed", result="successful"),
+                {"status": "completed", "result": "successful"},
+                {"status": "completed", "result": "successful"},
             ],
         )
         mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
@@ -160,27 +158,27 @@ class TestMovieFolderRename:
                 call(
                     "PUT",
                     "test.tld/api/v3/movie/editor",
-                    json=dict(
-                        rootFolderPath=movie_a_root,
-                        movieIds=[1],
-                        moveFiles=True,
-                    ),
+                    json={
+                        "rootFolderPath": movie_a_root,
+                        "movieIds": [1],
+                        "moveFiles": True,
+                    },
                 ),
                 call(
                     "PUT",
                     "test.tld/api/v3/movie/editor",
-                    json=dict(
-                        rootFolderPath=movie_b_root,
-                        movieIds=[2],
-                        moveFiles=True,
-                    ),
+                    json={
+                        "rootFolderPath": movie_b_root,
+                        "movieIds": [2],
+                        "moveFiles": True,
+                    },
                 ),
             ]
         )
         send_command.assert_has_calls(
             [
-                call(dict(priority="high", name="RefreshMovie", movieIds=[1])),
-                call(dict(priority="high", name="RefreshMovie", movieIds=[2])),
+                call({"priority": "high", "name": "RefreshMovie", "movieIds": [1]}),
+                call({"priority": "high", "name": "RefreshMovie", "movieIds": [2]}),
             ]
         )
 
@@ -190,11 +188,9 @@ class TestMovieFolderRename:
         mocker.patch.object(
             radarr_cli,
             "get_root_folder",
-            return_value=[dict(path="/rootB"), dict(path="/rootA")],
+            return_value=[{"path": "/rootB"}, {"path": "/rootA"}],
         )
-        mocker.patch.object(
-            radarr_cli, "request_get", return_value=dict(folder="Movie")
-        )
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "Movie"})
         service = MovieFolderRename(radarr_cli)
         find_movie_root_folder = mocker.spy(
             service, "_MovieFolderRename__find_movie_root_folder"
@@ -203,8 +199,8 @@ class TestMovieFolderRename:
         service.process([movie])
 
         assert find_movie_root_folder.call_args.args[1] == [
-            dict(path="/rootA"),
-            dict(path="/rootB"),
+            {"path": "/rootA"},
+            {"path": "/rootB"},
         ]
 
     def test_process_logs_when_updated_movie_rescan_fails(
@@ -213,17 +209,17 @@ class TestMovieFolderRename:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
         mocker.patch.object(
-            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            radarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "New"})
         mocker.patch.object(
             radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
         )
-        mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(radarr_cli, "_sendCommand", return_value={"id": 10})
         mocker.patch.object(
             radarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="failed"),
+            return_value={"status": "completed", "result": "failed"},
         )
         mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
 
@@ -242,17 +238,17 @@ class TestMovieFolderRename:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
         mocker.patch.object(
-            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            radarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "New"})
         mocker.patch.object(
             radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
         )
-        mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(radarr_cli, "_sendCommand", return_value={"id": 10})
         get_command = mocker.patch.object(
             radarr_cli,
             "get_command",
-            return_value=dict(status="started"),
+            return_value={"status": "started"},
         )
         sleep = mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
         mocker.patch(
@@ -280,9 +276,9 @@ class TestMovieFolderRename:
         radarr_cli = RadarrCli("test.tld", "test-api-key")
         movie = RadarrMovieItem(id=1, title="Movie", path="/root/Old")
         mocker.patch.object(
-            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            radarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
-        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "New"})
         mocker.patch.object(
             radarr_cli._session, "request", return_value=mocker.Mock(status_code=300)
         )
@@ -313,21 +309,21 @@ class TestMovieFolderRename:
         )
         matched_movie = RadarrMovieItem(id=2, title="Matched Movie", path="/root/Old")
         mocker.patch.object(
-            radarr_cli, "get_root_folder", return_value=[dict(path="/root")]
+            radarr_cli, "get_root_folder", return_value=[{"path": "/root"}]
         )
         request_get = mocker.patch.object(
-            radarr_cli, "request_get", return_value=dict(folder="New")
+            radarr_cli, "request_get", return_value={"folder": "New"}
         )
         request = mocker.patch.object(
             radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
         )
         send_command = mocker.patch.object(
-            radarr_cli, "_sendCommand", return_value=dict(id=10)
+            radarr_cli, "_sendCommand", return_value={"id": 10}
         )
         mocker.patch.object(
             radarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            return_value={"status": "completed", "result": "successful"},
         )
         mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
 
@@ -340,10 +336,10 @@ class TestMovieFolderRename:
         request.assert_called_once_with(
             "PUT",
             "test.tld/api/v3/movie/editor",
-            json=dict(rootFolderPath="/root", movieIds=[2], moveFiles=True),
+            json={"rootFolderPath": "/root", "movieIds": [2], "moveFiles": True},
         )
         send_command.assert_called_once_with(
-            dict(priority="high", name="RefreshMovie", movieIds=[2])
+            {"priority": "high", "name": "RefreshMovie", "movieIds": [2]}
         )
 
     def test_find_movie_root_folder_raises_when_no_root_folder_matches(self) -> None:
@@ -359,7 +355,7 @@ class TestMovieFolderRename:
         ):
             service._MovieFolderRename__find_movie_root_folder(
                 PurePosixPath("/unmatched/Movie"),
-                [dict(path="/root")],
+                [{"path": "/root"}],
             )
 
     @pytest.mark.parametrize(
@@ -367,12 +363,12 @@ class TestMovieFolderRename:
         [
             (
                 "/data/media/movies/OldName",
-                [dict(path="/data/media"), dict(path="/data/media/movies")],
+                [{"path": "/data/media"}, {"path": "/data/media/movies"}],
                 "/data/media/movies",
             ),
             (
                 "/data/media/movies",
-                [dict(path="/data/media"), dict(path="/data/media/movies")],
+                [{"path": "/data/media"}, {"path": "/data/media/movies"}],
                 "/data/media/movies",
             ),
         ],
@@ -392,15 +388,15 @@ class TestMovieFolderRename:
             "get_root_folder",
             return_value=root_folders,
         )
-        mocker.patch.object(radarr_cli, "request_get", return_value=dict(folder="New"))
+        mocker.patch.object(radarr_cli, "request_get", return_value={"folder": "New"})
         request = mocker.patch.object(
             radarr_cli._session, "request", return_value=mocker.Mock(status_code=200)
         )
-        mocker.patch.object(radarr_cli, "_sendCommand", return_value=dict(id=10))
+        mocker.patch.object(radarr_cli, "_sendCommand", return_value={"id": 10})
         mocker.patch.object(
             radarr_cli,
             "get_command",
-            return_value=dict(status="completed", result="successful"),
+            return_value={"status": "completed", "result": "successful"},
         )
         mocker.patch("renamarr.radarr.services.movie_folder_rename.sleep")
 
@@ -409,9 +405,9 @@ class TestMovieFolderRename:
         request.assert_called_once_with(
             "PUT",
             "test.tld/api/v3/movie/editor",
-            json=dict(
-                rootFolderPath=expected_root_folder,
-                movieIds=[1],
-                moveFiles=True,
-            ),
+            json={
+                "rootFolderPath": expected_root_folder,
+                "movieIds": [1],
+                "moveFiles": True,
+            },
         )

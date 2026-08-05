@@ -1,17 +1,18 @@
 import os
+from collections.abc import Generator
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Generator
 from unittest.mock import PropertyMock
 
 import pytest
 from loguru import logger
-from config_schema import CONFIG_SCHEMA
-from main import Main
 from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
-from renamarr.healthcheck.health_reporter import HealthReporter
 from schedule import Job, Scheduler, clear, get_jobs
+
+from config_schema import CONFIG_SCHEMA
+from main import Main
+from renamarr.healthcheck.health_reporter import HealthReporter
 
 # disable config caching
 configparser.hold_an_instance = False
