@@ -17,7 +17,7 @@ class SeriesRename:
             with logger.contextualize(item=show.title):
                 episodes_to_rename: list[json_data] = self.sonarr_cli.request_get(
                     path="/api/v3/rename",
-                    url_params=dict(seriesId=show.id),
+                    url_params={"seriesId": show.id},
                 )
 
                 if len(episodes_to_rename) == 0:

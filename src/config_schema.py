@@ -2,7 +2,6 @@ from schema import And, Optional, Schema, Use
 
 from interval import Interval
 
-
 NON_NEGATIVE_INTEGER = And(
     lambda value: type(value) is int,
     lambda value: value >= 0,
@@ -98,11 +97,11 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "series_scanner",
-                    default=dict(
-                        enabled=False,
-                        hourly_job=False,
-                        hours_before_air=4,
-                    ),
+                    default={
+                        "enabled": False,
+                        "hourly_job": False,
+                        "hours_before_air": 4,
+                    },
                     ignore_extra_keys=True,
                 ): {
                     Optional("enabled", default=False): bool,
@@ -111,13 +110,13 @@ CONFIG_SCHEMA = {
                 },
                 Optional(
                     "renamarr",
-                    default=dict(
-                        enabled=False,
-                        analyze_files=False,
-                        rename_folders=False,
-                        log_to_file=False,
-                        schedule=DEFAULT_SCHEDULE,
-                    ),
+                    default={
+                        "enabled": False,
+                        "analyze_files": False,
+                        "rename_folders": False,
+                        "log_to_file": False,
+                        "schedule": DEFAULT_SCHEDULE,
+                    },
                     ignore_extra_keys=True,
                 ): And(
                     Use(_migrate_hourly_job),
@@ -167,13 +166,13 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default=dict(
-                        enabled=False,
-                        analyze_files=False,
-                        rename_folders=False,
-                        log_to_file=False,
-                        schedule=DEFAULT_SCHEDULE,
-                    ),
+                    default={
+                        "enabled": False,
+                        "analyze_files": False,
+                        "rename_folders": False,
+                        "log_to_file": False,
+                        "schedule": DEFAULT_SCHEDULE,
+                    },
                     ignore_extra_keys=True,
                 ): And(
                     Use(_migrate_hourly_job),

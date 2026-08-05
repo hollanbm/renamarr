@@ -1,6 +1,6 @@
 import os
 from contextlib import contextmanager
-from sys import stdout
+from sys import exit, stdout
 from time import sleep
 
 import schedule
@@ -14,7 +14,6 @@ from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.radarr.services.renamarr import RadarrRenamarr
 from renamarr.sonarr.services.renamarr import SonarrRenamarr
 from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
-
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
@@ -84,17 +83,19 @@ class Main:
         return True
 
     def __sonarr_series_scanner_job(self, sonarr_config):
-        with self._health_reporter.running_job():
-            with logger.contextualize(service="sonarr", instance=sonarr_config.name):
-                try:
-                    SonarrSeriesScanner(
-                        name=sonarr_config.name,
-                        url=sonarr_config.url,
-                        api_key=sonarr_config.api_key,
-                        hours_before_air=sonarr_config.series_scanner.hours_before_air,
-                    ).scan()
-                except CliArrError as exc:
-                    logger.error(exc)
+        with (
+            self._health_reporter.running_job(),
+            logger.contextualize(service="sonarr", instance=sonarr_config.name),
+        ):
+            try:
+                SonarrSeriesScanner(
+                    name=sonarr_config.name,
+                    url=sonarr_config.url,
+                    api_key=sonarr_config.api_key,
+                    hours_before_air=sonarr_config.series_scanner.hours_before_air,
+                ).scan()
+            except CliArrError as exc:
+                logger.error(exc)
 
     def __schedule_sonarr_series_scanner(self, sonarr_config):
         self.__sonarr_series_scanner_job(sonarr_config)
@@ -105,27 +106,27 @@ class Main:
             )
 
     def __sonarr_renamarr_job(self, sonarr_config):
-        with self._health_reporter.running_job():
-            with logger.contextualize(service="sonarr", instance=sonarr_config.name):
-                uses_deprecated_hourly_job = hasattr(
-                    sonarr_config.renamarr, "hourly_job"
-                )
+        with (
+            self._health_reporter.running_job(),
+            logger.contextualize(service="sonarr", instance=sonarr_config.name),
+        ):
+            uses_deprecated_hourly_job = hasattr(sonarr_config.renamarr, "hourly_job")
+            if uses_deprecated_hourly_job:
+                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
+            try:
+                try:
+                    SonarrRenamarr(
+                        name=sonarr_config.name,
+                        url=sonarr_config.url,
+                        api_key=sonarr_config.api_key,
+                        analyze_files=sonarr_config.renamarr.analyze_files,
+                        rename_folders=sonarr_config.renamarr.rename_folders,
+                    ).scan()
+                except CliArrError as exc:
+                    logger.error(exc)
+            finally:
                 if uses_deprecated_hourly_job:
                     logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-                try:
-                    try:
-                        SonarrRenamarr(
-                            name=sonarr_config.name,
-                            url=sonarr_config.url,
-                            api_key=sonarr_config.api_key,
-                            analyze_files=sonarr_config.renamarr.analyze_files,
-                            rename_folders=sonarr_config.renamarr.rename_folders,
-                        ).scan()
-                    except CliArrError as exc:
-                        logger.error(exc)
-                finally:
-                    if uses_deprecated_hourly_job:
-                        logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
     def __schedule_radarr_renamarr(self, radarr_config):
         self.__radarr_renamarr_job(radarr_config)
@@ -136,27 +137,27 @@ class Main:
             ).minutes.do(self.__radarr_renamarr_job, radarr_config=radarr_config)
 
     def __radarr_renamarr_job(self, radarr_config):
-        with self._health_reporter.running_job():
-            with logger.contextualize(service="radarr", instance=radarr_config.name):
-                uses_deprecated_hourly_job = hasattr(
-                    radarr_config.renamarr, "hourly_job"
-                )
+        with (
+            self._health_reporter.running_job(),
+            logger.contextualize(service="radarr", instance=radarr_config.name),
+        ):
+            uses_deprecated_hourly_job = hasattr(radarr_config.renamarr, "hourly_job")
+            if uses_deprecated_hourly_job:
+                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
+            try:
+                try:
+                    RadarrRenamarr(
+                        name=radarr_config.name,
+                        url=radarr_config.url,
+                        api_key=radarr_config.api_key,
+                        analyze_files=radarr_config.renamarr.analyze_files,
+                        rename_folders=radarr_config.renamarr.rename_folders,
+                    ).scan()
+                except CliArrError as exc:
+                    logger.error(exc)
+            finally:
                 if uses_deprecated_hourly_job:
                     logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-                try:
-                    try:
-                        RadarrRenamarr(
-                            name=radarr_config.name,
-                            url=radarr_config.url,
-                            api_key=radarr_config.api_key,
-                            analyze_files=radarr_config.renamarr.analyze_files,
-                            rename_folders=radarr_config.renamarr.rename_folders,
-                        ).scan()
-                    except CliArrError as exc:
-                        logger.error(exc)
-                finally:
-                    if uses_deprecated_hourly_job:
-                        logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
     def __schedule_sonarr_renamarr(self, sonarr_config):
         self.__sonarr_renamarr_job(sonarr_config)

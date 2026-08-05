@@ -40,11 +40,11 @@ class SeriesFolderRename:
             )
             self.sonarr_cli.request_put(
                 path="/api/v3/series/editor",
-                json_data=dict(
-                    rootFolderPath=root_folder_rename.root_folder_path,
-                    seriesIds=series_ids,
-                    moveFiles=root_folder_rename.move_files,
-                ),
+                json_data={
+                    "rootFolderPath": root_folder_rename.root_folder_path,
+                    "seriesIds": series_ids,
+                    "moveFiles": root_folder_rename.move_files,
+                },
             )
 
             logger.info(f"Series folder rename successful for series: {series_titles}")

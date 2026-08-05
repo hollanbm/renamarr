@@ -19,8 +19,8 @@ class TestMovieRename:
 
         request_get.assert_has_calls(
             [
-                call(path="/api/v3/rename", url_params=dict(movieId=1)),
-                call(path="/api/v3/rename", url_params=dict(movieId=2)),
+                call(path="/api/v3/rename", url_params={"movieId": 1}),
+                call(path="/api/v3/rename", url_params={"movieId": 2}),
             ]
         )
         assert mock_loguru_debug.call_args_list == [
@@ -36,8 +36,8 @@ class TestMovieRename:
         movie_a = RadarrMovieItem(id=1, title="Movie A")
         movie_b = RadarrMovieItem(id=2, title="Movie B")
         mocker.patch.object(radarr_cli, "request_get").side_effect = [
-            [dict(movieId=1, movieFileId=10), dict(movieId=1, movieFileId=11)],
-            [dict(movieId=2, movieFileId=20)],
+            [{"movieId": 1, "movieFileId": 10}, {"movieId": 1, "movieFileId": 11}],
+            [{"movieId": 2, "movieFileId": 20}],
         ]
         send_command = mocker.patch.object(radarr_cli, "_sendCommand")
 

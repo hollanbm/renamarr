@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta, timezone
-from typing import List
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,7 +10,7 @@ from pytest_mock import MockerFixture
 
 @pytest.fixture
 def get_serie(mocker) -> None:
-    series: List[SonarrSerieItem] = [
+    series: list[SonarrSerieItem] = [
         SonarrSerieItem(id=1, title="test title", status="continuing")
     ]
     mocker.patch.object(SonarrCli, "get_serie").return_value = series
@@ -24,7 +23,7 @@ def get_serie_empty(mocker) -> None:
 
 @pytest.fixture
 def get_movie(mocker) -> None:
-    movies: List[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
+    movies: list[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
     mocker.patch.object(RadarrCli, "get_movie").return_value = movies
 
 
@@ -62,12 +61,12 @@ def episode_data(
     hasFile: bool = True,
     episodeFileId: int = 1,
 ) -> json_data:
-    return dict(
-        id=id,
-        title=title,
-        airDateUtc=(datetime.now(timezone.utc) + airDateDelta).isoformat(),
-        seasonNumber=seasonNumber,
-        episodeNumber=episodeNumber,
-        hasFile=hasFile,
-        episodeFileId=episodeFileId,
-    )
+    return {
+        "id": id,
+        "title": title,
+        "airDateUtc": (datetime.now(UTC) + airDateDelta).isoformat(),
+        "seasonNumber": seasonNumber,
+        "episodeNumber": episodeNumber,
+        "hasFile": hasFile,
+        "episodeFileId": episodeFileId,
+    }

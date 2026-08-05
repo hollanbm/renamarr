@@ -19,8 +19,8 @@ class TestSeriesRename:
 
         request_get.assert_has_calls(
             [
-                call(path="/api/v3/rename", url_params=dict(seriesId=1)),
-                call(path="/api/v3/rename", url_params=dict(seriesId=2)),
+                call(path="/api/v3/rename", url_params={"seriesId": 1}),
+                call(path="/api/v3/rename", url_params={"seriesId": 2}),
             ]
         )
         assert mock_loguru_debug.call_args_list == [
@@ -38,8 +38,8 @@ class TestSeriesRename:
             sonarr_cli,
             "request_get",
             return_value=[
-                dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=10),
-                dict(seasonNumber=1, episodeNumbers=[2], episodeFileId=20),
+                {"seasonNumber": 1, "episodeNumbers": [1], "episodeFileId": 10},
+                {"seasonNumber": 1, "episodeNumbers": [2], "episodeFileId": 20},
             ],
         )
         rename_files = mocker.patch.object(sonarr_cli, "rename_files")
@@ -62,8 +62,8 @@ class TestSeriesRename:
         series_a = SonarrSerieItem(id=1, title="Show A")
         series_b = SonarrSerieItem(id=2, title="Show B")
         mocker.patch.object(sonarr_cli, "request_get").side_effect = [
-            [dict(seasonNumber=1, episodeNumbers=[1], episodeFileId=10)],
-            [dict(seasonNumber=2, episodeNumbers=[1, 2], episodeFileId=20)],
+            [{"seasonNumber": 1, "episodeNumbers": [1], "episodeFileId": 10}],
+            [{"seasonNumber": 2, "episodeNumbers": [1, 2], "episodeFileId": 20}],
         ]
         rename_files = mocker.patch.object(sonarr_cli, "rename_files")
 
