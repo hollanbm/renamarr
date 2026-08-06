@@ -59,6 +59,7 @@ jobs:
         with:
           version: 2026.8.2
           install_args: prek
+          env: false
 
       - name: Run formatting checks
         run: |-
@@ -81,6 +82,7 @@ jobs:
         with:
           version: 2026.8.2
           install_args: hadolint
+          env: false
 
       - name: Run hadolint
         run: hadolint --config .hadolint.yaml Dockerfile
@@ -98,6 +100,7 @@ jobs:
         with:
           version: 2026.8.2
           install_args: actionlint
+          env: false
 
       - name: Run actionlint
         run: actionlint
