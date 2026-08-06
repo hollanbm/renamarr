@@ -35,7 +35,8 @@ COPY --from=builder --chown=nonroot:nonroot /renamarr /renamarr
 
 WORKDIR /renamarr
 
-USER nonroot
+# "nonroot" user
+USER 65532:65532
 
 # default settings
 ENV LOGURU_DIAGNOSE="NO"

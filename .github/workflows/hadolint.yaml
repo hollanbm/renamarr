@@ -13,10 +13,6 @@ on:
       - .hadolint.yaml
       - .github/workflows/hadolint.yaml
   pull_request:
-    paths:
-      - Dockerfile
-      - .hadolint.yaml
-      - .github/workflows/hadolint.yaml
 
 jobs:
   hadolint:
