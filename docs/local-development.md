@@ -4,7 +4,7 @@
 
 - [Python 3.14](https://www.python.org/downloads/release/python-3140/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [Hadolint 2.14.0](https://github.com/hadolint/hadolint/releases/tag/v2.14.0), installed natively and available on `PATH`
+- [Hadolint 2.15.1](https://github.com/hadolint/hadolint/releases/tag/v2.15.1), installed natively and available on `PATH`
 - [direnv](https://direnv.net/) (optional)
 - Dependency locking is configured for macOS and Linux environments only
 

@@ -54,6 +54,19 @@
       "packageNameTemplate": "astral-sh/uv",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^docs\/local-development\\.md$/"],
+      "matchStrings": [
+        "\\[Hadolint (?<currentValue>\\d+\\.\\d+\\.\\d+)\\]\\(https://github\\.com/hadolint/hadolint/releases/tag/v\\d+\\.\\d+\\.\\d+\\)"
+      ],
+      "autoReplaceStringTemplate": "[Hadolint {{{newValue}}}](https://github.com/hadolint/hadolint/releases/tag/v{{{newValue}}})",
+      "depNameTemplate": "hadolint/hadolint",
+      "packageNameTemplate": "hadolint/hadolint",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v?(?<version>.*)$",
+      "versioningTemplate": "semver"
     }
   ]
 }
