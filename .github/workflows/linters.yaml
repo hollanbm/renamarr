@@ -11,11 +11,39 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      hadolint: ${{ steps.filter.outputs.hadolint }}
+      actionlint: ${{ steps.filter.outputs.actionlint }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        if: github.event_name != 'workflow_dispatch'
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # v4.0.3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          filters: |
+            hadolint:
+              - 'Dockerfile'
+              - '.hadolint.yaml'
+              - '.github/workflows/linters.yaml'
+              - 'mise.toml'
+            actionlint:
+              - '.github/workflows/*.yaml'
+              - '.github/actionlint.yaml'
+              - 'mise.toml'
+
   hadolint:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.hadolint == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-
       - uses: jdx/mise-action@v4
         with:
           version: 2026.8.2
@@ -23,10 +51,11 @@ jobs:
         run: uv run hadolint --config .hadolint.yaml Dockerfile
 
   actionlint:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.actionlint == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-
       - uses: jdx/mise-action@v4
         with:
           version: 2026.8.2
