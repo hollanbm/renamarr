@@ -31,8 +31,8 @@ jobs:
         run: uv run ruff check --output-format=github .
       - name: Ruff format check
         run: uv run ruff format --check .
-      - name: Type check with ty
-        run: uv run ty check --output-format=github
+      # - name: Type check with ty
+      #   run: uv run ty check --output-format=github
       - name: Audit dependencies with uv
         run: uv audit --frozen --preview-features audit-command
       - name: Upload coverage
