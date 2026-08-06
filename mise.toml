@@ -1,0 +1,45 @@
+min_version = "2026.8.2"
+
+[settings]
+python.uv_venv_auto = "create|source"
+
+[tools]
+python = "3.14"
+hadolint = "2.15.1"
+actionlint = "1.7.12"
+uv = "0.12.1"
+ruff = "0.16.0"
+ty = "0.0.66"
+"pipx:yamlfix" = "1.19.1"
+"pipx:mdformat" = "1.0.0"
+direnv = "2.37.1"
+
+[tools.prek]
+version = "0.4.12"
+postinstall = '''
+prek_path="$(command -v prek)"
+ln -sf "$prek_path" "$(dirname "$prek_path")/pre-commit"
+'''
+
+[env]
+UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
+
+[tasks.sync]
+description = "Install development and test dependencies"
+run = "uv sync --group dev --group test"
+
+[tasks.check]
+description = "Run all repository checks"
+run = "prek run --all-files"
+
+[tasks.test]
+description = "Run tests"
+run = "uv run pytest"
+
+[tasks.audit]
+description = "Audit locked Python dependencies"
+run = "uv audit --frozen --preview-features audit-command"
+
+[tasks.docker-build]
+description = "Build the Docker image with Compose"
+run = "docker compose build"

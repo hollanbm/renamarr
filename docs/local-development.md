@@ -2,18 +2,22 @@
 
 ## Requirements
 
-- [Python 3.14](https://www.python.org/downloads/release/python-3140/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [Hadolint 2.15.1](https://github.com/hadolint/hadolint/releases/tag/v2.15.1), installed natively and available on `PATH`
-- [direnv](https://direnv.net/) (optional)
+- [mise 2026.8.2 or newer](https://mise.jdx.dev/)
+- A Docker-compatible runtime for building the container image (optional)
 - Dependency locking is configured for macOS and Linux environments only
 
 You will need to create `config.yml` in the [config](../config/) folder in the root of the repo.
 
 ```shell
-uv sync --group dev --group test
+mise install
 
-uv audit --frozen --preview-features audit
+mise run sync
+
+mise run check
+
+mise run audit
+
+mise run docker-build
 
 uv run python src/main.py
 ```

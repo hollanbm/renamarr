@@ -1,0 +1,8 @@
+# actionlint 1.7.12 predates GitHub's queue support: https://github.com/rhysd/actionlint/pull/661
+paths:
+  .github/workflows/buildImage.yaml:
+    ignore:
+      - unexpected key "queue" for "concurrency" section
+  .github/workflows/cleanupImages.yaml:
+    ignore:
+      - unexpected key "queue" for "concurrency" section

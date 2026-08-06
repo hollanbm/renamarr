@@ -20,23 +20,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7
+      - uses: jdx/mise-action@v4
         with:
-          python-version: '3.14'
-          architecture: x64
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-        with:
-          enable-cache: true
+          version: 2026.8.2
       - name: Install dependencies
-        run: uv sync --frozen --group dev --group test
+        run: uv sync --locked --group dev --group test
       - name: Test with pytest
         run: uv run pytest --junitxml=junit.xml -o junit_family=legacy
       - name: Lint with Ruff
         run: uv run ruff check --output-format=github .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Type check with ty
+        run: uv run ty check --output-format=github
       - name: Audit dependencies with uv
-        run: uv audit --frozen --preview-features audit
+        run: uv audit --frozen --preview-features audit-command
       - name: Upload coverage
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7
         with:
