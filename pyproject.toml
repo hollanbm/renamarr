@@ -34,6 +34,9 @@ environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux'",
 ]
+[tool.ty.analysis]
+# These dependencies expose incomplete or overly broad type information.
+replace-imports-with-any = ["pycliarr.**", "schema.**"]
 
 [tool.pytest]
 pythonpath = ["./src"]

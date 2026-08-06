@@ -165,4 +165,12 @@ When file logging is enabled, `/logs` must also be mounted as a writable volume;
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
 
-Dependency audits are run with `uv audit --frozen --preview-features audit`.
+The mise configuration installs the development toolchain and provides tasks for the common workflows:
+
+```shell
+mise install
+mise run sync
+mise run check
+mise run audit
+mise run docker-build
+```

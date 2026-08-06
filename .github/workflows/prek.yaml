@@ -1,0 +1,29 @@
+name: Prek
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prek:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.2
+
+      - name: prek
+        run: |-
+          prek run --all-files \
+          yamlfix \
+          mdformat \
+          trailing-whitespace \
+          end-of-file-fixer
