@@ -8,7 +8,6 @@ from typing import Protocol
 import schedule
 from dotenv import load_dotenv
 from loguru import logger
-from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
@@ -17,7 +16,6 @@ from renamarr.adapter_factory import ArrService, create_arr_adapter
 from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.models import CommandPollingSettings
 from renamarr.renamarr import Renamarr
-from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
@@ -42,15 +40,6 @@ class _ArrInstanceConfig(Protocol):
     url: str
     api_key: str
     renamarr: _RenamarrConfig
-
-
-class _SeriesScannerConfig(Protocol):
-    hourly_job: bool
-    hours_before_air: int
-
-
-class _SonarrInstanceConfig(_ArrInstanceConfig, Protocol):
-    series_scanner: _SeriesScannerConfig
 
 
 class Main:
@@ -114,31 +103,6 @@ class Main:
             return False
         return True
 
-    def __sonarr_series_scanner_job(self, sonarr_config: _SonarrInstanceConfig) -> None:
-        with (
-            self._health_reporter.running_job(),
-            logger.contextualize(service="sonarr", instance=sonarr_config.name),
-        ):
-            try:
-                SonarrSeriesScanner(
-                    name=sonarr_config.name,
-                    url=sonarr_config.url,
-                    api_key=sonarr_config.api_key,
-                    hours_before_air=sonarr_config.series_scanner.hours_before_air,
-                ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
-
-    def __schedule_sonarr_series_scanner(
-        self, sonarr_config: _SonarrInstanceConfig
-    ) -> None:
-        self.__sonarr_series_scanner_job(sonarr_config)
-
-        if sonarr_config.series_scanner.hourly_job:
-            schedule.every(55).to(65).minutes.do(
-                self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
-            )
-
     def __renamarr_job(self, service: ArrService, config: _ArrInstanceConfig) -> None:
         with (
             self._health_reporter.running_job(),
@@ -199,9 +163,7 @@ class Main:
             exit(1)
 
         for sonarr_config in config.sonarr:
-            if not (
-                sonarr_config.series_scanner.enabled or sonarr_config.renamarr.enabled
-            ):
+            if not sonarr_config.renamarr.enabled:
                 with logger.contextualize(instance=sonarr_config.name):
                     logger.warning(
                         "Possible config error? -- No jobs configured for current instance"
@@ -210,12 +172,9 @@ class Main:
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
                     )
                     continue
-            if sonarr_config.series_scanner.enabled:
-                self.__schedule_sonarr_series_scanner(sonarr_config)
-            if sonarr_config.renamarr.enabled:
-                if sonarr_config.renamarr.log_to_file:
-                    self.__configure_file_logging("sonarr", sonarr_config.name)
-                self.__schedule_renamarr(ArrService.SONARR, sonarr_config)
+            if sonarr_config.renamarr.log_to_file:
+                self.__configure_file_logging("sonarr", sonarr_config.name)
+            self.__schedule_renamarr(ArrService.SONARR, sonarr_config)
 
         for radarr_config in config.radarr:
             if radarr_config.renamarr.enabled:

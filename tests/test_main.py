@@ -6,7 +6,6 @@ from unittest.mock import PropertyMock
 
 import pytest
 from loguru import logger
-from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from schedule import Job, Scheduler, clear, get_jobs
 
@@ -81,35 +80,15 @@ class TestMain:
     def test_all_disabled(self, config, mocker) -> None:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
 
-        series_scanner = mocker.patch("main.SonarrSeriesScanner")
         renamarr = mocker.patch("main.Renamarr")
         create_arr_adapter = mocker.patch("main.create_arr_adapter")
         job = mocker.patch.object(Job, "do")
 
         Main().start()
 
-        series_scanner.assert_not_called()
         renamarr.assert_not_called()
         create_arr_adapter.assert_not_called()
         job.assert_not_called()
-
-    def test_sonarr_series_scanner_scan(self, config, mocker) -> None:
-        config.sonarr[0].series_scanner.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        mocker.patch.object(Job, "do")
-
-        sonarr_series_scanner = mocker.patch("main.SonarrSeriesScanner")
-
-        Main().start()
-
-        sonarr_series_scanner.assert_called_once_with(
-            name=config.sonarr[0].name,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
-            hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
-        )
-        sonarr_series_scanner.return_value.scan.assert_called_once_with()
-        self.health_reporter.running_job.assert_called_once_with()
 
     def test_start_uses_config_dir_env_var(self, config_dir, mocker) -> None:
         config = configparser.get_config(
@@ -252,90 +231,6 @@ class TestMain:
         assert isinstance(
             mock_loguru_warning.call_args_list[-1].args[0], PermissionError
         )
-
-    def test_sonarr_series_scanner_hourly_job(
-        self, config, enable_scheduler, mocker
-    ) -> None:
-        config.sonarr[0].series_scanner.enabled = True
-        config.sonarr[0].series_scanner.hourly_job = True
-
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        job = mocker.spy(Job, "do")
-        run_pending = mocker.spy(Scheduler, "run_pending")
-
-        sonarr_series_scanner = mocker.patch("main.SonarrSeriesScanner")
-
-        Main().start()
-
-        sonarr_series_scanner.assert_called_once_with(
-            name=config.sonarr[0].name,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
-            hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
-        )
-        sonarr_series_scanner.return_value.scan.assert_called_once_with()
-        job.assert_called()
-        run_pending.assert_called_once()
-        self.health_reporter.idle.assert_called_once_with()
-        self.health_reporter.heartbeat.assert_called_once_with()
-
-    def test_recurring_series_scanner_keeps_scheduler_running_with_one_shot_renamarr(
-        self, config, enable_scheduler, mocker
-    ) -> None:
-        sonarr_config = config.sonarr[0]
-        sonarr_config.series_scanner.enabled = True
-        sonarr_config.series_scanner.hourly_job = True
-        sonarr_config.renamarr.enabled = True
-        sonarr_config.renamarr.schedule.enabled = False
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        run_pending = mocker.spy(Scheduler, "run_pending")
-        series_scanner = mocker.patch("main.SonarrSeriesScanner")
-        renamarr = mocker.patch("main.Renamarr")
-        mocker.patch("main.create_arr_adapter")
-        clear()
-
-        try:
-            Main().start()
-
-            series_scanner.return_value.scan.assert_called_once_with()
-            renamarr.return_value.scan.assert_called_once_with()
-            jobs = get_jobs()
-            assert len(jobs) == 1
-            assert jobs[0].interval == 55
-            assert jobs[0].latest == 65
-            assert jobs[0].unit == "minutes"
-            run_pending.assert_called_once()
-            self.health_reporter.idle.assert_called_once_with()
-            self.health_reporter.heartbeat.assert_called_once_with()
-        finally:
-            clear()
-
-    def test_sonarr_series_scanner_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
-    ) -> None:
-        config.sonarr[0].series_scanner.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        mocker.patch.object(Job, "do")
-
-        exception = CliArrError("BOOM!")
-
-        sonarr_series_scanner = mocker.patch("main.SonarrSeriesScanner")
-        sonarr_series_scanner.return_value.scan.side_effect = exception
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        Main().start()
-
-        sonarr_series_scanner.assert_called_once_with(
-            name=config.sonarr[0].name,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
-            hours_before_air=config.sonarr[0].series_scanner.hours_before_air,
-        )
-        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
-        mock_loguru_error.assert_called_once_with(exception)
-        self.health_reporter.running_job.assert_called_once_with()
 
     def test_sonarr_renamarr_scan(self, config, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True

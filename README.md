@@ -23,7 +23,6 @@ Each invocation runs every enabled job once and exits without restarting when no
 2. Update `config.yml` as needed
    - _Set `sonarr[].renamarr.schedule.enabled` to `false` for every enabled Renamarr instance._
    - _Set `radarr[].renamarr.schedule.enabled` to `false` for every enabled Renamarr instance._
-   - _Set `sonarr[].series_scanner.hourly_job` to `false` for every enabled series scanner._
 3. Invoke the app from your scheduler using the provided [docker-compose.yml](example/external-scheduler/docker-compose.yml)
 
 #### Troubleshooting
@@ -66,28 +65,11 @@ This config option will rename series or movie folders when they no longer match
 
 Analysis, file rename, and post-move rescan commands use the same polling settings. Renamarr checks each command immediately, then checks every `command_polling.check_interval_seconds` until it succeeds, reports a completed failure, encounters a status-check error, or reaches `command_polling.timeout_seconds`. The timeout applies separately to each asynchronous command; it is not an HTTP request or whole-scan timeout.
 
-### Series Scanner (Sonarr Only)
-
-> [!IMPORTANT]
-> This feature is in maintenance mode and will not receive further development or enhancements. Its usage will be evaluated in the future to determine whether it should be removed completely.
-
-This job uses the [Sonarr API](https://sonarr.tv/docs/api/) to do the following
-
-- Iterate over continuing [series](https://sonarr.tv/docs/api/#/Series/get_api_v3_series)
-  - If a series has an episode airing within `config.sonarr[].series_scanner.hours_before_air`
-    - default value of 4, max value of 12
-  - OR
-  - An episode that has aired previously
-  - With a title of TBA (excluding specials)
-    - will trigger a series refresh, to hopefully pull new info from The TVDB
-
-This should prevent too many API calls to the TVDB. When recurring scans are enabled, individual series are checked every 55–65 minutes.
-
 ### Usage
 
 The application runs enabled jobs immediately on startup. Renamarr jobs repeat every hour by default. Set `renamarr.schedule.enabled` to `false` to run once, or configure the interval in days, hours, and minutes.
 
-The process remains running while at least one recurring job is registered. It exits after the initial run only when every enabled Renamarr job has `schedule.enabled` set to `false` and every enabled Sonarr series scanner has `hourly_job` set to `false`.
+The process remains running while at least one recurring job is registered. It exits after the initial run when every enabled Renamarr job has `schedule.enabled` set to `false`.
 
 Logs are always written to stdout.
 
@@ -123,9 +105,6 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].name`                                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
 | `sonarr[].url`                                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
 | `sonarr[].api_key`                                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
-| `sonarr[].series_scanner.enabled`                          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
-| `sonarr[].series_scanner.hourly_job`                       | boolean | No       | False         | enables recurring scans every 55–65 minutes; when false, the scanner runs once at startup                                                        |
-| `sonarr[].series_scanner.hours_before_air`                 | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
 | `sonarr[].renamarr.enabled`                                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
 | `sonarr[].renamarr.hourly_job`                             | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
 | `sonarr[].renamarr.schedule.enabled`                       | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
