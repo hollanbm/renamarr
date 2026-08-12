@@ -5,6 +5,7 @@ from schema import Schema, SchemaError
 
 from config_schema import CONFIG_SCHEMA
 from interval import Interval
+from renamarr.models import CommandPollingSettings
 
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:
@@ -46,6 +47,7 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
                     "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
+                "command_polling": CommandPollingSettings(),
             },
         }
     ]
@@ -69,6 +71,7 @@ def test_minimal_radarr_config_receives_defaults() -> None:
                     "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
+                "command_polling": CommandPollingSettings(),
             },
         }
     ]
@@ -325,4 +328,92 @@ def test_enabled_schedule_rejects_invalid_interval(
     }
 
     with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_omitted_command_polling_receives_defaults(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"enabled": True}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["command_polling"] == (
+        CommandPollingSettings(timeout_seconds=120, check_interval_seconds=3)
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        (
+            {},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=3),
+        ),
+        (
+            {"timeout_seconds": 60},
+            CommandPollingSettings(timeout_seconds=60, check_interval_seconds=3),
+        ),
+        (
+            {"check_interval_seconds": 5},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=5),
+        ),
+        (
+            {"timeout_seconds": 120, "check_interval_seconds": 30},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=30),
+        ),
+        (
+            {"timeout_seconds": 10, "check_interval_seconds": 10},
+            CommandPollingSettings(timeout_seconds=10, check_interval_seconds=10),
+        ),
+    ],
+)
+def test_command_polling_is_validated(
+    service: str,
+    configured: dict[str, int],
+    expected: CommandPollingSettings,
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"command_polling": configured}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["command_polling"] == expected
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("field", ["timeout_seconds", "check_interval_seconds"])
+@pytest.mark.parametrize("value", [0, -1, True, False, 1.5, "1"])
+def test_command_polling_rejects_non_positive_integer_values(
+    service: str, field: str, value: object
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"command_polling": {field: value}}
+    }
+
+    with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_command_polling_rejects_check_interval_over_timeout(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "command_polling": {
+                "timeout_seconds": 10,
+                "check_interval_seconds": 11,
+            }
+        }
+    }
+
+    with pytest.raises(
+        SchemaError,
+        match=(
+            "renamarr.command_polling.check_interval_seconds must not exceed "
+            "timeout_seconds"
+        ),
+    ):
         validate_config({service: [instance_config]})

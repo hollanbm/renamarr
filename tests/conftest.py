@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from loguru import logger
-from pycliarr.api import RadarrCli, RadarrMovieItem, SonarrCli, SonarrSerieItem
+from pycliarr.api import SonarrCli, SonarrSerieItem
 from pycliarr.api.base_api import json_data
 from pytest_mock import MockerFixture
 
@@ -14,22 +14,6 @@ def get_serie(mocker) -> None:
         SonarrSerieItem(id=1, title="test title", status="continuing")
     ]
     mocker.patch.object(SonarrCli, "get_serie").return_value = series
-
-
-@pytest.fixture
-def get_serie_empty(mocker) -> None:
-    mocker.patch.object(SonarrCli, "get_serie").return_value = []
-
-
-@pytest.fixture
-def get_movie(mocker) -> None:
-    movies: list[RadarrMovieItem] = [RadarrMovieItem(id=1, title="test title")]
-    mocker.patch.object(RadarrCli, "get_movie").return_value = movies
-
-
-@pytest.fixture
-def get_movie_empty(mocker) -> None:
-    mocker.patch.object(RadarrCli, "get_movie").return_value = []
 
 
 @pytest.fixture

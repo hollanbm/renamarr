@@ -1,10 +1,15 @@
 from schema import And, Optional, Schema, Use
 
 from interval import Interval
+from renamarr.models import CommandPollingSettings
 
 NON_NEGATIVE_INTEGER = And(
     lambda value: type(value) is int,
     lambda value: value >= 0,
+)
+POSITIVE_INTEGER = And(
+    lambda value: type(value) is int,
+    lambda value: value > 0,
 )
 
 INTERVAL_SCHEMA = {
@@ -19,6 +24,27 @@ DEFAULT_SCHEDULE: dict[str, object] = {
     "interval": DEFAULT_INTERVAL,
 }
 MAX_INTERVAL_DAYS: int = 30
+
+DEFAULT_COMMAND_POLLING = CommandPollingSettings()
+COMMAND_POLLING_SCHEMA = And(
+    {
+        Optional(
+            "timeout_seconds", default=DEFAULT_COMMAND_POLLING.timeout_seconds
+        ): POSITIVE_INTEGER,
+        Optional(
+            "check_interval_seconds",
+            default=DEFAULT_COMMAND_POLLING.check_interval_seconds,
+        ): POSITIVE_INTEGER,
+    },
+    And(
+        lambda value: value["check_interval_seconds"] <= value["timeout_seconds"],
+        error=(
+            "renamarr.command_polling.check_interval_seconds must not exceed "
+            "timeout_seconds"
+        ),
+    ),
+    Use(lambda value: CommandPollingSettings(**value)),
+)
 
 
 def _migrate_hourly_job(renamarr_config: object) -> object:
@@ -116,6 +142,7 @@ CONFIG_SCHEMA = {
                         "rename_folders": False,
                         "log_to_file": False,
                         "schedule": DEFAULT_SCHEDULE,
+                        "command_polling": DEFAULT_COMMAND_POLLING,
                     },
                     ignore_extra_keys=True,
                 ): And(
@@ -130,6 +157,10 @@ CONFIG_SCHEMA = {
                             Optional(
                                 "schedule", default=DEFAULT_SCHEDULE
                             ): SCHEDULE_SCHEMA,
+                            Optional(
+                                "command_polling",
+                                default=DEFAULT_COMMAND_POLLING,
+                            ): COMMAND_POLLING_SCHEMA,
                         },
                         ignore_extra_keys=True,
                     ),
@@ -172,6 +203,7 @@ CONFIG_SCHEMA = {
                         "rename_folders": False,
                         "log_to_file": False,
                         "schedule": DEFAULT_SCHEDULE,
+                        "command_polling": DEFAULT_COMMAND_POLLING,
                     },
                     ignore_extra_keys=True,
                 ): And(
@@ -186,6 +218,10 @@ CONFIG_SCHEMA = {
                             Optional(
                                 "schedule", default=DEFAULT_SCHEDULE
                             ): SCHEDULE_SCHEMA,
+                            Optional(
+                                "command_polling",
+                                default=DEFAULT_COMMAND_POLLING,
+                            ): COMMAND_POLLING_SCHEMA,
                         },
                         ignore_extra_keys=True,
                     ),

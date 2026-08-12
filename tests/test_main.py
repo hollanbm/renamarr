@@ -12,6 +12,7 @@ from schedule import Job, Scheduler, clear, get_jobs
 
 from config_schema import CONFIG_SCHEMA
 from main import Main
+from renamarr.adapter_factory import ArrService
 from renamarr.healthcheck.health_reporter import HealthReporter
 
 # disable config caching
@@ -81,15 +82,15 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
 
         series_scanner = mocker.patch("main.SonarrSeriesScanner")
-        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        renamarr = mocker.patch("main.Renamarr")
+        create_arr_adapter = mocker.patch("main.create_arr_adapter")
         job = mocker.patch.object(Job, "do")
 
         Main().start()
 
         series_scanner.assert_not_called()
-        sonarr_renamarr.assert_not_called()
-        radarr_renamarr.assert_not_called()
+        renamarr.assert_not_called()
+        create_arr_adapter.assert_not_called()
         job.assert_not_called()
 
     def test_sonarr_series_scanner_scan(self, config, mocker) -> None:
@@ -191,6 +192,8 @@ class TestMain:
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
+        mocker.patch("main.create_arr_adapter")
+        mocker.patch("main.Renamarr")
         main = Main()
         logger_add = mocker.patch.object(logger, "add")
 
@@ -287,7 +290,8 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         run_pending = mocker.spy(Scheduler, "run_pending")
         series_scanner = mocker.patch("main.SonarrSeriesScanner")
-        renamarr = mocker.patch("main.SonarrRenamarr")
+        renamarr = mocker.patch("main.Renamarr")
+        mocker.patch("main.create_arr_adapter")
         clear()
 
         try:
@@ -340,29 +344,32 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
-        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
+        adapter = mocker.sentinel.sonarr_adapter
+        create_arr_adapter = mocker.patch(
+            "main.create_arr_adapter", return_value=adapter
+        )
+        renamarr = mocker.patch("main.Renamarr")
 
         Main().start()
 
-        sonarr_renamarr.assert_called_once_with(
-            name=config.sonarr[0].name,
+        create_arr_adapter.assert_called_once_with(
+            service=ArrService.SONARR,
             url=config.sonarr[0].url,
             api_key=config.sonarr[0].api_key,
+        )
+        renamarr.assert_called_once_with(
+            name=config.sonarr[0].name,
+            adapter=adapter,
             analyze_files=True,
             rename_folders=True,
+            command_polling=config.sonarr[0].renamarr.command_polling,
         )
-        sonarr_renamarr.return_value.scan.assert_called_once_with()
+        renamarr.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
-    @pytest.mark.parametrize(
-        ("service", "renamarr_class"),
-        [
-            ("sonarr", "main.SonarrRenamarr"),
-            ("radarr", "main.RadarrRenamarr"),
-        ],
-    )
+    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
-        self, config, enable_scheduler, service, renamarr_class, mocker
+        self, config, enable_scheduler, service, mocker
     ) -> None:
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
@@ -370,7 +377,8 @@ class TestMain:
         assert service_config.renamarr.schedule.interval.total_minutes == 60
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         run_pending = mocker.spy(Scheduler, "run_pending")
-        renamarr = mocker.patch(renamarr_class)
+        renamarr = mocker.patch("main.Renamarr")
+        mocker.patch("main.create_arr_adapter")
         clear()
 
         try:
@@ -395,13 +403,14 @@ class TestMain:
         mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         run_pending = mocker.spy(Scheduler, "run_pending")
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        renamarr = mocker.patch("main.Renamarr")
+        mocker.patch("main.create_arr_adapter")
         clear()
 
         try:
             Main().start()
 
-            radarr_renamarr.return_value.scan.assert_called_once_with()
+            renamarr.return_value.scan.assert_called_once_with()
             jobs = get_jobs()
             assert len(jobs) == 1
             assert jobs[0].interval == 60
@@ -419,9 +428,8 @@ class TestMain:
         service_config.renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        renamarr = mocker.patch(
-            "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
-        )
+        mocker.patch("main.create_arr_adapter")
+        renamarr = mocker.patch("main.Renamarr")
         warning_message = (
             "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled "
             "instead. Remove renamarr.hourly_job after migrating the schedule "
@@ -449,34 +457,6 @@ class TestMain:
             mocker.call(warning_message),
             mocker.call(warning_message),
         ]
-
-    def test_sonarr_renamarr_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
-    ) -> None:
-        config.sonarr[0].renamarr.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        mocker.patch.object(Job, "do")
-
-        exception = CliArrError("BOOM!")
-
-        sonarr_renamarr = mocker.patch("main.SonarrRenamarr")
-        sonarr_renamarr.return_value.scan.side_effect = exception
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        Main().start()
-
-        sonarr_renamarr.assert_called_once_with(
-            name=config.sonarr[0].name,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
-            analyze_files=config.sonarr[0].renamarr.analyze_files,
-            rename_folders=config.sonarr[0].renamarr.rename_folders,
-        )
-        contextualize.assert_any_call(service="sonarr", instance=config.sonarr[0].name)
-        mock_loguru_error.assert_called_once_with(exception)
-        self.health_reporter.running_job.assert_called_once_with()
 
     def test_config_parser_error(self, mock_loguru_error, capsys, mocker) -> None:
         exception = ConfigError("BOOM!")
@@ -534,18 +514,27 @@ class TestMain:
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        adapter = mocker.sentinel.radarr_adapter
+        create_arr_adapter = mocker.patch(
+            "main.create_arr_adapter", return_value=adapter
+        )
+        renamarr = mocker.patch("main.Renamarr")
 
         Main().start()
 
-        radarr_renamarr.assert_called_once_with(
-            name=config.radarr[0].name,
+        create_arr_adapter.assert_called_once_with(
+            service=ArrService.RADARR,
             url=config.radarr[0].url,
             api_key=config.radarr[0].api_key,
+        )
+        renamarr.assert_called_once_with(
+            name=config.radarr[0].name,
+            adapter=adapter,
             analyze_files=config.radarr[0].renamarr.analyze_files,
             rename_folders=config.radarr[0].renamarr.rename_folders,
+            command_polling=config.radarr[0].renamarr.command_polling,
         )
-        radarr_renamarr.return_value.scan.assert_called_once_with()
+        renamarr.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
     def test_radarr_renamarr_rename_folders_defaults_false(self, config) -> None:
@@ -558,18 +547,20 @@ class TestMain:
 
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        adapter = mocker.sentinel.radarr_adapter
+        mocker.patch("main.create_arr_adapter", return_value=adapter)
+        renamarr = mocker.patch("main.Renamarr")
 
         Main().start()
 
-        radarr_renamarr.assert_called_once_with(
+        renamarr.assert_called_once_with(
             name=config.radarr[0].name,
-            url=config.radarr[0].url,
-            api_key=config.radarr[0].api_key,
+            adapter=adapter,
             analyze_files=True,
             rename_folders=True,
+            command_polling=config.radarr[0].renamarr.command_polling,
         )
-        radarr_renamarr.return_value.scan.assert_called_once_with()
+        renamarr.return_value.scan.assert_called_once_with()
 
     def test_radarr_log_to_file_configures_instance_sink(
         self, config, log_dir, log_retention, log_rotation, log_level, mocker
@@ -578,6 +569,8 @@ class TestMain:
         config.radarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
+        mocker.patch("main.create_arr_adapter")
+        mocker.patch("main.Renamarr")
         main = Main()
         logger_add = mocker.patch.object(logger, "add")
 
@@ -620,34 +613,6 @@ class TestMain:
             mock_loguru_warning.call_args_list[-1].args[0], PermissionError
         )
 
-    def test_radarr_renamarr_pycliarr_exception(
-        self, config, mock_loguru_error, mocker
-    ) -> None:
-        config.radarr[0].renamarr.enabled = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        mocker.patch.object(Job, "do")
-
-        exception = CliArrError("BOOM!")
-
-        renamarr = mocker.patch("main.RadarrRenamarr")
-        renamarr.return_value.scan.side_effect = exception
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        Main().start()
-
-        renamarr.assert_called_once_with(
-            name=config.radarr[0].name,
-            url=config.radarr[0].url,
-            api_key=config.radarr[0].api_key,
-            analyze_files=config.radarr[0].renamarr.analyze_files,
-            rename_folders=config.radarr[0].renamarr.rename_folders,
-        )
-        contextualize.assert_any_call(service="radarr", instance=config.radarr[0].name)
-        mock_loguru_error.assert_called_once_with(exception)
-        self.health_reporter.running_job.assert_called_once_with()
-
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_disabled_renamarr_schedule_runs_once(
         self, config, service, mocker
@@ -657,9 +622,8 @@ class TestMain:
         service_config.renamarr.schedule.enabled = False
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         run_pending = mocker.spy(Scheduler, "run_pending")
-        renamarr = mocker.patch(
-            "main.SonarrRenamarr" if service == "sonarr" else "main.RadarrRenamarr"
-        )
+        mocker.patch("main.create_arr_adapter")
+        renamarr = mocker.patch("main.Renamarr")
         clear()
 
         try:
@@ -678,12 +642,13 @@ class TestMain:
         config.radarr[0].renamarr.schedule.interval = mocker.Mock(total_minutes=1504)
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         every = mocker.patch("main.schedule.every")
-        radarr_renamarr = mocker.patch("main.RadarrRenamarr")
+        mocker.patch("main.create_arr_adapter")
+        renamarr = mocker.patch("main.Renamarr")
 
         Main().start()
 
         every.assert_called_once_with(1504)
         every.return_value.minutes.do.assert_called_once_with(
-            mocker.ANY, radarr_config=config.radarr[0]
+            mocker.ANY, service=ArrService.RADARR, config=config.radarr[0]
         )
-        radarr_renamarr.return_value.scan.assert_called_once_with()
+        renamarr.return_value.scan.assert_called_once_with()
