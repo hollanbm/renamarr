@@ -62,6 +62,10 @@ This config option will rename series or movie folders when they no longer match
 - sends a Radarr `RefreshMovie` command to rescan movies after successful folder moves
 - Series and movies are processed in bulk at the end of the run, **per root folder**
 
+#### Command Polling and Partial Results
+
+Analysis, file rename, and post-move rescan commands use the same polling settings. Renamarr checks each command immediately, then checks every `command_polling.check_interval_seconds` until it succeeds, reports a completed failure, encounters a status-check error, or reaches `command_polling.timeout_seconds`. The timeout applies separately to each asynchronous command; it is not an HTTP request or whole-scan timeout.
+
 ### Series Scanner (Sonarr Only)
 
 > [!IMPORTANT]
@@ -113,41 +117,47 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 
 ### Configuration
 
-| Name                                          | Type    | Required | Default Value | Description                                                                                                                                      |
-| --------------------------------------------- | ------- | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sonarr`                                      | Array   | No       | []            | Sonarr instances; when present, must contain at least one instance                                                                               |
-| `sonarr[].name`                               | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
-| `sonarr[].url`                                | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
-| `sonarr[].api_key`                            | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
-| `sonarr[].series_scanner.enabled`             | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
-| `sonarr[].series_scanner.hourly_job`          | boolean | No       | False         | enables recurring scans every 55–65 minutes; when false, the scanner runs once at startup                                                        |
-| `sonarr[].series_scanner.hours_before_air`    | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
-| `sonarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
-| `sonarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `sonarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
-| `sonarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
-| `sonarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
-| `sonarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
-| `sonarr[].renamarr.analyze_files`             | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
-| `sonarr[].renamarr.rename_folders`            | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
-| `sonarr[].renamarr.log_to_file`               | boolean | No       | False         | writes logs for this Sonarr instance to `LOG_DIR/sonarr/<name>.log` with daily rotation                                                          |
-| `radarr`                                      | Array   | No       | []            | Radarr instances; when present, must contain at least one instance                                                                               |
-| `radarr[].name`                               | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
-| `radarr[].url`                                | string  | Yes      | N/A           | url for radarr instance                                                                                                                          |
-| `radarr[].api_key`                            | string  | Yes      | N/A           | api_key for radarr instance                                                                                                                      |
-| `radarr[].renamarr.enabled`                   | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
-| `radarr[].renamarr.hourly_job`                | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
-| `radarr[].renamarr.schedule.enabled`          | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
-| `radarr[].renamarr.schedule.interval.days`    | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
-| `radarr[].renamarr.schedule.interval.hours`   | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
-| `radarr[].renamarr.schedule.interval.minutes` | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
-| `radarr[].renamarr.analyze_files`             | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
-| `radarr[].renamarr.rename_folders`            | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
-| `radarr[].renamarr.log_to_file`               | boolean | No       | False         | writes logs for this Radarr instance to `LOG_DIR/radarr/<name>.log` with daily rotation                                                          |
+| Name                                                       | Type    | Required | Default Value | Description                                                                                                                                      |
+| ---------------------------------------------------------- | ------- | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sonarr`                                                   | Array   | No       | []            | Sonarr instances; when present, must contain at least one instance                                                                               |
+| `sonarr[].name`                                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
+| `sonarr[].url`                                             | string  | Yes      | N/A           | url for sonarr instance                                                                                                                          |
+| `sonarr[].api_key`                                         | string  | Yes      | N/A           | api_key for sonarr instance                                                                                                                      |
+| `sonarr[].series_scanner.enabled`                          | boolean | No       | False         | enables/disables series_scanner functionality                                                                                                    |
+| `sonarr[].series_scanner.hourly_job`                       | boolean | No       | False         | enables recurring scans every 55–65 minutes; when false, the scanner runs once at startup                                                        |
+| `sonarr[].series_scanner.hours_before_air`                 | integer | No       | 4             | The number of hours before an episode has aired, to trigger a rescan when title is TBA                                                           |
+| `sonarr[].renamarr.enabled`                                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
+| `sonarr[].renamarr.hourly_job`                             | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
+| `sonarr[].renamarr.schedule.enabled`                       | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `sonarr[].renamarr.schedule.interval.days`                 | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
+| `sonarr[].renamarr.schedule.interval.hours`                | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
+| `sonarr[].renamarr.schedule.interval.minutes`              | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
+| `sonarr[].renamarr.analyze_files`                          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
+| `sonarr[].renamarr.rename_folders`                         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
+| `sonarr[].renamarr.log_to_file`                            | boolean | No       | False         | writes logs for this Sonarr instance to `LOG_DIR/sonarr/<name>.log` with daily rotation                                                          |
+| `sonarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, or rescan command                                                                                |
+| `sonarr[].renamarr.command_polling.check_interval_seconds` | integer | No       | 3             | seconds between command-status checks after the immediate first check                                                                            |
+| `radarr`                                                   | Array   | No       | []            | Radarr instances; when present, must contain at least one instance                                                                               |
+| `radarr[].name`                                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
+| `radarr[].url`                                             | string  | Yes      | N/A           | url for radarr instance                                                                                                                          |
+| `radarr[].api_key`                                         | string  | Yes      | N/A           | api_key for radarr instance                                                                                                                      |
+| `radarr[].renamarr.enabled`                                | boolean | No       | False         | enables/disables renamarr functionality                                                                                                          |
+| `radarr[].renamarr.hourly_job`                             | boolean | No       | N/A           | **Deprecated:** compatibility alias for `schedule.enabled`; an explicit `schedule.enabled` takes precedence                                      |
+| `radarr[].renamarr.schedule.enabled`                       | boolean | No       | True          | enables recurring Renamarr jobs; when false, Renamarr runs once at startup                                                                       |
+| `radarr[].renamarr.schedule.interval.days`                 | integer | No       | 0             | days between Renamarr jobs                                                                                                                       |
+| `radarr[].renamarr.schedule.interval.hours`                | integer | No       | 0             | hours between Renamarr jobs                                                                                                                      |
+| `radarr[].renamarr.schedule.interval.minutes`              | integer | No       | 0             | minutes between Renamarr jobs                                                                                                                    |
+| `radarr[].renamarr.analyze_files`                          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
+| `radarr[].renamarr.rename_folders`                         | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
+| `radarr[].renamarr.log_to_file`                            | boolean | No       | False         | writes logs for this Radarr instance to `LOG_DIR/radarr/<name>.log` with daily rotation                                                          |
+| `radarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, or rescan command                                                                                |
+| `radarr[].renamarr.command_polling.check_interval_seconds` | integer | No       | 3             | seconds between command-status checks after the immediate first check                                                                            |
 
 Schedule interval values must be non-negative integers, and the combined interval cannot exceed 30 days. When scheduling is enabled, the combined interval must be greater than zero. A zero interval is valid only when `schedule.enabled` is `false`.
 
 When `schedule.interval` is omitted or empty, Renamarr uses the default interval of one hour.
+
+Command-polling values must be positive integers. `check_interval_seconds` cannot exceed `timeout_seconds`. The section is optional; omitting `command_polling`, or the entire `renamarr` section, uses a two-minute timeout and a three-second check interval.
 
 ### Docker Heartbeat
 
