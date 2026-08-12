@@ -122,19 +122,6 @@ CONFIG_SCHEMA = {
                     error="sonarr[].api_key is a required field",
                 ),
                 Optional(
-                    "series_scanner",
-                    default={
-                        "enabled": False,
-                        "hourly_job": False,
-                        "hours_before_air": 4,
-                    },
-                    ignore_extra_keys=True,
-                ): {
-                    Optional("enabled", default=False): bool,
-                    Optional("hourly_job", default=False): bool,
-                    Optional("hours_before_air", default=4): int,
-                },
-                Optional(
                     "renamarr",
                     default={
                         "enabled": False,

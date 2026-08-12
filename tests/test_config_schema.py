@@ -33,11 +33,6 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
             "name": "instance",
             "url": "https://instance.tld",
             "api_key": "api-key",
-            "series_scanner": {
-                "enabled": False,
-                "hourly_job": False,
-                "hours_before_air": 4,
-            },
             "renamarr": {
                 "enabled": False,
                 "analyze_files": False,
@@ -111,10 +106,6 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
                 minimal_instance_config()
                 | {
                     "unexpected": True,
-                    "series_scanner": {
-                        "enabled": True,
-                        "unexpected": True,
-                    },
                     "renamarr": {
                         "rename_folders": True,
                         "unexpected": True,
@@ -138,11 +129,9 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
     radarr_config = validated["radarr"][0]
 
     assert "unexpected" not in sonarr_config
-    assert "unexpected" not in sonarr_config["series_scanner"]
     assert "unexpected" not in sonarr_config["renamarr"]
     assert "unexpected" not in radarr_config
     assert "unexpected" not in radarr_config["renamarr"]
-    assert sonarr_config["series_scanner"]["enabled"] is True
     assert sonarr_config["renamarr"]["rename_folders"] is True
     assert radarr_config["renamarr"]["analyze_files"] is True
 
@@ -150,8 +139,6 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
 @pytest.mark.parametrize(
     ("service", "section", "field"),
     [
-        ("sonarr", "series_scanner", "enabled"),
-        ("sonarr", "series_scanner", "hourly_job"),
         ("sonarr", "renamarr", "enabled"),
         ("sonarr", "renamarr", "analyze_files"),
         ("sonarr", "renamarr", "rename_folders"),

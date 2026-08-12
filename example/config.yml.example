@@ -13,21 +13,6 @@ sonarr:
           days: 0
           hours: 1
           minutes: 0
-    series_scanner:
-      enabled: false
-      hourly_job: false
-  - name: anime
-    url: https://sonarr-anime.tld:8989
-    api_key: not-a-real-api-key
-    renamarr:
-      enabled: false
-      analyze_files: false
-      rename_folders: false
-      log_to_file: false
-    series_scanner:
-      enabled: true
-      hourly_job: true
-      hours_before_air: 1 # optional, defaults to 4
 radarr:
   - name: radarr
     url: https://radarr.tld:7878
