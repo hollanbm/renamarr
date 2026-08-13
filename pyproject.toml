@@ -10,6 +10,8 @@ dependencies = [
   "loguru>=0.7.3,<0.8",
   "python-config-parser>=3.1.3,<4",
   "schedule>=1.2.2,<2",
+  "sonarr",
+  "pydantic>=2,<3",
 ]
 
 [dependency-groups]
@@ -32,6 +34,9 @@ environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux'",
 ]
+
+[tool.uv.sources]
+sonarr = { git = "https://github.com/devopsarr/sonarr-py.git", tag = "v1.1.1" }
 [tool.ty.analysis]
 # These dependencies expose incomplete or overly broad type information.
 replace-imports-with-any = ["pycliarr.**", "schema.**"]

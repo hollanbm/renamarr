@@ -35,6 +35,8 @@ Image tags ending in `-dev` can be used for troubleshooting purposes, but are no
 
 This job uses the [Sonarr API](https://sonarr.tv/docs/api/)/[Radarr API](https://radarr.video/docs/api/) to do the following
 
+Sonarr API access uses [devopsarr/sonarr-py](https://github.com/devopsarr/sonarr-py). Existing Sonarr configuration remains unchanged.
+
 - Iterate over all items (Movies or Series)
   - Checks if any items need to be renamed
     - Radarr [get_api_v3_rename](https://radarr.video/docs/api/#/RenameMovie/get_api_v3_rename)
