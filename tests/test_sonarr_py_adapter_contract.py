@@ -139,9 +139,7 @@ def test_maps_episode_previews_and_builds_one_batch_per_series(
         FileRenameBatch((2,), (30,), "Show B: S03E05"),
     ]
     assert adapter.build_file_rename_batches(()) == []
-    rename_api.list_rename.assert_has_calls(
-        [call(series_id=1), call(series_id=1)]
-    )
+    rename_api.list_rename.assert_has_calls([call(series_id=1), call(series_id=1)])
 
 
 def test_starts_series_file_rename(
@@ -256,9 +254,7 @@ def test_translates_api_errors_at_every_boundary(
 def test_does_not_translate_unexpected_errors(
     adapter: SonarrPyAdapter, sonarr_apis: dict[str, MagicMock]
 ) -> None:
-    sonarr_apis["SeriesApi"].list_series.side_effect = RuntimeError(
-        "programming error"
-    )
+    sonarr_apis["SeriesApi"].list_series.side_effect = RuntimeError("programming error")
 
     with pytest.raises(RuntimeError, match="programming error"):
         adapter.list_media_items()
@@ -364,9 +360,7 @@ def test_rejects_rename_preview_missing_required_fields(
 def test_rejects_root_folder_missing_path(
     adapter: SonarrPyAdapter, sonarr_apis: dict[str, MagicMock]
 ) -> None:
-    sonarr_apis["RootFolderApi"].list_root_folder.return_value = [
-        RootFolderResource()
-    ]
+    sonarr_apis["RootFolderApi"].list_root_folder.return_value = [RootFolderResource()]
 
     with pytest.raises(TypeError, match="Expected a root-folder path"):
         adapter.list_root_folders()
