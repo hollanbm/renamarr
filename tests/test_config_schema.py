@@ -5,7 +5,7 @@ from schema import Schema, SchemaError
 
 from config_schema import CONFIG_SCHEMA
 from interval import Interval
-from renamarr.models import CommandPollingSettings
+from renamarr.models.command import CommandPollingSettings
 
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:

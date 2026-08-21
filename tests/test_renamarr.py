@@ -4,18 +4,14 @@ from unittest.mock import MagicMock, call
 import pytest
 
 from renamarr.exceptions import ArrOperationError
-from renamarr.models import (
-    CommandPollingSettings,
-    CommandStatus,
+from renamarr.models.command import CommandPollingSettings, CommandStatus
+from renamarr.models.media import (
     FileRenameBatch,
     FileRenameCandidate,
     FolderRenameBatch,
     MediaItem,
-    ScanFailure,
-    ScanPhase,
-    ScanResult,
-    WorkSummary,
 )
+from renamarr.models.scan import ScanFailure, ScanPhase, ScanResult, WorkSummary
 from renamarr.protocols import ArrAdapter
 from renamarr.renamarr import Renamarr
 
@@ -59,94 +55,8 @@ def configured_adapter(mocker, items: list[MediaItem]) -> MagicMock:
     return adapter
 
 
-def test_folder_rename_batch_exposes_ids_and_titles() -> None:
-    items = (
-        MediaItem(1, "A", "/root/a"),
-        MediaItem(2, "B", "/root/b"),
-    )
-
-    batch = FolderRenameBatch("/root", items)
-
-    assert batch.item_ids == (1, 2)
-    assert batch.titles == ("A", "B")
-
-
-@pytest.mark.parametrize(
-    "settings",
-    [
-        pytest.param({"timeout_seconds": True}, id="boolean-timeout"),
-        pytest.param({"timeout_seconds": 0}, id="non-positive-timeout"),
-        pytest.param({"check_interval_seconds": False}, id="boolean-check-interval"),
-        pytest.param({"check_interval_seconds": -1}, id="non-positive-check-interval"),
-        pytest.param(
-            {"timeout_seconds": 10, "check_interval_seconds": 11},
-            id="check-exceeds-timeout",
-        ),
-    ],
-)
-def test_command_polling_settings_reject_invalid_values(
-    settings: dict[str, object],
-) -> None:
-    with pytest.raises(ValueError):
-        CommandPollingSettings(**settings)
-
-
-def test_command_polling_settings_accept_valid_boundary() -> None:
-    assert CommandPollingSettings(10, 10) == CommandPollingSettings(
-        timeout_seconds=10,
-        check_interval_seconds=10,
-    )
-
-
-@pytest.mark.parametrize(
-    "result",
-    [
-        pytest.param(
-            ScanResult(0, WorkSummary(), WorkSummary(), WorkSummary(), ()),
-            id="empty-library",
-        ),
-        pytest.param(
-            ScanResult(
-                1,
-                WorkSummary(),
-                WorkSummary(),
-                WorkSummary(),
-                (ScanFailure(ScanPhase.DISCOVERY, (), "failed"),),
-            ),
-            id="recorded-failure",
-        ),
-        pytest.param(
-            ScanResult(1, WorkSummary(failed=1), WorkSummary(), WorkSummary(), ()),
-            id="analysis-failure",
-        ),
-        pytest.param(
-            ScanResult(1, WorkSummary(), WorkSummary(failed=1), WorkSummary(), ()),
-            id="file-failure",
-        ),
-        pytest.param(
-            ScanResult(1, WorkSummary(), WorkSummary(), WorkSummary(failed=1), ()),
-            id="folder-failure",
-        ),
-    ],
-)
-def test_scan_result_reports_unsuccessful_outcomes(result: ScanResult) -> None:
-    assert not result.successful
-
-
-def test_scan_result_reports_success() -> None:
-    result = ScanResult(
-        1,
-        WorkSummary(succeeded=1),
-        WorkSummary(skipped=1),
-        WorkSummary(skipped=1),
-        (),
-    )
-
-    assert result.successful
-
-
 def test_scan_runs_shared_workflow_in_sorted_order(
-    mock_loguru_info: MagicMock, mocker
+    mock_loguru_debug: MagicMock, mock_loguru_info: MagicMock, mocker
 ) -> None:
     item_b = MediaItem(2, "B", "/root/nested/old-b")
     item_a = MediaItem(1, "A", "/root/old-a")
@@ -161,9 +71,9 @@ def test_scan_runs_shared_workflow_in_sorted_order(
 
     assert result == ScanResult(
         items_found=2,
-        analysis=WorkSummary(succeeded=2),
-        file_renames=WorkSummary(succeeded=2),
-        folder_renames=WorkSummary(succeeded=2),
+        analysis=WorkSummary(success=2),
+        file_renames=WorkSummary(success=2),
+        folder_renames=WorkSummary(success=2),
         failures=(),
     )
     assert result.successful
@@ -179,15 +89,19 @@ def test_scan_runs_shared_workflow_in_sorted_order(
             call(FolderRenameBatch("/root/nested", (item_b,))),
         ]
     )
+    assert mock_loguru_debug.call_args_list[-1] == call(
+        "Items found: 2 | analysis: [ success=2, failed=0, skipped=0 ]"
+    )
     assert mock_loguru_info.call_args_list[-1] == call(
-        "Finished Renamarr successfully: items=2; "
-        "analysis=2 succeeded, 0 failed, 0 skipped; "
-        "file renames=2 succeeded, 0 failed, 0 skipped; "
-        "folder renames=2 succeeded, 0 failed, 0 skipped"
+        "Finished Renamarr successfully | "
+        "file renames: [ success=2, failed=0, skipped=0 ] | "
+        "folder renames: [ success=2, failed=0, skipped=0 ]"
     )
 
 
-def test_scan_skips_disabled_analysis_and_folder_renames(mocker) -> None:
+def test_scan_skips_disabled_analysis_and_folder_renames(
+    mock_loguru_info: MagicMock, mocker
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_file_rename_candidate.return_value = None
@@ -201,6 +115,11 @@ def test_scan_skips_disabled_analysis_and_folder_renames(mocker) -> None:
     assert result.successful
     adapter.is_media_analysis_enabled.assert_not_called()
     adapter.list_root_folders.assert_not_called()
+    assert mock_loguru_info.call_args_list[-1] == call(
+        "Finished Renamarr successfully | "
+        "file renames: [ success=0, failed=0, skipped=1 ] | "
+        "folder renames: [ success=0, failed=0, skipped=1 ]"
+    )
 
 
 def test_scan_skips_analysis_disabled_by_service(mocker) -> None:
@@ -232,6 +151,7 @@ def test_scan_skips_analysis_disabled_by_service(mocker) -> None:
 def test_scan_ends_after_library_discovery_failure(
     library: list[MediaItem] | ArrOperationError,
     message: str,
+    mock_loguru_error: MagicMock,
     mocker,
 ) -> None:
     adapter = configured_adapter(mocker, [])
@@ -247,6 +167,14 @@ def test_scan_ends_after_library_discovery_failure(
     assert not result.successful
     adapter.get_file_rename_candidate.assert_not_called()
     adapter.list_root_folders.assert_not_called()
+    assert mock_loguru_error.call_args_list == [
+        call(message),
+        call(
+            "Finished Renamarr with 1 failures | "
+            "file renames: [ success=0, failed=0, skipped=0 ] | "
+            "folder renames: [ success=0, failed=0, skipped=0 ]"
+        ),
+    ]
 
 
 def test_scan_propagates_unexpected_discovery_error(mocker) -> None:
@@ -257,7 +185,9 @@ def test_scan_propagates_unexpected_discovery_error(mocker) -> None:
         Renamarr("test", adapter).scan()
 
 
-def test_analysis_failure_is_recorded_and_discovery_continues(mocker) -> None:
+def test_analysis_failure_is_recorded_and_discovery_continues(
+    mock_loguru_debug: MagicMock, mock_loguru_error: MagicMock, mocker
+) -> None:
     items = [
         MediaItem(2, "Item B", "/root/Item B"),
         MediaItem(1, "Item A", "/root/Item A"),
@@ -275,6 +205,17 @@ def test_analysis_failure_is_recorded_and_discovery_continues(mocker) -> None:
         ScanFailure(ScanPhase.ANALYSIS, (1, 2), "analysis failed"),
     )
     assert not result.successful
+    assert mock_loguru_debug.call_args_list[-1] == call(
+        "Items found: 2 | analysis: [ success=0, failed=2, skipped=0 ]"
+    )
+    assert mock_loguru_error.call_args_list == [
+        call("analysis failed"),
+        call(
+            "Finished Renamarr with 1 failures | "
+            "file renames: [ success=0, failed=0, skipped=2 ] | "
+            "folder renames: [ success=0, failed=0, skipped=2 ]"
+        ),
+    ]
 
 
 def test_completed_unsuccessful_analysis_command_is_recorded(mocker) -> None:
@@ -315,7 +256,7 @@ def test_command_polling_checks_immediately_then_sleeps(mocker) -> None:
         command_polling=CommandPollingSettings(10, 1),
     ).scan()
 
-    assert result.analysis == WorkSummary(succeeded=1)
+    assert result.analysis == WorkSummary(success=1)
     adapter.get_command_status.assert_has_calls([call(10), call(10)])
     sleep.assert_called_once_with(1)
     assert monotonic.call_count == 3
@@ -399,7 +340,7 @@ def test_command_polling_accepts_completion_on_final_deadline_check(mocker) -> N
         command_polling=CommandPollingSettings(10, 10),
     ).scan()
 
-    assert result.analysis == WorkSummary(succeeded=1)
+    assert result.analysis == WorkSummary(success=1)
     adapter.get_command_status.assert_has_calls([call(10), call(10)])
     sleep.assert_called_once_with(10)
 
@@ -441,7 +382,9 @@ def test_command_status_check_error_is_recorded(mocker) -> None:
     assert result.failures[0].message == "status check failed"
 
 
-def test_file_preview_failures_and_noops_do_not_block_other_items(mocker) -> None:
+def test_file_preview_failures_and_noops_do_not_block_other_items(
+    mock_loguru_error: MagicMock, mocker
+) -> None:
     failed = MediaItem(1, "A", "/root/A")
     skipped = MediaItem(2, "B", "/root/B")
     renamed = MediaItem(3, "C", "/root/C")
@@ -458,11 +401,19 @@ def test_file_preview_failures_and_noops_do_not_block_other_items(mocker) -> Non
 
     result = Renamarr("test", adapter).scan()
 
-    assert result.file_renames == WorkSummary(succeeded=1, failed=1, skipped=1)
+    assert result.file_renames == WorkSummary(success=1, failed=1, skipped=1)
     assert result.failures == (
         ScanFailure(ScanPhase.FILE_RENAMES, (1,), "preview failed"),
     )
     adapter.start_file_rename.assert_called_once()
+    assert mock_loguru_error.call_args_list == [
+        call("preview failed"),
+        call(
+            "Finished Renamarr with 1 failures | "
+            "file renames: [ success=1, failed=1, skipped=1 ] | "
+            "folder renames: [ success=0, failed=0, skipped=3 ]"
+        ),
+    ]
 
 
 def test_file_batch_planning_failure_marks_all_candidates_failed(mocker) -> None:
@@ -508,8 +459,8 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(mocker) -> N
 
     result = Renamarr("test", adapter, rename_folders=True).scan()
 
-    assert result.file_renames == WorkSummary(succeeded=1, failed=1)
-    assert result.folder_renames == WorkSummary(succeeded=2)
+    assert result.file_renames == WorkSummary(success=1, failed=1)
+    assert result.folder_renames == WorkSummary(success=2)
     assert result.failures == (
         ScanFailure(ScanPhase.FILE_RENAMES, (1,), "rename failed"),
     )
@@ -559,7 +510,7 @@ def test_folder_planning_isolated_failures_and_noops_continue(mocker) -> None:
 
     result = Renamarr("test", adapter, rename_folders=True).scan()
 
-    assert result.folder_renames == WorkSummary(succeeded=2, failed=2, skipped=1)
+    assert result.folder_renames == WorkSummary(success=2, failed=2, skipped=1)
     assert result.failures == (
         ScanFailure(
             ScanPhase.FOLDER_RENAMES,

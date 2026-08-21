@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from renamarr.models import (
-    CommandStatus,
+from renamarr.models.command import CommandStatus
+from renamarr.models.media import (
     FileRenameBatch,
     FileRenameCandidate,
     FolderRenameBatch,
