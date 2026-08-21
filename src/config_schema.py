@@ -1,10 +1,15 @@
 from schema import And, Optional, Schema, Use
 
 from interval import Interval
+from renamarr.models.command import CommandPollingSettings
 
 NON_NEGATIVE_INTEGER = And(
     lambda value: type(value) is int,
     lambda value: value >= 0,
+)
+POSITIVE_INTEGER = And(
+    lambda value: type(value) is int,
+    lambda value: value > 0,
 )
 
 INTERVAL_SCHEMA = {
@@ -19,6 +24,27 @@ DEFAULT_SCHEDULE: dict[str, object] = {
     "interval": DEFAULT_INTERVAL,
 }
 MAX_INTERVAL_DAYS: int = 30
+
+DEFAULT_COMMAND_POLLING = CommandPollingSettings()
+COMMAND_POLLING_SCHEMA = And(
+    {
+        Optional(
+            "timeout_seconds", default=DEFAULT_COMMAND_POLLING.timeout_seconds
+        ): POSITIVE_INTEGER,
+        Optional(
+            "check_interval_seconds",
+            default=DEFAULT_COMMAND_POLLING.check_interval_seconds,
+        ): POSITIVE_INTEGER,
+    },
+    And(
+        lambda value: value["check_interval_seconds"] <= value["timeout_seconds"],
+        error=(
+            "renamarr.command_polling.check_interval_seconds must not exceed "
+            "timeout_seconds"
+        ),
+    ),
+    Use(lambda value: CommandPollingSettings(**value)),
+)
 
 
 def _migrate_hourly_job(renamarr_config: object) -> object:
@@ -68,6 +94,33 @@ SCHEDULE_SCHEMA = And(
     ),
 )
 
+RENAMARR_DEFAULTS: dict[str, object] = {
+    "enabled": False,
+    "analyze_files": False,
+    "rename_folders": False,
+    "log_to_file": False,
+    "schedule": DEFAULT_SCHEDULE,
+    "command_polling": DEFAULT_COMMAND_POLLING,
+}
+RENAMARR_SCHEMA = And(
+    Use(_migrate_hourly_job),
+    Schema(
+        {
+            Optional("enabled", default=False): bool,
+            Optional("hourly_job"): bool,
+            Optional("analyze_files", default=False): bool,
+            Optional("rename_folders", default=False): bool,
+            Optional("log_to_file", default=False): bool,
+            Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
+            Optional(
+                "command_polling",
+                default=DEFAULT_COMMAND_POLLING,
+            ): COMMAND_POLLING_SCHEMA,
+        },
+        ignore_extra_keys=True,
+    ),
+)
+
 CONFIG_SCHEMA = {
     Optional(
         "sonarr",
@@ -96,44 +149,10 @@ CONFIG_SCHEMA = {
                     error="sonarr[].api_key is a required field",
                 ),
                 Optional(
-                    "series_scanner",
-                    default={
-                        "enabled": False,
-                        "hourly_job": False,
-                        "hours_before_air": 4,
-                    },
-                    ignore_extra_keys=True,
-                ): {
-                    Optional("enabled", default=False): bool,
-                    Optional("hourly_job", default=False): bool,
-                    Optional("hours_before_air", default=4): int,
-                },
-                Optional(
                     "renamarr",
-                    default={
-                        "enabled": False,
-                        "analyze_files": False,
-                        "rename_folders": False,
-                        "log_to_file": False,
-                        "schedule": DEFAULT_SCHEDULE,
-                    },
+                    default=RENAMARR_DEFAULTS.copy,
                     ignore_extra_keys=True,
-                ): And(
-                    Use(_migrate_hourly_job),
-                    Schema(
-                        {
-                            Optional("enabled", default=False): bool,
-                            Optional("hourly_job"): bool,
-                            Optional("analyze_files", default=False): bool,
-                            Optional("rename_folders", default=False): bool,
-                            Optional("log_to_file", default=False): bool,
-                            Optional(
-                                "schedule", default=DEFAULT_SCHEDULE
-                            ): SCHEDULE_SCHEMA,
-                        },
-                        ignore_extra_keys=True,
-                    ),
-                ),
+                ): RENAMARR_SCHEMA,
             }
         ],
         ignore_extra_keys=True,
@@ -166,30 +185,9 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default={
-                        "enabled": False,
-                        "analyze_files": False,
-                        "rename_folders": False,
-                        "log_to_file": False,
-                        "schedule": DEFAULT_SCHEDULE,
-                    },
+                    default=RENAMARR_DEFAULTS.copy,
                     ignore_extra_keys=True,
-                ): And(
-                    Use(_migrate_hourly_job),
-                    Schema(
-                        {
-                            Optional("enabled", default=False): bool,
-                            Optional("hourly_job"): bool,
-                            Optional("analyze_files", default=False): bool,
-                            Optional("rename_folders", default=False): bool,
-                            Optional("log_to_file", default=False): bool,
-                            Optional(
-                                "schedule", default=DEFAULT_SCHEDULE
-                            ): SCHEDULE_SCHEMA,
-                        },
-                        ignore_extra_keys=True,
-                    ),
-                ),
+                ): RENAMARR_SCHEMA,
             }
         ],
         ignore_extra_keys=True,

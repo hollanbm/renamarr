@@ -5,6 +5,7 @@ from schema import Schema, SchemaError
 
 from config_schema import CONFIG_SCHEMA
 from interval import Interval
+from renamarr.models.command import CommandPollingSettings
 
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:
@@ -32,11 +33,6 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
             "name": "instance",
             "url": "https://instance.tld",
             "api_key": "api-key",
-            "series_scanner": {
-                "enabled": False,
-                "hourly_job": False,
-                "hours_before_air": 4,
-            },
             "renamarr": {
                 "enabled": False,
                 "analyze_files": False,
@@ -46,6 +42,7 @@ def test_minimal_sonarr_config_receives_defaults() -> None:
                     "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
+                "command_polling": CommandPollingSettings(),
             },
         }
     ]
@@ -69,9 +66,35 @@ def test_minimal_radarr_config_receives_defaults() -> None:
                     "enabled": True,
                     "interval": Interval(days=0, hours=1, minutes=0),
                 },
+                "command_polling": CommandPollingSettings(),
             },
         }
     ]
+
+
+def test_omitted_renamarr_defaults_are_independent_between_services() -> None:
+    validated = validate_config(
+        {
+            "sonarr": [minimal_instance_config()],
+            "radarr": [minimal_instance_config()],
+        }
+    )
+    sonarr_configs = validated["sonarr"]
+    radarr_configs = validated["radarr"]
+    assert isinstance(sonarr_configs, list)
+    assert isinstance(radarr_configs, list)
+    sonarr_config = sonarr_configs[0]
+    radarr_config = radarr_configs[0]
+    assert isinstance(sonarr_config, dict)
+    assert isinstance(radarr_config, dict)
+    sonarr_renamarr = sonarr_config["renamarr"]
+    radarr_renamarr = radarr_config["renamarr"]
+    assert isinstance(sonarr_renamarr, dict)
+    assert isinstance(radarr_renamarr, dict)
+
+    sonarr_renamarr["enabled"] = True
+
+    assert radarr_renamarr["enabled"] is False
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
@@ -108,10 +131,6 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
                 minimal_instance_config()
                 | {
                     "unexpected": True,
-                    "series_scanner": {
-                        "enabled": True,
-                        "unexpected": True,
-                    },
                     "renamarr": {
                         "rename_folders": True,
                         "unexpected": True,
@@ -135,11 +154,9 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
     radarr_config = validated["radarr"][0]
 
     assert "unexpected" not in sonarr_config
-    assert "unexpected" not in sonarr_config["series_scanner"]
     assert "unexpected" not in sonarr_config["renamarr"]
     assert "unexpected" not in radarr_config
     assert "unexpected" not in radarr_config["renamarr"]
-    assert sonarr_config["series_scanner"]["enabled"] is True
     assert sonarr_config["renamarr"]["rename_folders"] is True
     assert radarr_config["renamarr"]["analyze_files"] is True
 
@@ -147,8 +164,6 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
 @pytest.mark.parametrize(
     ("service", "section", "field"),
     [
-        ("sonarr", "series_scanner", "enabled"),
-        ("sonarr", "series_scanner", "hourly_job"),
         ("sonarr", "renamarr", "enabled"),
         ("sonarr", "renamarr", "analyze_files"),
         ("sonarr", "renamarr", "rename_folders"),
@@ -325,4 +340,92 @@ def test_enabled_schedule_rejects_invalid_interval(
     }
 
     with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_omitted_command_polling_receives_defaults(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"enabled": True}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["command_polling"] == (
+        CommandPollingSettings(timeout_seconds=120, check_interval_seconds=3)
+    )
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        (
+            {},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=3),
+        ),
+        (
+            {"timeout_seconds": 60},
+            CommandPollingSettings(timeout_seconds=60, check_interval_seconds=3),
+        ),
+        (
+            {"check_interval_seconds": 5},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=5),
+        ),
+        (
+            {"timeout_seconds": 120, "check_interval_seconds": 30},
+            CommandPollingSettings(timeout_seconds=120, check_interval_seconds=30),
+        ),
+        (
+            {"timeout_seconds": 10, "check_interval_seconds": 10},
+            CommandPollingSettings(timeout_seconds=10, check_interval_seconds=10),
+        ),
+    ],
+)
+def test_command_polling_is_validated(
+    service: str,
+    configured: dict[str, int],
+    expected: CommandPollingSettings,
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"command_polling": configured}
+    }
+
+    validated = validate_config({service: [instance_config]})
+
+    assert validated[service][0]["renamarr"]["command_polling"] == expected
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("field", ["timeout_seconds", "check_interval_seconds"])
+@pytest.mark.parametrize("value", [0, -1, True, False, 1.5, "1"])
+def test_command_polling_rejects_invalid_integer_values(
+    service: str, field: str, value: object
+) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {"command_polling": {field: value}}
+    }
+
+    with pytest.raises(SchemaError):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_command_polling_rejects_check_interval_over_timeout(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "command_polling": {
+                "timeout_seconds": 10,
+                "check_interval_seconds": 11,
+            }
+        }
+    }
+
+    with pytest.raises(
+        SchemaError,
+        match=(
+            "renamarr.command_polling.check_interval_seconds must not exceed "
+            "timeout_seconds"
+        ),
+    ):
         validate_config({service: [instance_config]})

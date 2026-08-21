@@ -1,24 +1,47 @@
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from sys import exit, stdout
 from time import sleep
+from typing import Protocol
 
 import schedule
 from dotenv import load_dotenv
 from loguru import logger
-from pycliarr.api import CliArrError
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
+from interval import Interval
+from renamarr.adapter_factory import ArrService, create_arr_adapter
 from renamarr.healthcheck.health_reporter import HealthReporter
-from renamarr.radarr.services.renamarr import RadarrRenamarr
-from renamarr.sonarr.services.renamarr import SonarrRenamarr
-from renamarr.sonarr.services.series_scanner import SonarrSeriesScanner
+from renamarr.models.command import CommandPollingSettings
+from renamarr.renamarr import Renamarr
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
     "Remove renamarr.hourly_job after migrating the schedule configuration."
 )
+
+
+class _ScheduleConfig(Protocol):
+    enabled: bool
+    interval: Interval
+
+
+class _RenamarrConfig(Protocol):
+    enabled: bool
+    analyze_files: bool
+    rename_folders: bool
+    log_to_file: bool
+    schedule: _ScheduleConfig
+    command_polling: CommandPollingSettings
+
+
+class _ArrInstanceConfig(Protocol):
+    name: str
+    url: str
+    api_key: str
+    renamarr: _RenamarrConfig
 
 
 class Main:
@@ -82,90 +105,45 @@ class Main:
             return False
         return True
 
-    def __sonarr_series_scanner_job(self, sonarr_config):
+    def __renamarr_job(self, service: ArrService, config: _ArrInstanceConfig) -> None:
         with (
             self._health_reporter.running_job(),
-            logger.contextualize(service="sonarr", instance=sonarr_config.name),
+            logger.contextualize(service=service.value, instance=config.name),
         ):
+            uses_deprecated_hourly_job = hasattr(config.renamarr, "hourly_job")
+            if uses_deprecated_hourly_job:
+                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
             try:
-                SonarrSeriesScanner(
-                    name=sonarr_config.name,
-                    url=sonarr_config.url,
-                    api_key=sonarr_config.api_key,
-                    hours_before_air=sonarr_config.series_scanner.hours_before_air,
+                adapter = create_arr_adapter(
+                    service=service,
+                    url=config.url,
+                    api_key=config.api_key,
+                )
+                Renamarr(
+                    name=config.name,
+                    adapter=adapter,
+                    analyze_files=config.renamarr.analyze_files,
+                    rename_folders=config.renamarr.rename_folders,
+                    command_polling=config.renamarr.command_polling,
                 ).scan()
-            except CliArrError as exc:
-                logger.error(exc)
+            except Exception:  # noqa: BLE001 - A failed job must not stop the scheduler.
+                logger.exception(
+                    "Unexpected failure while running Renamarr for "
+                    f"{service.value} instance {config.name!r}."
+                )
+            finally:
+                if uses_deprecated_hourly_job:
+                    logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
 
-    def __schedule_sonarr_series_scanner(self, sonarr_config):
-        self.__sonarr_series_scanner_job(sonarr_config)
+    def __schedule_renamarr(
+        self, service: ArrService, config: _ArrInstanceConfig
+    ) -> None:
+        self.__renamarr_job(service, config)
 
-        if sonarr_config.series_scanner.hourly_job:
-            schedule.every(55).to(65).minutes.do(
-                self.__sonarr_series_scanner_job, sonarr_config=sonarr_config
+        if config.renamarr.schedule.enabled:
+            schedule.every(config.renamarr.schedule.interval.total_minutes).minutes.do(
+                self.__renamarr_job, service=service, config=config
             )
-
-    def __sonarr_renamarr_job(self, sonarr_config):
-        with (
-            self._health_reporter.running_job(),
-            logger.contextualize(service="sonarr", instance=sonarr_config.name),
-        ):
-            uses_deprecated_hourly_job = hasattr(sonarr_config.renamarr, "hourly_job")
-            if uses_deprecated_hourly_job:
-                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-            try:
-                try:
-                    SonarrRenamarr(
-                        name=sonarr_config.name,
-                        url=sonarr_config.url,
-                        api_key=sonarr_config.api_key,
-                        analyze_files=sonarr_config.renamarr.analyze_files,
-                        rename_folders=sonarr_config.renamarr.rename_folders,
-                    ).scan()
-                except CliArrError as exc:
-                    logger.error(exc)
-            finally:
-                if uses_deprecated_hourly_job:
-                    logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-
-    def __schedule_radarr_renamarr(self, radarr_config):
-        self.__radarr_renamarr_job(radarr_config)
-
-        if radarr_config.renamarr.schedule.enabled:
-            schedule.every(
-                radarr_config.renamarr.schedule.interval.total_minutes
-            ).minutes.do(self.__radarr_renamarr_job, radarr_config=radarr_config)
-
-    def __radarr_renamarr_job(self, radarr_config):
-        with (
-            self._health_reporter.running_job(),
-            logger.contextualize(service="radarr", instance=radarr_config.name),
-        ):
-            uses_deprecated_hourly_job = hasattr(radarr_config.renamarr, "hourly_job")
-            if uses_deprecated_hourly_job:
-                logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-            try:
-                try:
-                    RadarrRenamarr(
-                        name=radarr_config.name,
-                        url=radarr_config.url,
-                        api_key=radarr_config.api_key,
-                        analyze_files=radarr_config.renamarr.analyze_files,
-                        rename_folders=radarr_config.renamarr.rename_folders,
-                    ).scan()
-                except CliArrError as exc:
-                    logger.error(exc)
-            finally:
-                if uses_deprecated_hourly_job:
-                    logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
-
-    def __schedule_sonarr_renamarr(self, sonarr_config):
-        self.__sonarr_renamarr_job(sonarr_config)
-
-        if sonarr_config.renamarr.schedule.enabled:
-            schedule.every(
-                sonarr_config.renamarr.schedule.interval.total_minutes
-            ).minutes.do(self.__sonarr_renamarr_job, sonarr_config=sonarr_config)
 
     def start(self) -> None:
         config_dir = os.getenv("CONFIG_DIR", "/")
@@ -191,10 +169,13 @@ class Main:
             logger.error(exc)
             exit(1)
 
+        sonarr_config: _ArrInstanceConfig
         for sonarr_config in config.sonarr:
-            if not (
-                sonarr_config.series_scanner.enabled or sonarr_config.renamarr.enabled
-            ):
+            if sonarr_config.renamarr.enabled:
+                if sonarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("sonarr", sonarr_config.name)
+                self.__schedule_renamarr(ArrService.SONARR, sonarr_config)
+            else:
                 with logger.contextualize(instance=sonarr_config.name):
                     logger.warning(
                         "Possible config error? -- No jobs configured for current instance"
@@ -202,19 +183,13 @@ class Main:
                     logger.warning(
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
                     )
-                    continue
-            if sonarr_config.series_scanner.enabled:
-                self.__schedule_sonarr_series_scanner(sonarr_config)
-            if sonarr_config.renamarr.enabled:
-                if sonarr_config.renamarr.log_to_file:
-                    self.__configure_file_logging("sonarr", sonarr_config.name)
-                self.__schedule_sonarr_renamarr(sonarr_config)
 
+        radarr_config: _ArrInstanceConfig
         for radarr_config in config.radarr:
             if radarr_config.renamarr.enabled:
                 if radarr_config.renamarr.log_to_file:
                     self.__configure_file_logging("radarr", radarr_config.name)
-                self.__schedule_radarr_renamarr(radarr_config)
+                self.__schedule_renamarr(ArrService.RADARR, radarr_config)
             else:
                 with logger.contextualize(instance=radarr_config.name):
                     logger.warning(
@@ -233,7 +208,7 @@ class Main:
 
 
 @contextmanager
-def set_directory(path):
+def set_directory(path: str) -> Iterator[None]:
     oldpwd = os.getcwd()
     os.chdir(path)
     try:

@@ -2,19 +2,11 @@ sonarr:
   - name: sonarr
     url: https://sonarr.tld
     api_key: sonarr-api-key
-    series_scanner:
-      enabled: false
-      hourly_job: false
-      hours_before_air: 2
     renamarr:
       enabled: false
   - name: sonarr1
     url: https://sonarr1.tld
     api_key: sonarr1-api-key
-    series_scanner:
-      enabled: false
-      hourly_job: false
-      hours_before_air: 4
     renamarr:
       enabled: false
 
