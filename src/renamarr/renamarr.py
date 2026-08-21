@@ -254,7 +254,7 @@ class Renamarr:
 
         while not status.completed:
             elapsed_seconds = time.monotonic() - started_at
-            if elapsed_seconds >= self.command_polling.timeout_seconds:
+            if self._deadline_exceeded(elapsed_seconds, inclusive=True):
                 self._raise_timeout(command_id, description)
             time.sleep(
                 min(
@@ -262,7 +262,7 @@ class Renamarr:
                     self.command_polling.timeout_seconds - elapsed_seconds,
                 )
             )
-            if time.monotonic() - started_at > self.command_polling.timeout_seconds:
+            if self._deadline_exceeded(time.monotonic() - started_at, inclusive=False):
                 self._raise_timeout(command_id, description)
             status = self.adapter.get_command_status(command_id)
 
@@ -271,6 +271,11 @@ class Renamarr:
             raise ArrOperationError(
                 f"{normalized_description} command {command_id} completed unsuccessfully"
             )
+
+    def _deadline_exceeded(self, elapsed_seconds: float, *, inclusive: bool) -> bool:
+        if inclusive:
+            return elapsed_seconds >= self.command_polling.timeout_seconds
+        return elapsed_seconds > self.command_polling.timeout_seconds
 
     def _raise_timeout(self, command_id: int, description: str) -> None:
         raise ArrOperationError(

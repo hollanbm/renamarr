@@ -94,6 +94,33 @@ SCHEDULE_SCHEMA = And(
     ),
 )
 
+RENAMARR_DEFAULTS: dict[str, object] = {
+    "enabled": False,
+    "analyze_files": False,
+    "rename_folders": False,
+    "log_to_file": False,
+    "schedule": DEFAULT_SCHEDULE,
+    "command_polling": DEFAULT_COMMAND_POLLING,
+}
+RENAMARR_SCHEMA = And(
+    Use(_migrate_hourly_job),
+    Schema(
+        {
+            Optional("enabled", default=False): bool,
+            Optional("hourly_job"): bool,
+            Optional("analyze_files", default=False): bool,
+            Optional("rename_folders", default=False): bool,
+            Optional("log_to_file", default=False): bool,
+            Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
+            Optional(
+                "command_polling",
+                default=DEFAULT_COMMAND_POLLING,
+            ): COMMAND_POLLING_SCHEMA,
+        },
+        ignore_extra_keys=True,
+    ),
+)
+
 CONFIG_SCHEMA = {
     Optional(
         "sonarr",
@@ -123,35 +150,9 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default={
-                        "enabled": False,
-                        "analyze_files": False,
-                        "rename_folders": False,
-                        "log_to_file": False,
-                        "schedule": DEFAULT_SCHEDULE,
-                        "command_polling": DEFAULT_COMMAND_POLLING,
-                    },
+                    default=RENAMARR_DEFAULTS.copy,
                     ignore_extra_keys=True,
-                ): And(
-                    Use(_migrate_hourly_job),
-                    Schema(
-                        {
-                            Optional("enabled", default=False): bool,
-                            Optional("hourly_job"): bool,
-                            Optional("analyze_files", default=False): bool,
-                            Optional("rename_folders", default=False): bool,
-                            Optional("log_to_file", default=False): bool,
-                            Optional(
-                                "schedule", default=DEFAULT_SCHEDULE
-                            ): SCHEDULE_SCHEMA,
-                            Optional(
-                                "command_polling",
-                                default=DEFAULT_COMMAND_POLLING,
-                            ): COMMAND_POLLING_SCHEMA,
-                        },
-                        ignore_extra_keys=True,
-                    ),
-                ),
+                ): RENAMARR_SCHEMA,
             }
         ],
         ignore_extra_keys=True,
@@ -184,35 +185,9 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default={
-                        "enabled": False,
-                        "analyze_files": False,
-                        "rename_folders": False,
-                        "log_to_file": False,
-                        "schedule": DEFAULT_SCHEDULE,
-                        "command_polling": DEFAULT_COMMAND_POLLING,
-                    },
+                    default=RENAMARR_DEFAULTS.copy,
                     ignore_extra_keys=True,
-                ): And(
-                    Use(_migrate_hourly_job),
-                    Schema(
-                        {
-                            Optional("enabled", default=False): bool,
-                            Optional("hourly_job"): bool,
-                            Optional("analyze_files", default=False): bool,
-                            Optional("rename_folders", default=False): bool,
-                            Optional("log_to_file", default=False): bool,
-                            Optional(
-                                "schedule", default=DEFAULT_SCHEDULE
-                            ): SCHEDULE_SCHEMA,
-                            Optional(
-                                "command_polling",
-                                default=DEFAULT_COMMAND_POLLING,
-                            ): COMMAND_POLLING_SCHEMA,
-                        },
-                        ignore_extra_keys=True,
-                    ),
-                ),
+                ): RENAMARR_SCHEMA,
             }
         ],
         ignore_extra_keys=True,

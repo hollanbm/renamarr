@@ -29,8 +29,10 @@ class _ScheduleConfig(Protocol):
 
 
 class _RenamarrConfig(Protocol):
+    enabled: bool
     analyze_files: bool
     rename_folders: bool
+    log_to_file: bool
     schedule: _ScheduleConfig
     command_polling: CommandPollingSettings
 
@@ -124,6 +126,11 @@ class Main:
                     rename_folders=config.renamarr.rename_folders,
                     command_polling=config.renamarr.command_polling,
                 ).scan()
+            except Exception:  # noqa: BLE001 - A failed job must not stop the scheduler.
+                logger.exception(
+                    "Unexpected failure while running Renamarr for "
+                    f"{service.value} instance {config.name!r}."
+                )
             finally:
                 if uses_deprecated_hourly_job:
                     logger.warning(_DEPRECATED_HOURLY_JOB_WARNING)
@@ -162,8 +169,13 @@ class Main:
             logger.error(exc)
             exit(1)
 
+        sonarr_config: _ArrInstanceConfig
         for sonarr_config in config.sonarr:
-            if not sonarr_config.renamarr.enabled:
+            if sonarr_config.renamarr.enabled:
+                if sonarr_config.renamarr.log_to_file:
+                    self.__configure_file_logging("sonarr", sonarr_config.name)
+                self.__schedule_renamarr(ArrService.SONARR, sonarr_config)
+            else:
                 with logger.contextualize(instance=sonarr_config.name):
                     logger.warning(
                         "Possible config error? -- No jobs configured for current instance"
@@ -171,11 +183,8 @@ class Main:
                     logger.warning(
                         "Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/example/config.yml.example"
                     )
-                    continue
-            if sonarr_config.renamarr.log_to_file:
-                self.__configure_file_logging("sonarr", sonarr_config.name)
-            self.__schedule_renamarr(ArrService.SONARR, sonarr_config)
 
+        radarr_config: _ArrInstanceConfig
         for radarr_config in config.radarr:
             if radarr_config.renamarr.enabled:
                 if radarr_config.renamarr.log_to_file:

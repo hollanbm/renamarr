@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from unittest.mock import MagicMock, call
 
 import pytest
+from pytest_mock import MockerFixture
 
 from renamarr.exceptions import ArrOperationError
 from renamarr.models.command import CommandPollingSettings, CommandStatus
@@ -16,7 +17,7 @@ from renamarr.protocols import ArrAdapter
 from renamarr.renamarr import Renamarr
 
 
-def configured_adapter(mocker, items: list[MediaItem]) -> MagicMock:
+def configured_adapter(mocker: MockerFixture, items: list[MediaItem]) -> MagicMock:
     adapter = mocker.MagicMock(spec=ArrAdapter)
     adapter.list_media_items.return_value = items
     adapter.is_media_analysis_enabled.return_value = True
@@ -55,8 +56,15 @@ def configured_adapter(mocker, items: list[MediaItem]) -> MagicMock:
     return adapter
 
 
+def without_file_renames(adapter: MagicMock) -> None:
+    adapter.get_file_rename_candidate.return_value = None
+    adapter.get_file_rename_candidate.side_effect = None
+
+
 def test_scan_runs_shared_workflow_in_sorted_order(
-    mock_loguru_debug: MagicMock, mock_loguru_info: MagicMock, mocker
+    mock_loguru_debug: MagicMock,
+    mock_loguru_info: MagicMock,
+    mocker: MockerFixture,
 ) -> None:
     item_b = MediaItem(2, "B", "/root/nested/old-b")
     item_a = MediaItem(1, "A", "/root/old-a")
@@ -100,12 +108,11 @@ def test_scan_runs_shared_workflow_in_sorted_order(
 
 
 def test_scan_skips_disabled_analysis_and_folder_renames(
-    mock_loguru_info: MagicMock, mocker
+    mock_loguru_info: MagicMock, mocker: MockerFixture
 ) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
 
     result = Renamarr("test", adapter).scan()
 
@@ -122,15 +129,14 @@ def test_scan_skips_disabled_analysis_and_folder_renames(
     )
 
 
-def test_scan_skips_analysis_disabled_by_service(mocker) -> None:
+def test_scan_skips_analysis_disabled_by_service(mocker: MockerFixture) -> None:
     items = [
         MediaItem(2, "Item B", "/root/Item B"),
         MediaItem(1, "Item A", "/root/Item A"),
     ]
     adapter = configured_adapter(mocker, items)
     adapter.is_media_analysis_enabled.return_value = False
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
 
     result = Renamarr("test", adapter, analyze_files=True).scan()
 
@@ -152,7 +158,7 @@ def test_scan_ends_after_library_discovery_failure(
     library: list[MediaItem] | ArrOperationError,
     message: str,
     mock_loguru_error: MagicMock,
-    mocker,
+    mocker: MockerFixture,
 ) -> None:
     adapter = configured_adapter(mocker, [])
     if isinstance(library, ArrOperationError):
@@ -177,7 +183,9 @@ def test_scan_ends_after_library_discovery_failure(
     ]
 
 
-def test_scan_propagates_unexpected_discovery_error(mocker) -> None:
+def test_scan_propagates_unexpected_discovery_error(
+    mocker: MockerFixture,
+) -> None:
     adapter = configured_adapter(mocker, [])
     adapter.list_media_items.side_effect = RuntimeError("programming error")
 
@@ -186,7 +194,9 @@ def test_scan_propagates_unexpected_discovery_error(mocker) -> None:
 
 
 def test_analysis_failure_is_recorded_and_discovery_continues(
-    mock_loguru_debug: MagicMock, mock_loguru_error: MagicMock, mocker
+    mock_loguru_debug: MagicMock,
+    mock_loguru_error: MagicMock,
+    mocker: MockerFixture,
 ) -> None:
     items = [
         MediaItem(2, "Item B", "/root/Item B"),
@@ -194,8 +204,7 @@ def test_analysis_failure_is_recorded_and_discovery_continues(
     ]
     adapter = configured_adapter(mocker, items)
     adapter.is_media_analysis_enabled.side_effect = ArrOperationError("analysis failed")
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
 
     result = Renamarr("test", adapter, analyze_files=True).scan()
 
@@ -218,12 +227,13 @@ def test_analysis_failure_is_recorded_and_discovery_continues(
     ]
 
 
-def test_completed_unsuccessful_analysis_command_is_recorded(mocker) -> None:
+def test_completed_unsuccessful_analysis_command_is_recorded(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.return_value = CommandStatus(True, False)
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
 
     result = Renamarr("test", adapter, analyze_files=True).scan()
 
@@ -235,15 +245,16 @@ def test_completed_unsuccessful_analysis_command_is_recorded(mocker) -> None:
     )
 
 
-def test_command_polling_checks_immediately_then_sleeps(mocker) -> None:
+def test_command_polling_checks_immediately_then_sleeps(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.side_effect = [
         CommandStatus(False, False),
         CommandStatus(True, True),
     ]
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     monotonic = mocker.patch(
         "renamarr.renamarr.time.monotonic", side_effect=[0.0, 0.0, 1.0]
     )
@@ -262,12 +273,11 @@ def test_command_polling_checks_immediately_then_sleeps(mocker) -> None:
     assert monotonic.call_count == 3
 
 
-def test_command_polling_times_out_before_sleep(mocker) -> None:
+def test_command_polling_times_out_before_sleep(mocker: MockerFixture) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.return_value = CommandStatus(False, False)
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     mocker.patch("renamarr.renamarr.time.monotonic", side_effect=[0.0, 10.0])
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
@@ -285,7 +295,9 @@ def test_command_polling_times_out_before_sleep(mocker) -> None:
     sleep.assert_not_called()
 
 
-def test_command_polling_caps_sleep_at_remaining_timeout(mocker) -> None:
+def test_command_polling_caps_sleep_at_remaining_timeout(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.side_effect = [
@@ -293,8 +305,7 @@ def test_command_polling_caps_sleep_at_remaining_timeout(mocker) -> None:
         CommandStatus(False, False),
         CommandStatus(False, False),
     ]
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     mocker.patch(
         "renamarr.renamarr.time.monotonic",
         side_effect=[0.0, 0.0, 9.0, 9.0, 10.0, 10.0],
@@ -312,15 +323,16 @@ def test_command_polling_caps_sleep_at_remaining_timeout(mocker) -> None:
     assert sleep.call_args_list == [call(9), call(1)]
 
 
-def test_command_polling_accepts_completion_on_final_deadline_check(mocker) -> None:
+def test_command_polling_accepts_completion_on_final_deadline_check(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.side_effect = [
         CommandStatus(False, False),
         CommandStatus(True, True),
     ]
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     current_time = 0
 
     def monotonic() -> int:
@@ -345,12 +357,13 @@ def test_command_polling_accepts_completion_on_final_deadline_check(mocker) -> N
     sleep.assert_called_once_with(10)
 
 
-def test_command_polling_rejects_check_after_deadline(mocker) -> None:
+def test_command_polling_rejects_check_after_deadline(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.return_value = CommandStatus(False, False)
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     mocker.patch("renamarr.renamarr.time.monotonic", side_effect=[0.0, 0.0, 10.1])
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
@@ -369,12 +382,11 @@ def test_command_polling_rejects_check_after_deadline(mocker) -> None:
     sleep.assert_called_once_with(10)
 
 
-def test_command_status_check_error_is_recorded(mocker) -> None:
+def test_command_status_check_error_is_recorded(mocker: MockerFixture) -> None:
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.side_effect = ArrOperationError("status check failed")
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
 
     result = Renamarr("test", adapter, analyze_files=True).scan()
 
@@ -383,7 +395,7 @@ def test_command_status_check_error_is_recorded(mocker) -> None:
 
 
 def test_file_preview_failures_and_noops_do_not_block_other_items(
-    mock_loguru_error: MagicMock, mocker
+    mock_loguru_error: MagicMock, mocker: MockerFixture
 ) -> None:
     failed = MediaItem(1, "A", "/root/A")
     skipped = MediaItem(2, "B", "/root/B")
@@ -416,7 +428,9 @@ def test_file_preview_failures_and_noops_do_not_block_other_items(
     ]
 
 
-def test_file_batch_planning_failure_marks_all_candidates_failed(mocker) -> None:
+def test_file_batch_planning_failure_marks_all_candidates_failed(
+    mocker: MockerFixture,
+) -> None:
     items = [MediaItem(1, "A", "/root/A"), MediaItem(2, "B", "/root/B")]
     adapter = configured_adapter(mocker, items)
     adapter.build_file_rename_batches.side_effect = ArrOperationError("batch failed")
@@ -430,7 +444,9 @@ def test_file_batch_planning_failure_marks_all_candidates_failed(mocker) -> None
     adapter.start_file_rename.assert_not_called()
 
 
-def test_invalid_file_batches_fail_before_starting_commands(mocker) -> None:
+def test_invalid_file_batches_fail_before_starting_commands(
+    mocker: MockerFixture,
+) -> None:
     item = MediaItem(1, "A", "/root/A")
     adapter = configured_adapter(mocker, [item])
     adapter.build_file_rename_batches.return_value = []
@@ -442,7 +458,9 @@ def test_invalid_file_batches_fail_before_starting_commands(mocker) -> None:
     adapter.start_file_rename.assert_not_called()
 
 
-def test_file_batch_failure_does_not_block_later_batches_or_folders(mocker) -> None:
+def test_file_batch_failure_does_not_block_later_batches_or_folders(
+    mocker: MockerFixture,
+) -> None:
     item_a = MediaItem(1, "A", "/root/old-a")
     item_b = MediaItem(2, "B", "/root/old-b")
     adapter = configured_adapter(mocker, [item_a, item_b])
@@ -470,11 +488,12 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(mocker) -> N
     )
 
 
-def test_root_folder_listing_failure_marks_every_item_failed(mocker) -> None:
+def test_root_folder_listing_failure_marks_every_item_failed(
+    mocker: MockerFixture,
+) -> None:
     items = [MediaItem(1, "A", "/root/A"), MediaItem(2, "B", "/root/B")]
     adapter = configured_adapter(mocker, items)
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     adapter.list_root_folders.side_effect = ArrOperationError("roots failed")
 
     result = Renamarr("test", adapter, rename_folders=True).scan()
@@ -485,7 +504,9 @@ def test_root_folder_listing_failure_marks_every_item_failed(mocker) -> None:
     )
 
 
-def test_folder_planning_isolated_failures_and_noops_continue(mocker) -> None:
+def test_folder_planning_isolated_failures_and_noops_continue(
+    mocker: MockerFixture,
+) -> None:
     unmatched = MediaItem(1, "A", "/missing/A")
     lookup_failed = MediaItem(2, "B", "/root/B")
     correct = MediaItem(3, "C", "/root/C")
@@ -493,8 +514,7 @@ def test_folder_planning_isolated_failures_and_noops_continue(mocker) -> None:
     renamed_b = MediaItem(5, "E", "/root/old-e")
     items = [renamed_b, correct, unmatched, renamed_a, lookup_failed]
     adapter = configured_adapter(mocker, items)
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     adapter.list_root_folders.return_value = ["/root"]
 
     def expected_folder(item: MediaItem) -> str:
@@ -524,15 +544,16 @@ def test_folder_planning_isolated_failures_and_noops_continue(mocker) -> None:
     )
 
 
-def test_failed_folder_operations_continue_across_roots(mocker) -> None:
+def test_failed_folder_operations_continue_across_roots(
+    mocker: MockerFixture,
+) -> None:
     move_failed = MediaItem(1, "A", "/one/old-a")
     rescan_start_failed = MediaItem(2, "B", "/two/old-b")
     rescan_command_failed = MediaItem(3, "NASA", "/three/old-nasa")
     adapter = configured_adapter(
         mocker, [rescan_command_failed, rescan_start_failed, move_failed]
     )
-    adapter.get_file_rename_candidate.return_value = None
-    adapter.get_file_rename_candidate.side_effect = None
+    without_file_renames(adapter)
     adapter.list_root_folders.return_value = ["/one", "/two", "/three"]
     adapter.get_expected_folder_name.side_effect = lambda item: f"new-{item.title}"
 

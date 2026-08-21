@@ -1,8 +1,8 @@
 import pytest
 
 from renamarr.adapter_factory import ArrService, create_arr_adapter
-from renamarr.radarr.adapter import RadarrAdapter
-from renamarr.sonarr_py.adapter import SonarrPyAdapter
+from renamarr.radarr.radarr_adapter import RadarrAdapter
+from renamarr.sonarr_py.sonarr_py_adapter import SonarrPyAdapter
 
 
 def test_creates_radarr_adapter() -> None:
@@ -24,3 +24,12 @@ def test_creates_sonarr_adapter() -> None:
 def test_rejects_unsupported_service_value() -> None:
     with pytest.raises(ValueError, match="'lidarr' is not a valid ArrService"):
         ArrService("lidarr")
+
+
+def test_factory_rejects_unsupported_future_service_member(mocker) -> None:
+    with pytest.raises(ValueError, match="Unsupported Arr service"):
+        create_arr_adapter(
+            mocker.sentinel.unsupported_service,
+            "https://lidarr.test",
+            "lidarr-key",
+        )
