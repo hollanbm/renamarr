@@ -1,7 +1,7 @@
 from schema import And, Optional, Schema, Use
 
 from interval import Interval
-from renamarr.models import CommandPollingSettings
+from renamarr.models.command import CommandPollingSettings
 
 NON_NEGATIVE_INTEGER = And(
     lambda value: type(value) is int,

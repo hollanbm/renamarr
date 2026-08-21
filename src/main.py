@@ -14,7 +14,7 @@ from config_schema import CONFIG_SCHEMA
 from interval import Interval
 from renamarr.adapter_factory import ArrService, create_arr_adapter
 from renamarr.healthcheck.health_reporter import HealthReporter
-from renamarr.models import CommandPollingSettings
+from renamarr.models.command import CommandPollingSettings
 from renamarr.renamarr import Renamarr
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (

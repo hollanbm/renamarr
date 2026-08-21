@@ -75,6 +75,14 @@ The process remains running while at least one recurring job is registered. It e
 
 Logs are always written to stdout.
 
+Each successful run ends with file and folder rename totals in the following format:
+
+```text
+Finished Renamarr successfully | file renames: [ success=0, failed=0, skipped=373 ] | folder renames: [ success=0, failed=0, skipped=373 ]
+```
+
+Failed runs report the same totals at `ERROR` level after their individual errors. At `DEBUG` level, each run also reports its item count and analysis outcomes.
+
 ### File Logging
 
 Set `sonarr[].renamarr.log_to_file` or `radarr[].renamarr.log_to_file` to `true` to enable per-instance log files. If the target log path is not writable, renamarr logs a warning to stdout and continues running without logging to file.

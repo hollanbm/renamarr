@@ -5,8 +5,8 @@ from pycliarr.api.base_api import json_data, json_dict
 from pycliarr.api.exceptions import CliArrError
 
 from renamarr.exceptions import ArrOperationError
-from renamarr.models import (
-    CommandStatus,
+from renamarr.models.command import CommandStatus
+from renamarr.models.media import (
     FileRenameBatch,
     FileRenameCandidate,
     FolderRenameBatch,

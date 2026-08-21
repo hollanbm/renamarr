@@ -7,16 +7,9 @@ from pathlib import PurePosixPath
 from loguru import logger
 
 from renamarr.exceptions import ArrOperationError
-from renamarr.models import (
-    CommandPollingSettings,
-    FileRenameCandidate,
-    FolderRenameBatch,
-    MediaItem,
-    ScanFailure,
-    ScanPhase,
-    ScanResult,
-    WorkSummary,
-)
+from renamarr.models.command import CommandPollingSettings
+from renamarr.models.media import FileRenameCandidate, FolderRenameBatch, MediaItem
+from renamarr.models.scan import ScanFailure, ScanPhase, ScanResult, WorkSummary
 from renamarr.protocols import ArrAdapter
 
 _DEFAULT_COMMAND_POLLING = CommandPollingSettings()
@@ -82,7 +75,6 @@ class Renamarr:
             analysis = self._summarize_analysis(
                 analysis_outcome, analysis_error, items, failures
             )
-            logger.debug(f"Retrieved {len(items)} media items")
             file_renames = self._rename_files(items, failures)
             folder_renames = self._rename_folders(items, failures)
             return self._finish_scan(
@@ -303,7 +295,7 @@ class Renamarr:
     def _summarize(outcomes: Iterable[_WorkOutcome]) -> WorkSummary:
         counts = Counter(outcomes)
         return WorkSummary(
-            succeeded=counts[_WorkOutcome.SUCCEEDED],
+            success=counts[_WorkOutcome.SUCCEEDED],
             failed=counts[_WorkOutcome.FAILED],
             skipped=counts[_WorkOutcome.SKIPPED],
         )
@@ -333,19 +325,20 @@ class Renamarr:
             folder_renames=folder_renames,
             failures=tuple(failures),
         )
+        logger.debug(
+            f"Items found: {items_found} | analysis: [ success={analysis.success}, "
+            f"failed={analysis.failed}, skipped={analysis.skipped} ]"
+        )
         summary = (
-            f"items={items_found}; "
-            f"analysis={analysis.succeeded} succeeded, {analysis.failed} failed, "
-            f"{analysis.skipped} skipped; "
-            f"file renames={file_renames.succeeded} succeeded, "
-            f"{file_renames.failed} failed, {file_renames.skipped} skipped; "
-            f"folder renames={folder_renames.succeeded} succeeded, "
-            f"{folder_renames.failed} failed, {folder_renames.skipped} skipped"
+            f"file renames: [ success={file_renames.success}, "
+            f"failed={file_renames.failed}, skipped={file_renames.skipped} ] | "
+            f"folder renames: [ success={folder_renames.success}, "
+            f"failed={folder_renames.failed}, skipped={folder_renames.skipped} ]"
         )
         if result.successful:
-            logger.info(f"Finished Renamarr successfully: {summary}")
+            logger.info(f"Finished Renamarr successfully | {summary}")
         else:
             logger.error(
-                f"Finished Renamarr with {len(result.failures)} failures: {summary}"
+                f"Finished Renamarr with {len(result.failures)} failures | {summary}"
             )
         return result

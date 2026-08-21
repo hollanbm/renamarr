@@ -11,6 +11,11 @@ def mock_loguru_error(mocker) -> None:
 
 
 @pytest.fixture
+def mock_loguru_debug(mocker) -> None:
+    return mocker.patch.object(logger, "debug")
+
+
+@pytest.fixture
 def mock_loguru_info(mocker) -> None:
     return mocker.patch.object(logger, "info")
 
