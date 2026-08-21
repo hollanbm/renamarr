@@ -1,10 +1,14 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 from pycliarr.api import RadarrCli
-from pycliarr.api.base_api import json_data, json_dict
 from pycliarr.api.exceptions import CliArrError
 
-from renamarr.exceptions import ArrOperationError
+from renamarr.adapter_helpers import (
+    _as_dict,
+    _command_id,
+    _send_command,
+    _translate_api_error,
+)
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -12,28 +16,6 @@ from renamarr.models.media import (
     FolderRenameBatch,
     MediaItem,
 )
-
-
-def _translate_api_error[Result](
-    operation: str, action: Callable[[], Result]
-) -> Result:
-    try:
-        return action()
-    except CliArrError as error:
-        raise ArrOperationError(f"{operation} failed: {error}") from error
-
-
-def _as_dict(response: json_data) -> json_dict:
-    if not isinstance(response, dict):
-        raise TypeError("Expected an object response from Radarr")
-    return response
-
-
-def _command_id(response: json_data) -> int:
-    command_id = _as_dict(response)["id"]
-    if not isinstance(command_id, int):
-        raise TypeError("Expected a numeric command ID from Radarr")
-    return command_id
 
 
 class RadarrAdapter:
@@ -44,7 +26,9 @@ class RadarrAdapter:
 
     def list_media_items(self) -> list[MediaItem]:
         """Return the movies in the Radarr library."""
-        movies = _translate_api_error("List Radarr movies", self._client.get_movie)
+        movies = _translate_api_error(
+            "Radarr", CliArrError, "List", "movies", self._client.get_movie
+        )
         if not isinstance(movies, list):
             raise TypeError("Expected a list of movies from Radarr")
         return [
@@ -55,10 +39,13 @@ class RadarrAdapter:
     def is_media_analysis_enabled(self) -> bool:
         """Return whether Radarr is configured to analyze media files."""
         response = _translate_api_error(
-            "Read Radarr media-management settings",
+            "Radarr",
+            CliArrError,
+            "Read",
+            "media-management settings",
             lambda: self._client.request_get(path="/api/v3/config/mediamanagement"),
         )
-        enabled = _as_dict(response)["enableMediaInfo"]
+        enabled = _as_dict("Radarr", response)["enableMediaInfo"]
         if not isinstance(enabled, bool):
             raise TypeError("Expected enableMediaInfo to be a boolean")
         return enabled
@@ -66,20 +53,27 @@ class RadarrAdapter:
     def start_media_analysis(self) -> int:
         """Start a full Radarr movie rescan and return its command ID."""
         response = _translate_api_error(
-            "Start Radarr media analysis",
-            lambda: self._client._sendCommand(
-                {"name": "RescanMovie", "priority": "high"}
+            "Radarr",
+            CliArrError,
+            "Start",
+            "media analysis",
+            lambda: _send_command(
+                self._client, {"name": "RescanMovie", "priority": "high"}
             ),
         )
-        return _command_id(response)
+        return _command_id("Radarr", response)
 
     def get_command_status(self, command_id: int) -> CommandStatus:
         """Return the normalized state of a Radarr command."""
         response = _as_dict(
+            "Radarr",
             _translate_api_error(
-                "Read Radarr command status",
+                "Radarr",
+                CliArrError,
+                "Read",
+                "command status",
                 lambda: self._client.get_command(cid=command_id),
-            )
+            ),
         )
         return CommandStatus(
             completed=response.get("status") == "completed",
@@ -89,7 +83,10 @@ class RadarrAdapter:
     def get_file_rename_candidate(self, item: MediaItem) -> FileRenameCandidate | None:
         """Return a file-rename candidate when Radarr has a rename preview."""
         response = _translate_api_error(
-            f"Preview Radarr file rename for {item.title}",
+            "Radarr",
+            CliArrError,
+            "Preview",
+            f"file rename for {item.title}",
             lambda: self._client.request_get(
                 path="/api/v3/rename", url_params={"movieId": item.id}
             ),
@@ -98,9 +95,16 @@ class RadarrAdapter:
             raise TypeError("Expected a list of rename previews from Radarr")
         if not response:
             return None
+        file_ids: list[int] = []
+        for preview in response:
+            preview_dict = _as_dict("Radarr", preview)
+            movie_file_id = preview_dict.get("movieFileId")
+            if type(movie_file_id) is not int:
+                raise TypeError("Expected a movie file ID in Radarr rename preview")
+            file_ids.append(movie_file_id)
         return FileRenameCandidate(
             item=item,
-            file_ids=tuple(preview["movieFileId"] for preview in response),
+            file_ids=tuple(file_ids),
             description=item.title,
         )
 
@@ -127,17 +131,25 @@ class RadarrAdapter:
     def start_file_rename(self, batch: FileRenameBatch) -> int:
         """Start a Radarr RenameMovie command for a batch."""
         response = _translate_api_error(
-            "Start Radarr file rename",
-            lambda: self._client._sendCommand(
-                {"name": "RenameMovie", "movieIds": list(batch.item_ids)}
+            "Radarr",
+            CliArrError,
+            "Start",
+            "file rename",
+            lambda: _send_command(
+                self._client,
+                {"name": "RenameMovie", "movieIds": list(batch.item_ids)},
             ),
         )
-        return _command_id(response)
+        return _command_id("Radarr", response)
 
     def list_root_folders(self) -> list[str]:
         """Return configured Radarr root-folder paths."""
         response = _translate_api_error(
-            "List Radarr root folders", self._client.get_root_folder
+            "Radarr",
+            CliArrError,
+            "List",
+            "root folders",
+            self._client.get_root_folder,
         )
         if not isinstance(response, list):
             raise TypeError("Expected a list of root folders from Radarr")
@@ -146,10 +158,13 @@ class RadarrAdapter:
     def get_expected_folder_name(self, item: MediaItem) -> str:
         """Return the folder name Radarr expects for a movie."""
         response = _translate_api_error(
-            f"Resolve Radarr folder for {item.title}",
+            "Radarr",
+            CliArrError,
+            "Resolve",
+            f"folder for {item.title}",
             lambda: self._client.request_get(path=f"/api/v3/movie/{item.id}/folder"),
         )
-        folder = _as_dict(response)["folder"]
+        folder = _as_dict("Radarr", response)["folder"]
         if not isinstance(folder, str):
             raise TypeError("Expected a folder name from Radarr")
         return folder
@@ -157,7 +172,10 @@ class RadarrAdapter:
     def move_folder(self, batch: FolderRenameBatch) -> None:
         """Move a batch of Radarr movie folders through the public API."""
         _translate_api_error(
-            "Move Radarr movie folders",
+            "Radarr",
+            CliArrError,
+            "Move",
+            "movie folders",
             lambda: self._client.request_put(
                 path="/api/v3/movie/editor",
                 json_data={
@@ -171,13 +189,17 @@ class RadarrAdapter:
     def start_folder_rescan(self, batch: FolderRenameBatch) -> int:
         """Start a Radarr refresh for movies whose folders moved."""
         response = _translate_api_error(
-            "Start Radarr folder rescan",
-            lambda: self._client._sendCommand(
+            "Radarr",
+            CliArrError,
+            "Start",
+            "folder rescan",
+            lambda: _send_command(
+                self._client,
                 {
                     "priority": "high",
                     "name": "RefreshMovie",
                     "movieIds": [item.id for item in batch.items],
-                }
+                },
             ),
         )
-        return _command_id(response)
+        return _command_id("Radarr", response)

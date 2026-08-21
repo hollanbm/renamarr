@@ -12,12 +12,14 @@ from renamarr.models.media import (
     FolderRenameBatch,
     MediaItem,
 )
-from renamarr.sonarr.adapter import SonarrAdapter
+from renamarr.sonarr.sonarr_adapter import SonarrAdapter
 
 
 @pytest.fixture
 def sonarr_client(mocker) -> MagicMock:
-    return mocker.patch("renamarr.sonarr.adapter.SonarrCli").return_value
+    client = mocker.patch("renamarr.sonarr.sonarr_adapter.SonarrCli").return_value
+    client.api_url_command = "/api/v3/command"
+    return client
 
 
 @pytest.fixture
@@ -55,7 +57,7 @@ def test_reads_media_analysis_setting(
 def test_starts_media_analysis_and_maps_command_status(
     adapter: SonarrAdapter, sonarr_client: MagicMock
 ) -> None:
-    sonarr_client._sendCommand.return_value = {"id": 17}
+    sonarr_client.request_post.return_value = {"id": 17}
     sonarr_client.get_command.side_effect = [
         {"status": "started"},
         {"status": "completed", "result": "failed"},
@@ -66,8 +68,9 @@ def test_starts_media_analysis_and_maps_command_status(
     assert adapter.get_command_status(17) == CommandStatus(False, False)
     assert adapter.get_command_status(17) == CommandStatus(True, False)
     assert adapter.get_command_status(17) == CommandStatus(True, True)
-    sonarr_client._sendCommand.assert_called_once_with(
-        {"name": "RescanSeries", "priority": "high"}
+    sonarr_client.request_post.assert_called_once_with(
+        "/api/v3/command",
+        json_data={"name": "RescanSeries", "priority": "high"},
     )
     sonarr_client.get_command.assert_has_calls(
         [call(cid=17), call(cid=17), call(cid=17)]
@@ -132,7 +135,7 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
     ]
     sonarr_client.request_get.return_value = {"folder": "Show A (2026)"}
     sonarr_client.request_put.return_value = {}
-    sonarr_client._sendCommand.return_value = {"id": 29}
+    sonarr_client.request_post.return_value = {"id": 29}
 
     assert adapter.list_root_folders() == ["/tv", "/tv-anime"]
     assert adapter.get_expected_folder_name(show_a) == "Show A (2026)"
@@ -147,12 +150,13 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
             "moveFiles": False,
         },
     )
-    sonarr_client._sendCommand.assert_called_once_with(
-        {
+    sonarr_client.request_post.assert_called_once_with(
+        "/api/v3/command",
+        json_data={
             "name": "RescanSeries",
             "priority": "high",
             "seriesIds": [1, 2],
-        }
+        },
     )
 
 
@@ -161,14 +165,14 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
     [
         ("list", "get_serie"),
         ("setting", "request_get"),
-        ("analysis", "_sendCommand"),
+        ("analysis", "request_post"),
         ("status", "get_command"),
         ("preview", "request_get"),
         ("rename", "rename_files"),
         ("roots", "get_root_folder"),
         ("folder", "request_get"),
         ("move", "request_put"),
-        ("rescan", "_sendCommand"),
+        ("rescan", "request_post"),
     ],
 )
 def test_translates_cliarr_errors_at_every_api_boundary(
@@ -217,6 +221,51 @@ def test_does_not_translate_unexpected_errors(
         ("setting", {"enableMediaInfo": 1}, "Expected enableMediaInfo"),
         ("analysis", {"id": "1"}, "Expected a numeric command ID"),
         ("preview", {}, "Expected a list of rename previews"),
+        ("preview", [[]], "Expected an object response"),
+        (
+            "preview",
+            [
+                {
+                    "episodeFileId": "10",
+                    "seasonNumber": 1,
+                    "episodeNumbers": [1],
+                }
+            ],
+            "Expected an episode file ID",
+        ),
+        (
+            "preview",
+            [
+                {
+                    "episodeFileId": 10,
+                    "seasonNumber": "1",
+                    "episodeNumbers": [1],
+                }
+            ],
+            "Expected a season number",
+        ),
+        (
+            "preview",
+            [
+                {
+                    "episodeFileId": 10,
+                    "seasonNumber": 1,
+                    "episodeNumbers": 1,
+                }
+            ],
+            "Expected episode numbers",
+        ),
+        (
+            "preview",
+            [
+                {
+                    "episodeFileId": 10,
+                    "seasonNumber": 1,
+                    "episodeNumbers": ["1"],
+                }
+            ],
+            "Expected integer episode numbers",
+        ),
         ("roots", {}, "Expected a list of root folders"),
         ("folder", {"folder": 1}, "Expected a folder name"),
     ],
@@ -235,7 +284,7 @@ def test_rejects_malformed_sonarr_responses(
             sonarr_client.request_get,
             adapter.is_media_analysis_enabled,
         ),
-        "analysis": (sonarr_client._sendCommand, adapter.start_media_analysis),
+        "analysis": (sonarr_client.request_post, adapter.start_media_analysis),
         "preview": (
             sonarr_client.request_get,
             lambda: adapter.get_file_rename_candidate(item),

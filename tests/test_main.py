@@ -262,6 +262,56 @@ class TestMain:
         renamarr.return_value.scan.assert_called_once_with()
         self.health_reporter.running_job.assert_called_once_with()
 
+    @pytest.mark.parametrize("failure_source", ["adapter_creation", "scan"])
+    def test_unexpected_renamarr_job_failure_is_logged_and_contained(
+        self,
+        config,
+        failure_source: str,
+        mock_loguru_warning,
+        mocker,
+    ) -> None:
+        service_config = config.sonarr[0]
+        service_config.renamarr.enabled = True
+        service_config.renamarr.hourly_job = True
+        mocker.patch("pyconfigparser.configparser.get_config", return_value=config)
+        error = RuntimeError(f"{failure_source} failed")
+        create_arr_adapter = mocker.patch("main.create_arr_adapter")
+        renamarr = mocker.patch("main.Renamarr")
+        if failure_source == "adapter_creation":
+            create_arr_adapter.side_effect = error
+        else:
+            renamarr.return_value.scan.side_effect = error
+        log_exception = mocker.patch.object(logger, "exception")
+        contextualize = mocker.patch.object(
+            logger, "contextualize", return_value=nullcontext()
+        )
+        every = mocker.patch("main.schedule.every")
+
+        Main().start()
+
+        contextualize.assert_any_call(
+            service=ArrService.SONARR.value,
+            instance=service_config.name,
+        )
+        log_exception.assert_called_once_with(
+            "Unexpected failure while running Renamarr for sonarr instance "
+            f"{service_config.name!r}."
+        )
+        deprecation_warnings = [
+            call
+            for call in mock_loguru_warning.call_args_list
+            if "renamarr.hourly_job is deprecated" in call.args[0]
+        ]
+        assert len(deprecation_warnings) == 2
+        every.assert_called_once_with(
+            service_config.renamarr.schedule.interval.total_minutes
+        )
+        every.return_value.minutes.do.assert_called_once_with(
+            mocker.ANY,
+            service=ArrService.SONARR,
+            config=service_config,
+        )
+
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
         self, config, enable_scheduler, service, mocker

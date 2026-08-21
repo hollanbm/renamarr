@@ -21,14 +21,14 @@ from renamarr.models.media import (
     FolderRenameBatch,
     MediaItem,
 )
-from renamarr.sonarr_py.adapter import SonarrPyAdapter
+from renamarr.sonarr_py.sonarr_py_adapter import SonarrPyAdapter
 
 
 @pytest.fixture
 def sonarr_apis(mocker) -> dict[str, MagicMock]:
-    mocker.patch("renamarr.sonarr_py.adapter.ApiClient")
+    mocker.patch("renamarr.sonarr_py.sonarr_py_adapter.ApiClient")
     return {
-        name: mocker.patch(f"renamarr.sonarr_py.adapter.{name}").return_value
+        name: mocker.patch(f"renamarr.sonarr_py.sonarr_py_adapter.{name}").return_value
         for name in (
             "SeriesApi",
             "MediaManagementConfigApi",
@@ -171,7 +171,7 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
     ]
     series_folder_api = sonarr_apis["SeriesFolderApi"]
     series_folder_api.get_series_folder_without_preload_content.return_value = (
-        MagicMock(data=b'{"folder": "Show A (2026)"}')
+        MagicMock(status=200, data=b'{"folder": "Show A (2026)"}')
     )
     command_api = sonarr_apis["CommandApi"]
     command_api.create_command.return_value = CommandResource(id=29)
@@ -366,6 +366,29 @@ def test_rejects_root_folder_missing_path(
         adapter.list_root_folders()
 
 
+@pytest.mark.parametrize("status", [199, 300])
+def test_rejects_non_successful_folder_response_before_parsing(
+    adapter: SonarrPyAdapter,
+    sonarr_apis: dict[str, MagicMock],
+    status: int,
+) -> None:
+    sonarr_apis[
+        "SeriesFolderApi"
+    ].get_series_folder_without_preload_content.return_value = MagicMock(
+        status=status,
+        reason="Unexpected status",
+        data=b"not json",
+    )
+
+    with pytest.raises(
+        ArrOperationError, match="Resolve Sonarr folder.*failed"
+    ) as error:
+        adapter.get_expected_folder_name(MediaItem(1, "Show", "/tv/Show"))
+
+    assert isinstance(error.value.__cause__, ApiException)
+    assert error.value.__cause__.status == status
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
@@ -381,7 +404,9 @@ def test_rejects_malformed_folder_response(
 ) -> None:
     sonarr_apis[
         "SeriesFolderApi"
-    ].get_series_folder_without_preload_content.return_value = MagicMock(data=payload)
+    ].get_series_folder_without_preload_content.return_value = MagicMock(
+        status=200, data=payload
+    )
 
     with pytest.raises(TypeError, match=message):
         adapter.get_expected_folder_name(MediaItem(1, "Show", "/tv/Show"))

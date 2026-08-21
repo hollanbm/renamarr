@@ -72,6 +72,31 @@ def test_minimal_radarr_config_receives_defaults() -> None:
     ]
 
 
+def test_omitted_renamarr_defaults_are_independent_between_services() -> None:
+    validated = validate_config(
+        {
+            "sonarr": [minimal_instance_config()],
+            "radarr": [minimal_instance_config()],
+        }
+    )
+    sonarr_configs = validated["sonarr"]
+    radarr_configs = validated["radarr"]
+    assert isinstance(sonarr_configs, list)
+    assert isinstance(radarr_configs, list)
+    sonarr_config = sonarr_configs[0]
+    radarr_config = radarr_configs[0]
+    assert isinstance(sonarr_config, dict)
+    assert isinstance(radarr_config, dict)
+    sonarr_renamarr = sonarr_config["renamarr"]
+    radarr_renamarr = radarr_config["renamarr"]
+    assert isinstance(sonarr_renamarr, dict)
+    assert isinstance(radarr_renamarr, dict)
+
+    sonarr_renamarr["enabled"] = True
+
+    assert radarr_renamarr["enabled"] is False
+
+
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_present_empty_service_list_is_rejected(service: str) -> None:
     with pytest.raises(SchemaError):
@@ -374,7 +399,7 @@ def test_command_polling_is_validated(
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 @pytest.mark.parametrize("field", ["timeout_seconds", "check_interval_seconds"])
 @pytest.mark.parametrize("value", [0, -1, True, False, 1.5, "1"])
-def test_command_polling_rejects_non_positive_integer_values(
+def test_command_polling_rejects_invalid_integer_values(
     service: str, field: str, value: object
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
