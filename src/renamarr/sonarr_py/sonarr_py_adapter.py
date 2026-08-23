@@ -21,7 +21,7 @@ from sonarr import CommandResult as SonarrCommandResult
 from sonarr import CommandStatus as SonarrCommandStatus
 from sonarr.rest import ApiException, RESTResponseType
 
-from renamarr.adapter_helpers import _translate_api_error
+from renamarr.adapter_helpers import translate_api_error
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -82,7 +82,7 @@ class SonarrPyAdapter:
 
     def list_media_items(self) -> list[MediaItem]:
         """Return the series in the Sonarr library."""
-        series = _translate_api_error(
+        series = translate_api_error(
             "Sonarr",
             ApiException,
             "List",
@@ -102,7 +102,7 @@ class SonarrPyAdapter:
 
     def is_media_analysis_enabled(self) -> bool:
         """Return whether Sonarr is configured to analyze media files."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Read",
@@ -116,7 +116,7 @@ class SonarrPyAdapter:
 
     def start_media_analysis(self) -> int:
         """Start a full Sonarr series rescan and return its command ID."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Start",
@@ -132,7 +132,7 @@ class SonarrPyAdapter:
 
     def get_command_status(self, command_id: int) -> CommandStatus:
         """Return the normalized state of a Sonarr command."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Read",
@@ -146,7 +146,7 @@ class SonarrPyAdapter:
 
     def get_file_rename_candidate(self, item: MediaItem) -> FileRenameCandidate | None:
         """Return a candidate containing Sonarr's episode rename preview."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Preview",
@@ -187,7 +187,7 @@ class SonarrPyAdapter:
 
     def start_file_rename(self, batch: FileRenameBatch) -> int:
         """Start a Sonarr RenameFiles command for one series."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Start",
@@ -204,7 +204,7 @@ class SonarrPyAdapter:
 
     def list_root_folders(self) -> list[str]:
         """Return configured Sonarr root-folder paths."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "List",
@@ -231,7 +231,7 @@ class SonarrPyAdapter:
                 raise ApiException(status=response.status, reason=response.reason)
             return response
 
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Resolve",
@@ -248,7 +248,7 @@ class SonarrPyAdapter:
 
     def move_folder(self, batch: FolderRenameBatch) -> None:
         """Move a batch of Sonarr series folders through the public API."""
-        _translate_api_error(
+        translate_api_error(
             "Sonarr",
             ApiException,
             "Move",
@@ -264,7 +264,7 @@ class SonarrPyAdapter:
 
     def start_folder_rescan(self, batch: FolderRenameBatch) -> int:
         """Start a Sonarr rescan for series whose folders moved."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             ApiException,
             "Start",

@@ -94,14 +94,18 @@ SCHEDULE_SCHEMA = And(
     ),
 )
 
-RENAMARR_DEFAULTS: dict[str, object] = {
-    "enabled": False,
-    "analyze_files": False,
-    "rename_folders": False,
-    "log_to_file": False,
-    "schedule": DEFAULT_SCHEDULE,
-    "command_polling": DEFAULT_COMMAND_POLLING,
-}
+
+def _renamarr_defaults() -> dict[str, object]:
+    return {
+        "enabled": False,
+        "analyze_files": False,
+        "rename_folders": False,
+        "log_to_file": False,
+        "schedule": dict(DEFAULT_SCHEDULE),
+        "command_polling": DEFAULT_COMMAND_POLLING,
+    }
+
+
 RENAMARR_SCHEMA = And(
     Use(_migrate_hourly_job),
     Schema(
@@ -150,7 +154,7 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default=RENAMARR_DEFAULTS.copy,
+                    default=_renamarr_defaults,
                     ignore_extra_keys=True,
                 ): RENAMARR_SCHEMA,
             }
@@ -185,7 +189,7 @@ CONFIG_SCHEMA = {
                 ),
                 Optional(
                     "renamarr",
-                    default=RENAMARR_DEFAULTS.copy,
+                    default=_renamarr_defaults,
                     ignore_extra_keys=True,
                 ): RENAMARR_SCHEMA,
             }

@@ -5,10 +5,10 @@ from pycliarr.api.base_api import json_dict
 from pycliarr.api.exceptions import CliArrError
 
 from renamarr.adapter_helpers import (
-    _as_dict,
-    _command_id,
-    _send_command,
-    _translate_api_error,
+    as_dict,
+    command_id,
+    send_command,
+    translate_api_error,
 )
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
@@ -35,7 +35,7 @@ class SonarrAdapter:
 
     def list_media_items(self) -> list[MediaItem]:
         """Return the series in the Sonarr library."""
-        series = _translate_api_error(
+        series = translate_api_error(
             "Sonarr", CliArrError, "List", "series", self._client.get_serie
         )
         if not isinstance(series, list):
@@ -46,36 +46,36 @@ class SonarrAdapter:
 
     def is_media_analysis_enabled(self) -> bool:
         """Return whether Sonarr is configured to analyze media files."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Read",
             "media-management settings",
             lambda: self._client.request_get(path="/api/v3/config/mediamanagement"),
         )
-        enabled = _as_dict("Sonarr", response)["enableMediaInfo"]
+        enabled = as_dict("Sonarr", response).get("enableMediaInfo")
         if not isinstance(enabled, bool):
             raise TypeError("Expected enableMediaInfo to be a boolean")
         return enabled
 
     def start_media_analysis(self) -> int:
         """Start a full Sonarr series rescan and return its command ID."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Start",
             "media analysis",
-            lambda: _send_command(
+            lambda: send_command(
                 self._client, {"name": "RescanSeries", "priority": "high"}
             ),
         )
-        return _command_id("Sonarr", response)
+        return command_id("Sonarr", response)
 
     def get_command_status(self, command_id: int) -> CommandStatus:
         """Return the normalized state of a Sonarr command."""
-        response = _as_dict(
+        response = as_dict(
             "Sonarr",
-            _translate_api_error(
+            translate_api_error(
                 "Sonarr",
                 CliArrError,
                 "Read",
@@ -90,7 +90,7 @@ class SonarrAdapter:
 
     def get_file_rename_candidate(self, item: MediaItem) -> FileRenameCandidate | None:
         """Return a candidate containing Sonarr's episode rename preview."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Preview",
@@ -106,7 +106,7 @@ class SonarrAdapter:
         file_ids: list[int] = []
         previews: list[json_dict] = []
         for preview in response:
-            preview_dict = _as_dict("Sonarr", preview)
+            preview_dict = as_dict("Sonarr", preview)
             episode_file_id = preview_dict.get("episodeFileId")
             if type(episode_file_id) is not int:
                 raise TypeError("Expected an episode file ID in Sonarr rename preview")
@@ -150,18 +150,18 @@ class SonarrAdapter:
 
     def start_file_rename(self, batch: FileRenameBatch) -> int:
         """Start a Sonarr RenameFiles command for one series."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Start",
             "file rename",
             lambda: self._client.rename_files(list(batch.file_ids), batch.item_ids[0]),
         )
-        return _command_id("Sonarr", response)
+        return command_id("Sonarr", response)
 
     def list_root_folders(self) -> list[str]:
         """Return configured Sonarr root-folder paths."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "List",
@@ -170,25 +170,31 @@ class SonarrAdapter:
         )
         if not isinstance(response, list):
             raise TypeError("Expected a list of root folders from Sonarr")
-        return [root_folder["path"] for root_folder in response]
+        paths: list[str] = []
+        for root_folder in response:
+            path = as_dict("Sonarr", root_folder).get("path")
+            if not isinstance(path, str):
+                raise TypeError("Expected a root-folder path from Sonarr")
+            paths.append(path)
+        return paths
 
     def get_expected_folder_name(self, item: MediaItem) -> str:
         """Return the folder name Sonarr expects for a series."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Resolve",
             f"folder for {item.title}",
             lambda: self._client.request_get(path=f"/api/v3/series/{item.id}/folder"),
         )
-        folder = _as_dict("Sonarr", response)["folder"]
+        folder = as_dict("Sonarr", response).get("folder")
         if not isinstance(folder, str):
             raise TypeError("Expected a folder name from Sonarr")
         return folder
 
     def move_folder(self, batch: FolderRenameBatch) -> None:
         """Move a batch of Sonarr series folders through the public API."""
-        _translate_api_error(
+        translate_api_error(
             "Sonarr",
             CliArrError,
             "Move",
@@ -205,12 +211,12 @@ class SonarrAdapter:
 
     def start_folder_rescan(self, batch: FolderRenameBatch) -> int:
         """Start a Sonarr rescan for series whose folders moved."""
-        response = _translate_api_error(
+        response = translate_api_error(
             "Sonarr",
             CliArrError,
             "Start",
             "folder rescan",
-            lambda: _send_command(
+            lambda: send_command(
                 self._client,
                 {
                     "name": "RescanSeries",
@@ -219,4 +225,4 @@ class SonarrAdapter:
                 },
             ),
         )
-        return _command_id("Sonarr", response)
+        return command_id("Sonarr", response)

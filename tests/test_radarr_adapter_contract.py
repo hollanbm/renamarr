@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from pycliarr.api import RadarrMovieItem
 from pycliarr.api.exceptions import CliArrError
+from pytest_mock import MockerFixture
 
 from renamarr.exceptions import ArrOperationError
 from renamarr.models.command import CommandStatus
@@ -16,7 +17,7 @@ from renamarr.radarr.radarr_adapter import RadarrAdapter
 
 
 @pytest.fixture
-def radarr_client(mocker) -> MagicMock:
+def radarr_client(mocker: MockerFixture) -> MagicMock:
     client = mocker.patch("renamarr.radarr.radarr_adapter.RadarrCli").return_value
     client.api_url_command = "/api/v3/command"
     return client
@@ -212,7 +213,9 @@ def test_does_not_translate_unexpected_errors(
     [
         ("list", RadarrMovieItem(id=1), "Expected a list of movies"),
         ("setting", [], "Expected an object response"),
+        ("setting", {}, "Expected enableMediaInfo"),
         ("setting", {"enableMediaInfo": 1}, "Expected enableMediaInfo"),
+        ("analysis", {}, "Expected a numeric command ID"),
         ("analysis", {"id": "1"}, "Expected a numeric command ID"),
         ("preview", {}, "Expected a list of rename previews"),
         ("preview", [[]], "Expected an object response"),
@@ -222,6 +225,9 @@ def test_does_not_translate_unexpected_errors(
             "Expected a movie file ID",
         ),
         ("roots", {}, "Expected a list of root folders"),
+        ("roots", [[]], "Expected an object response"),
+        ("roots", [{"path": 1}], "Expected a root-folder path"),
+        ("folder", {}, "Expected a folder name"),
         ("folder", {"folder": 1}, "Expected a folder name"),
     ],
 )

@@ -1,4 +1,5 @@
 import pytest
+from pytest_mock import MockerFixture
 
 from renamarr.adapter_factory import ArrService, create_arr_adapter
 from renamarr.radarr.radarr_adapter import RadarrAdapter
@@ -26,7 +27,9 @@ def test_rejects_unsupported_service_value() -> None:
         ArrService("lidarr")
 
 
-def test_factory_rejects_unsupported_future_service_member(mocker) -> None:
+def test_factory_rejects_unsupported_future_service_member(
+    mocker: MockerFixture,
+) -> None:
     with pytest.raises(ValueError, match="Unsupported Arr service"):
         create_arr_adapter(
             mocker.sentinel.unsupported_service,

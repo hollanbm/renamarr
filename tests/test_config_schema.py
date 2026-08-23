@@ -20,6 +20,16 @@ def minimal_instance_config() -> dict[str, str]:
     }
 
 
+def _renamarr_config(validated: dict[str, object], service: str) -> dict[str, object]:
+    service_configs = validated[service]
+    assert isinstance(service_configs, list)
+    instance_config = service_configs[0]
+    assert isinstance(instance_config, dict)
+    renamarr_config = instance_config["renamarr"]
+    assert isinstance(renamarr_config, dict)
+    return renamarr_config
+
+
 def test_omitted_services_default_to_empty_lists() -> None:
     assert validate_config({}) == {"sonarr": [], "radarr": []}
 
@@ -79,22 +89,18 @@ def test_omitted_renamarr_defaults_are_independent_between_services() -> None:
             "radarr": [minimal_instance_config()],
         }
     )
-    sonarr_configs = validated["sonarr"]
-    radarr_configs = validated["radarr"]
-    assert isinstance(sonarr_configs, list)
-    assert isinstance(radarr_configs, list)
-    sonarr_config = sonarr_configs[0]
-    radarr_config = radarr_configs[0]
-    assert isinstance(sonarr_config, dict)
-    assert isinstance(radarr_config, dict)
-    sonarr_renamarr = sonarr_config["renamarr"]
-    radarr_renamarr = radarr_config["renamarr"]
-    assert isinstance(sonarr_renamarr, dict)
-    assert isinstance(radarr_renamarr, dict)
+    sonarr_renamarr = _renamarr_config(validated, "sonarr")
+    radarr_renamarr = _renamarr_config(validated, "radarr")
+    sonarr_schedule = sonarr_renamarr["schedule"]
+    radarr_schedule = radarr_renamarr["schedule"]
+    assert isinstance(sonarr_schedule, dict)
+    assert isinstance(radarr_schedule, dict)
 
     sonarr_renamarr["enabled"] = True
+    sonarr_schedule["enabled"] = False
 
     assert radarr_renamarr["enabled"] is False
+    assert radarr_schedule["enabled"] is True
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
@@ -350,8 +356,9 @@ def test_omitted_command_polling_receives_defaults(service: str) -> None:
     }
 
     validated = validate_config({service: [instance_config]})
+    renamarr_config = _renamarr_config(validated, service)
 
-    assert validated[service][0]["renamarr"]["command_polling"] == (
+    assert renamarr_config["command_polling"] == (
         CommandPollingSettings(timeout_seconds=120, check_interval_seconds=3)
     )
 
@@ -392,8 +399,9 @@ def test_command_polling_is_validated(
     }
 
     validated = validate_config({service: [instance_config]})
+    renamarr_config = _renamarr_config(validated, service)
 
-    assert validated[service][0]["renamarr"]["command_polling"] == expected
+    assert renamarr_config["command_polling"] == expected
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])

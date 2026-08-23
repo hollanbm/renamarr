@@ -7,12 +7,14 @@ from unittest.mock import PropertyMock
 import pytest
 from loguru import logger
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
+from pytest_mock import MockerFixture
 from schedule import Job, Scheduler, clear, get_jobs
 
 from config_schema import CONFIG_SCHEMA
 from main import Main
 from renamarr.adapter_factory import ArrService
 from renamarr.healthcheck.health_reporter import HealthReporter
+from renamarr.logging_config import LoggingConfigurator
 
 # disable config caching
 configparser.hold_an_instance = False
@@ -20,10 +22,17 @@ configparser.hold_an_instance = False
 
 class TestMain:
     @pytest.fixture(autouse=True)
-    def health_reporter(self, mocker) -> None:
+    def mock_health_reporter(self, mocker: MockerFixture) -> None:
         self.health_reporter = mocker.Mock(spec=HealthReporter)
         self.health_reporter.running_job.side_effect = nullcontext
         mocker.patch("main.HealthReporter", return_value=self.health_reporter)
+
+    @pytest.fixture(autouse=True)
+    def mock_logging_configurator(self, mocker: MockerFixture) -> None:
+        self.logging_configurator = mocker.Mock(spec=LoggingConfigurator)
+        self.logging_configurator_factory = mocker.patch(
+            "main.LoggingConfigurator", return_value=self.logging_configurator
+        )
 
     @pytest.fixture
     def enable_scheduler(self, mocker) -> Generator:
@@ -34,30 +43,6 @@ class TestMain:
         Main.RUN_SCHEDULER = PropertyMock(side_effect=[True, False])
         yield
         Main.RUN_SCHEDULER = True
-
-    @pytest.fixture
-    def log_dir(self) -> Generator:
-        os.environ["LOG_DIR"] = "/tmp/renamarr-logs"
-        yield
-        del os.environ["LOG_DIR"]
-
-    @pytest.fixture
-    def log_retention(self) -> Generator:
-        os.environ["LOG_RETENTION"] = "14 days"
-        yield
-        del os.environ["LOG_RETENTION"]
-
-    @pytest.fixture
-    def log_rotation(self) -> Generator:
-        os.environ["LOG_ROTATION"] = "12:00"
-        yield
-        del os.environ["LOG_ROTATION"]
-
-    @pytest.fixture
-    def log_level(self) -> Generator:
-        os.environ["LOG_LEVEL"] = "DEBUG"
-        yield
-        del os.environ["LOG_LEVEL"]
 
     @pytest.fixture
     def config_dir(self) -> Generator:
@@ -121,116 +106,57 @@ class TestMain:
         finally:
             del os.environ["CONFIG_DIR"]
 
-    def test_init_uses_log_level_env_var(self, log_level, mocker) -> None:
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        assert logger_add.call_args_list[0].kwargs["level"] == "DEBUG"
-
-    def test_init_hides_logger_source_location_by_default(self, mocker) -> None:
-        mocker.patch("main.load_dotenv")
-        mocker.patch.dict(os.environ, {}, clear=True)
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_format = logger_add.call_args_list[0].kwargs["format"]
-        logger_name_format = "<cyan>{name}</cyan>"
-        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        assert logger_name_format not in logger_format
-        assert source_location_format not in logger_format
-
-    def test_init_shows_logger_name_and_source_location_when_log_level_is_debug(
-        self, mocker
-    ) -> None:
-        mocker.patch.dict(os.environ, {"LOG_LEVEL": "debug"})
-        logger_add = mocker.patch.object(logger, "add")
-
-        Main()
-
-        logger_format = logger_add.call_args_list[0].kwargs["format"]
-        logger_name_format = "<cyan>{name}</cyan>"
-        source_location_format = "<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-        assert f"{logger_name_format}:{source_location_format}" in logger_format
-
-    def test_init_loads_local_dotenv_file(self, mocker) -> None:
-        logger_add = mocker.patch.object(logger, "add")
+    def test_init_loads_dotenv_before_configuring_logging(self, mocker) -> None:
         load_dotenv = mocker.patch("main.load_dotenv")
+        initialization = mocker.Mock()
+        initialization.attach_mock(load_dotenv, "load_dotenv")
+        initialization.attach_mock(
+            self.logging_configurator_factory, "logging_configurator"
+        )
 
         Main()
 
-        load_dotenv.assert_called_once()
-        assert load_dotenv.call_args.args == (".env.local",)
-        assert logger_add.called
+        assert initialization.mock_calls == [
+            mocker.call.load_dotenv(".env.local"),
+            mocker.call.logging_configurator(),
+        ]
+        self.logging_configurator.configure_stdout.assert_called_once_with()
 
-    def test_sonarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+    @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
+    def test_log_to_file_configures_instance_sink(
+        self, config, service: ArrService, mocker
     ) -> None:
-        config.sonarr[0].renamarr.enabled = True
-        config.sonarr[0].renamarr.log_to_file = True
+        instance_config = getattr(config, service.value)[0]
+        instance_config.renamarr.enabled = True
+        instance_config.renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
         mocker.patch("main.create_arr_adapter")
-        mocker.patch("main.Renamarr")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-
-        main.start()
-
-        file_sink_call = next(
-            call
-            for call in logger_add.call_args_list
-            if call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log"
+        renamarr = mocker.patch("main.Renamarr")
+        events: list[str] = []
+        self.logging_configurator.configure_instance_file.side_effect = lambda *_: (
+            events.append("configure")
         )
-        assert file_sink_call.kwargs["format"]
-        assert file_sink_call.kwargs["level"] == "DEBUG"
-        assert file_sink_call.kwargs["rotation"] == "12:00"
-        assert file_sink_call.kwargs["retention"] == "14 days"
+        renamarr.return_value.scan.side_effect = lambda: events.append("scan")
 
-        filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"service": "sonarr", "instance": "sonarr"}})
-        assert not filter_fn({"extra": {"service": "radarr", "instance": "sonarr"}})
-        assert not filter_fn({"extra": {"service": "sonarr", "instance": "sonarr1"}})
-        assert not filter_fn({"extra": {}})
+        Main().start()
 
-    def test_sonarr_log_to_file_does_not_configure_sink_when_renamarr_disabled(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
+        self.logging_configurator.configure_instance_file.assert_called_once_with(
+            service.value, instance_config.name
+        )
+        assert events == ["configure", "scan"]
+
+    def test_log_to_file_does_not_configure_sink_when_renamarr_disabled(
+        self, config, mocker
     ) -> None:
         config.sonarr[0].renamarr.enabled = False
         config.sonarr[0].renamarr.log_to_file = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
 
-        main.start()
+        Main().start()
 
-        assert all(
-            not (call.args and call.args[0] == "/tmp/renamarr-logs/sonarr/sonarr.log")
-            for call in logger_add.call_args_list
-        )
-
-    def test_sonarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
-    ) -> None:
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-        logger_add.side_effect = PermissionError("read-only file system")
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        configured = main._Main__configure_file_logging("sonarr", "sonarr")
-
-        assert not configured
-        contextualize.assert_called_once_with(service="sonarr", instance="sonarr")
-        mock_loguru_warning.assert_any_call(
-            "Unable to write logs to '/tmp/renamarr-logs/sonarr/sonarr.log'; continuing with stdout logging only."
-        )
-        assert isinstance(
-            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
-        )
+        self.logging_configurator.configure_instance_file.assert_not_called()
 
     def test_sonarr_renamarr_scan(self, config, mocker) -> None:
         config.sonarr[0].renamarr.enabled = True
@@ -506,57 +432,6 @@ class TestMain:
             command_polling=config.radarr[0].renamarr.command_polling,
         )
         renamarr.return_value.scan.assert_called_once_with()
-
-    def test_radarr_log_to_file_configures_instance_sink(
-        self, config, log_dir, log_retention, log_rotation, log_level, mocker
-    ) -> None:
-        config.radarr[0].renamarr.enabled = True
-        config.radarr[0].renamarr.log_to_file = True
-        mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        mocker.patch.object(Job, "do")
-        mocker.patch("main.create_arr_adapter")
-        mocker.patch("main.Renamarr")
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-
-        main.start()
-
-        file_sink_call = next(
-            call
-            for call in logger_add.call_args_list
-            if call.args and call.args[0] == "/tmp/renamarr-logs/radarr/radarr.log"
-        )
-        assert file_sink_call.kwargs["format"]
-        assert file_sink_call.kwargs["level"] == "DEBUG"
-        assert file_sink_call.kwargs["rotation"] == "12:00"
-        assert file_sink_call.kwargs["retention"] == "14 days"
-
-        filter_fn = file_sink_call.kwargs["filter"]
-        assert filter_fn({"extra": {"service": "radarr", "instance": "radarr"}})
-        assert not filter_fn({"extra": {"service": "sonarr", "instance": "radarr"}})
-        assert not filter_fn({"extra": {"service": "radarr", "instance": "radarr1"}})
-        assert not filter_fn({"extra": {}})
-
-    def test_radarr_log_to_file_warns_when_sink_setup_fails(
-        self, log_dir, mock_loguru_warning, mocker
-    ) -> None:
-        main = Main()
-        logger_add = mocker.patch.object(logger, "add")
-        logger_add.side_effect = PermissionError("read-only file system")
-        contextualize = mocker.patch.object(
-            logger, "contextualize", return_value=nullcontext()
-        )
-
-        configured = main._Main__configure_file_logging("radarr", "radarr")
-
-        assert not configured
-        contextualize.assert_called_once_with(service="radarr", instance="radarr")
-        mock_loguru_warning.assert_any_call(
-            "Unable to write logs to '/tmp/renamarr-logs/radarr/radarr.log'; continuing with stdout logging only."
-        )
-        assert isinstance(
-            mock_loguru_warning.call_args_list[-1].args[0], PermissionError
-        )
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_disabled_renamarr_schedule_runs_once(

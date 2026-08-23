@@ -3,6 +3,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
 from pathlib import PurePosixPath
+from typing import NoReturn
 
 from loguru import logger
 
@@ -277,7 +278,7 @@ class Renamarr:
             return elapsed_seconds >= self.command_polling.timeout_seconds
         return elapsed_seconds > self.command_polling.timeout_seconds
 
-    def _raise_timeout(self, command_id: int, description: str) -> None:
+    def _raise_timeout(self, command_id: int, description: str) -> NoReturn:
         raise ArrOperationError(
             f"Timed out waiting for {description} command {command_id} "
             f"after {self.command_polling.timeout_seconds} seconds"

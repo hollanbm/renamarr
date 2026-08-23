@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, call
 
 import pytest
+from pytest_mock import MockerFixture
 from sonarr import (
     CommandResource,
     MediaManagementConfigResource,
@@ -25,7 +26,7 @@ from renamarr.sonarr_py.sonarr_py_adapter import SonarrPyAdapter
 
 
 @pytest.fixture
-def sonarr_apis(mocker) -> dict[str, MagicMock]:
+def sonarr_apis(mocker: MockerFixture) -> dict[str, MagicMock]:
     mocker.patch("renamarr.sonarr_py.sonarr_py_adapter.ApiClient")
     return {
         name: mocker.patch(f"renamarr.sonarr_py.sonarr_py_adapter.{name}").return_value

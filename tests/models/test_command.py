@@ -1,6 +1,13 @@
+from typing import TypedDict
+
 import pytest
 
 from renamarr.models.command import CommandPollingSettings
+
+
+class _CommandPollingSettingsInput(TypedDict, total=False):
+    timeout_seconds: int
+    check_interval_seconds: int
 
 
 @pytest.mark.parametrize(
@@ -17,7 +24,7 @@ from renamarr.models.command import CommandPollingSettings
     ],
 )
 def test_command_polling_settings_reject_invalid_values(
-    settings: dict[str, object],
+    settings: _CommandPollingSettingsInput,
 ) -> None:
     with pytest.raises(ValueError):
         CommandPollingSettings(**settings)

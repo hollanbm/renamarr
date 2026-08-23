@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from pycliarr.api import SonarrSerieItem
 from pycliarr.api.exceptions import CliArrError
+from pytest_mock import MockerFixture
 
 from renamarr.exceptions import ArrOperationError
 from renamarr.models.command import CommandStatus
@@ -16,8 +17,10 @@ from renamarr.sonarr.sonarr_adapter import SonarrAdapter
 
 
 @pytest.fixture
-def sonarr_client(mocker) -> MagicMock:
-    client = mocker.patch("renamarr.sonarr.sonarr_adapter.SonarrCli").return_value
+def sonarr_client(mocker: MockerFixture) -> MagicMock:
+    client = mocker.patch(
+        "renamarr.sonarr.sonarr_adapter.SonarrCli", autospec=True
+    ).return_value
     client.api_url_command = "/api/v3/command"
     return client
 
@@ -218,7 +221,9 @@ def test_does_not_translate_unexpected_errors(
     [
         ("list", SonarrSerieItem(id=1), "Expected a list of series"),
         ("setting", [], "Expected an object response"),
+        ("setting", {}, "Expected enableMediaInfo"),
         ("setting", {"enableMediaInfo": 1}, "Expected enableMediaInfo"),
+        ("analysis", {}, "Expected a numeric command ID"),
         ("analysis", {"id": "1"}, "Expected a numeric command ID"),
         ("preview", {}, "Expected a list of rename previews"),
         ("preview", [[]], "Expected an object response"),
@@ -267,6 +272,9 @@ def test_does_not_translate_unexpected_errors(
             "Expected integer episode numbers",
         ),
         ("roots", {}, "Expected a list of root folders"),
+        ("roots", [[]], "Expected an object response"),
+        ("roots", [{"path": 1}], "Expected a root-folder path"),
+        ("folder", {}, "Expected a folder name"),
         ("folder", {"folder": 1}, "Expected a folder name"),
     ],
 )
