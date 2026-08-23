@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from sys import exit
 from time import sleep
-from typing import Protocol
+from typing import NoReturn, Protocol
 
 import schedule
 from dotenv import load_dotenv
@@ -50,8 +50,6 @@ class Main:
     This class handles config parsing, and job scheduling
     """
 
-    RUN_SCHEDULER = True
-
     def __init__(self) -> None:
         load_dotenv(".env.local")
         self._health_reporter = HealthReporter()
@@ -97,6 +95,13 @@ class Main:
             schedule.every(config.renamarr.schedule.interval.total_minutes).minutes.do(
                 self.__renamarr_job, service=service, config=config
             )
+
+    def _run_scheduler_forever(self) -> NoReturn:
+        self._health_reporter.idle()
+        while True:
+            self._health_reporter.heartbeat()
+            schedule.run_pending()
+            sleep(1)
 
     def start(self) -> None:
         config_dir = os.getenv("CONFIG_DIR", "/")
@@ -146,11 +151,7 @@ class Main:
                     )
 
         if schedule.get_jobs():
-            self._health_reporter.idle()
-            while self.RUN_SCHEDULER:
-                self._health_reporter.heartbeat()
-                schedule.run_pending()
-                sleep(1)
+            self._run_scheduler_forever()
 
 
 @contextmanager

@@ -2,13 +2,12 @@ import os
 from collections.abc import Generator
 from contextlib import nullcontext
 from pathlib import Path
-from unittest.mock import PropertyMock
 
 import pytest
 from loguru import logger
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 from pytest_mock import MockerFixture
-from schedule import Job, Scheduler, clear, get_jobs
+from schedule import Job, clear, get_jobs
 
 from config_schema import CONFIG_SCHEMA
 from main import Main
@@ -35,27 +34,14 @@ class TestMain:
         )
 
     @pytest.fixture
-    def enable_scheduler(self, mocker) -> Generator:
-        """
-        Allows scheduler loop to enter, exactly one time, and then exit
-        """
-        mocker.patch("main.sleep").return_value = None
-        Main.RUN_SCHEDULER = PropertyMock(side_effect=[True, False])
-        yield
-        Main.RUN_SCHEDULER = True
-
-    @pytest.fixture
     def config_dir(self) -> Generator:
         os.environ["CONFIG_DIR"] = "tests/fixtures"
         yield
         del os.environ["CONFIG_DIR"]
 
     @pytest.fixture
-    def config(self) -> Generator:
-        """
-        Disable scheduler loop for the majority of tests
-        """
-        Main.RUN_SCHEDULER = False
+    def config(self, mocker: MockerFixture) -> Generator:
+        self.scheduler_loop = mocker.patch.object(Main, "_run_scheduler_forever")
         yield configparser.get_config(
             CONFIG_SCHEMA,
             config_dir="tests/fixtures",
@@ -121,6 +107,21 @@ class TestMain:
             mocker.call.logging_configurator(),
         ]
         self.logging_configurator.configure_stdout.assert_called_once_with()
+
+    def test_scheduler_loop_runs_pending_and_updates_health(
+        self, mocker: MockerFixture
+    ) -> None:
+        run_pending = mocker.patch("main.schedule.run_pending")
+        stop_scheduler = RuntimeError("stop scheduler")
+        sleep = mocker.patch("main.sleep", side_effect=stop_scheduler)
+
+        with pytest.raises(RuntimeError, match="stop scheduler"):
+            Main()._run_scheduler_forever()
+
+        self.health_reporter.idle.assert_called_once_with()
+        self.health_reporter.heartbeat.assert_called_once_with()
+        run_pending.assert_called_once_with()
+        sleep.assert_called_once_with(1)
 
     @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
     def test_log_to_file_configures_instance_sink(
@@ -240,14 +241,13 @@ class TestMain:
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
-        self, config, enable_scheduler, service, mocker
+        self, config, service, mocker
     ) -> None:
         service_config = getattr(config, service)[0]
         service_config.renamarr.enabled = True
         assert service_config.renamarr.schedule.enabled is True
         assert service_config.renamarr.schedule.interval.total_minutes == 60
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        run_pending = mocker.spy(Scheduler, "run_pending")
         renamarr = mocker.patch("main.Renamarr")
         mocker.patch("main.create_arr_adapter")
         clear()
@@ -260,20 +260,17 @@ class TestMain:
             assert len(jobs) == 1
             assert jobs[0].interval == 60
             assert jobs[0].unit == "minutes"
-            run_pending.assert_called_once()
-            self.health_reporter.idle.assert_called_once_with()
-            self.health_reporter.heartbeat.assert_called_once_with()
+            self.scheduler_loop.assert_called_once_with()
         finally:
             clear()
 
     def test_external_cron_does_not_disable_explicit_renamarr_schedule(
-        self, config, enable_scheduler, mocker
+        self, config, mocker
     ) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.schedule.enabled = True
         mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        run_pending = mocker.spy(Scheduler, "run_pending")
         renamarr = mocker.patch("main.Renamarr")
         mocker.patch("main.create_arr_adapter")
         clear()
@@ -286,7 +283,7 @@ class TestMain:
             assert len(jobs) == 1
             assert jobs[0].interval == 60
             assert jobs[0].unit == "minutes"
-            run_pending.assert_called_once()
+            self.scheduler_loop.assert_called_once_with()
         finally:
             clear()
 
@@ -441,7 +438,6 @@ class TestMain:
         service_config.renamarr.enabled = True
         service_config.renamarr.schedule.enabled = False
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
-        run_pending = mocker.spy(Scheduler, "run_pending")
         mocker.patch("main.create_arr_adapter")
         renamarr = mocker.patch("main.Renamarr")
         clear()
@@ -451,7 +447,7 @@ class TestMain:
 
             renamarr.return_value.scan.assert_called_once_with()
             assert get_jobs() == []
-            run_pending.assert_not_called()
+            self.scheduler_loop.assert_not_called()
             self.health_reporter.idle.assert_not_called()
         finally:
             clear()
