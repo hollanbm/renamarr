@@ -113,15 +113,15 @@ class TestMain:
     ) -> None:
         run_pending = mocker.patch("main.schedule.run_pending")
         stop_scheduler = RuntimeError("stop scheduler")
-        sleep = mocker.patch("main.sleep", side_effect=stop_scheduler)
+        sleep = mocker.patch("main.sleep", side_effect=[None, stop_scheduler])
 
         with pytest.raises(RuntimeError, match="stop scheduler"):
             Main()._run_scheduler_forever()
 
         self.health_reporter.idle.assert_called_once_with()
-        self.health_reporter.heartbeat.assert_called_once_with()
-        run_pending.assert_called_once_with()
-        sleep.assert_called_once_with(1)
+        assert self.health_reporter.heartbeat.call_count == 2
+        assert run_pending.call_count == 2
+        assert sleep.call_args_list == [mocker.call(1), mocker.call(1)]
 
     @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
     def test_log_to_file_configures_instance_sink(
