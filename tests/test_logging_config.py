@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Iterator
 from contextlib import nullcontext
 from io import StringIO
@@ -11,6 +12,8 @@ from pytest_mock import MockerFixture
 
 from renamarr.logging_config import LoggingConfigurator
 
+SOURCE_LOCATION = re.compile(r"\| [^|]+:[^|]+:\d+ \| [^|]+ \|")
+
 
 @pytest.fixture
 def restore_default_logger() -> Iterator[None]:
@@ -22,16 +25,16 @@ def restore_default_logger() -> Iterator[None]:
 
 class TestLoggingConfigurator:
     @pytest.mark.parametrize(
-        ("log_level", "expected_format"),
+        ("log_level", "includes_source_location"),
         [
-            ("INFO", LoggingConfigurator._LOG_FORMAT),
-            ("debug", LoggingConfigurator._DEBUG_LOG_FORMAT),
+            ("INFO", False),
+            ("debug", True),
         ],
     )
     def test_configure_stdout(
         self,
         log_level: str,
-        expected_format: str,
+        includes_source_location: bool,
         mocker: MockerFixture,
     ) -> None:
         mocker.patch.dict(os.environ, {"LOG_LEVEL": log_level}, clear=True)
@@ -54,10 +57,16 @@ class TestLoggingConfigurator:
         assert record_without_item["extra"]["item_context"] == ""
         assert record_with_item["extra"]["item_context"] == "Example | "
         logger_remove.assert_called_once_with()
-        logger_add.assert_called_once_with(
-            stdout,
-            format=expected_format,
-            level=log_level,
+        logger_add.assert_called_once()
+        assert logger_add.call_args.args == (stdout,)
+        assert logger_add.call_args.kwargs["level"] == log_level
+        configured_format = logger_add.call_args.kwargs["format"]
+        assert (
+            all(
+                field in configured_format
+                for field in ("{name}", "{function}", "{line}")
+            )
+            is includes_source_location
         )
 
     @pytest.mark.parametrize("log_level", ["INFO", "DEBUG"])
@@ -81,24 +90,40 @@ class TestLoggingConfigurator:
         assert instance_message.endswith(" | sonarr | Starting Renamarr")
         assert item_message.endswith(" | sonarr | Example | No files need renaming")
         assert " | sonarr |  | " not in instance_message
+        assert (SOURCE_LOCATION.search(instance_message) is not None) is (
+            log_level == "DEBUG"
+        )
 
-    def test_instance_file_emits_without_stdout_configuration(
+    @pytest.mark.parametrize("log_level", ["INFO", "DEBUG"])
+    def test_instance_file_preserves_instance_and_item_context(
         self,
+        log_level: str,
         tmp_path: Path,
         restore_default_logger: None,
         mocker: MockerFixture,
     ) -> None:
         logger.remove()
-        mocker.patch.dict(os.environ, {"LOG_DIR": str(tmp_path)}, clear=True)
+        mocker.patch.dict(
+            os.environ,
+            {"LOG_DIR": str(tmp_path), "LOG_LEVEL": log_level},
+            clear=True,
+        )
 
         configured = LoggingConfigurator().configure_instance_file("sonarr", "shows")
         with logger.contextualize(service="sonarr", instance="shows"):
             logger.info("Starting Renamarr")
+            with logger.contextualize(item="Example"):
+                logger.info("No files need renaming")
 
         assert configured
         output = (tmp_path / "sonarr" / "shows.log").read_text(encoding="utf-8")
-        assert output.rstrip().endswith(" | shows | Starting Renamarr")
-        assert " | shows |  | " not in output
+        instance_message, item_message = output.splitlines()
+        assert instance_message.endswith(" | shows | Starting Renamarr")
+        assert item_message.endswith(" | shows | Example | No files need renaming")
+        assert " | shows |  | " not in instance_message
+        assert (SOURCE_LOCATION.search(instance_message) is not None) is (
+            log_level == "DEBUG"
+        )
 
     def test_configure_instance_file_uses_environment_configuration(
         self, mocker: MockerFixture
@@ -122,8 +147,9 @@ class TestLoggingConfigurator:
         logger_configure.assert_called_once()
         logger_add.assert_called_once()
         assert logger_add.call_args.args == ("/tmp/renamarr-logs/sonarr/shows.log",)
-        assert logger_add.call_args.kwargs["format"] == (
-            LoggingConfigurator._DEBUG_LOG_FORMAT
+        configured_format = logger_add.call_args.kwargs["format"]
+        assert all(
+            field in configured_format for field in ("{name}", "{function}", "{line}")
         )
         assert logger_add.call_args.kwargs["level"] == "DEBUG"
         assert logger_add.call_args.kwargs["rotation"] == "12:00"
@@ -150,7 +176,11 @@ class TestLoggingConfigurator:
         logger_configure.assert_called_once()
         logger_add.assert_called_once()
         assert logger_add.call_args.args == ("/logs/radarr/movies.log",)
-        assert logger_add.call_args.kwargs["format"] == LoggingConfigurator._LOG_FORMAT
+        configured_format = logger_add.call_args.kwargs["format"]
+        assert all(
+            field not in configured_format
+            for field in ("{name}", "{function}", "{line}")
+        )
         assert logger_add.call_args.kwargs["level"] == "INFO"
         assert logger_add.call_args.kwargs["rotation"] == "00:00"
         assert logger_add.call_args.kwargs["retention"] == "7 days"

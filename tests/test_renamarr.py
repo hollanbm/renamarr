@@ -69,6 +69,11 @@ def test_scan_runs_shared_workflow_in_sorted_order(
     item_b = MediaItem(2, "B", "/root/nested/old-b")
     item_a = MediaItem(1, "A", "/root/old-a")
     adapter = configured_adapter(mocker, [item_b, item_a])
+    candidate_a = FileRenameCandidate(item_a, (10,), "A")
+    candidate_b = FileRenameCandidate(item_b, (20,), "B")
+    file_batch = FileRenameBatch((1, 2), (10, 20), "A, B")
+    folder_batch_a = FolderRenameBatch("/root", (item_a,))
+    folder_batch_b = FolderRenameBatch("/root/nested", (item_b,))
 
     result = Renamarr(
         "test",
@@ -85,18 +90,26 @@ def test_scan_runs_shared_workflow_in_sorted_order(
         failures=(),
     )
     assert result.successful
-    assert [
-        entry.args[0] for entry in adapter.get_file_rename_candidate.call_args_list
-    ] == [
-        item_a,
-        item_b,
+    assert adapter.method_calls == [
+        call.is_media_analysis_enabled(),
+        call.start_media_analysis(),
+        call.get_command_status(10),
+        call.list_media_items(),
+        call.get_file_rename_candidate(item_a),
+        call.get_file_rename_candidate(item_b),
+        call.build_file_rename_batches([candidate_a, candidate_b]),
+        call.start_file_rename(file_batch),
+        call.get_command_status(20),
+        call.list_root_folders(),
+        call.get_expected_folder_name(item_a),
+        call.get_expected_folder_name(item_b),
+        call.move_folder(folder_batch_a),
+        call.start_folder_rescan(folder_batch_a),
+        call.get_command_status(30),
+        call.move_folder(folder_batch_b),
+        call.start_folder_rescan(folder_batch_b),
+        call.get_command_status(31),
     ]
-    adapter.move_folder.assert_has_calls(
-        [
-            call(FolderRenameBatch("/root", (item_a,))),
-            call(FolderRenameBatch("/root/nested", (item_b,))),
-        ]
-    )
     assert mock_loguru_debug.call_args_list[-1] == call(
         "Items found: 2 | analysis: [ success=2, failed=0, skipped=0 ]"
     )
@@ -183,14 +196,45 @@ def test_scan_ends_after_library_discovery_failure(
     ]
 
 
-def test_scan_propagates_unexpected_discovery_error(
+@pytest.mark.parametrize(
+    ("operation", "analyze_files", "rename_folders", "skip_file_renames"),
+    [
+        pytest.param("is_media_analysis_enabled", True, False, False, id="analysis"),
+        pytest.param("list_media_items", False, False, False, id="discovery"),
+        pytest.param(
+            "get_file_rename_candidate", False, False, False, id="file-preview"
+        ),
+        pytest.param(
+            "build_file_rename_batches", False, False, False, id="file-planning"
+        ),
+        pytest.param("start_file_rename", False, False, False, id="file-execution"),
+        pytest.param("list_root_folders", False, True, True, id="folder-roots"),
+        pytest.param(
+            "get_expected_folder_name", False, True, True, id="folder-planning"
+        ),
+        pytest.param("move_folder", False, True, True, id="folder-execution"),
+    ],
+)
+def test_scan_propagates_unexpected_adapter_errors(
+    operation: str,
+    analyze_files: bool,
+    rename_folders: bool,
+    skip_file_renames: bool,
     mocker: MockerFixture,
 ) -> None:
-    adapter = configured_adapter(mocker, [])
-    adapter.list_media_items.side_effect = RuntimeError("programming error")
+    item = MediaItem(1, "Item", "/root/old-item")
+    adapter = configured_adapter(mocker, [item])
+    if skip_file_renames:
+        without_file_renames(adapter)
+    getattr(adapter, operation).side_effect = RuntimeError("programming error")
 
     with pytest.raises(RuntimeError, match="programming error"):
-        Renamarr("test", adapter).scan()
+        Renamarr(
+            "test",
+            adapter,
+            analyze_files=analyze_files,
+            rename_folders=rename_folders,
+        ).scan()
 
 
 def test_analysis_failure_is_recorded_and_discovery_continues(
@@ -256,7 +300,7 @@ def test_command_polling_checks_immediately_then_sleeps(
     ]
     without_file_renames(adapter)
     monotonic = mocker.patch(
-        "renamarr.renamarr.time.monotonic", side_effect=[0.0, 0.0, 1.0]
+        "renamarr.renamarr.time.monotonic", side_effect=[1000.0, 1000.0, 1001.0]
     )
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
@@ -268,7 +312,7 @@ def test_command_polling_checks_immediately_then_sleeps(
     ).scan()
 
     assert result.analysis == WorkSummary(success=1)
-    adapter.get_command_status.assert_has_calls([call(10), call(10)])
+    assert adapter.get_command_status.call_args_list == [call(10), call(10)]
     sleep.assert_called_once_with(1)
     assert monotonic.call_count == 3
 
@@ -278,7 +322,7 @@ def test_command_polling_times_out_before_sleep(mocker: MockerFixture) -> None:
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.return_value = CommandStatus(False, False)
     without_file_renames(adapter)
-    mocker.patch("renamarr.renamarr.time.monotonic", side_effect=[0.0, 10.0])
+    mocker.patch("renamarr.renamarr.time.monotonic", side_effect=[1000.0, 1010.0])
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
     result = Renamarr(
@@ -289,9 +333,14 @@ def test_command_polling_times_out_before_sleep(mocker: MockerFixture) -> None:
     ).scan()
 
     assert result.analysis == WorkSummary(failed=1)
-    assert (
-        "Timed out waiting for media analysis command 10" in result.failures[0].message
+    assert result.failures == (
+        ScanFailure(
+            ScanPhase.ANALYSIS,
+            (1,),
+            "Timed out waiting for media analysis command 10 after 10 seconds",
+        ),
     )
+    assert adapter.get_command_status.call_args_list == [call(10)]
     sleep.assert_not_called()
 
 
@@ -308,7 +357,7 @@ def test_command_polling_caps_sleep_at_remaining_timeout(
     without_file_renames(adapter)
     mocker.patch(
         "renamarr.renamarr.time.monotonic",
-        side_effect=[0.0, 0.0, 9.0, 9.0, 10.0, 10.0],
+        side_effect=[1000.0, 1000.0, 1009.0, 1009.0, 1010.0, 1010.0],
     )
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
@@ -320,6 +369,7 @@ def test_command_polling_caps_sleep_at_remaining_timeout(
     ).scan()
 
     assert result.analysis == WorkSummary(failed=1)
+    assert adapter.get_command_status.call_args_list == [call(10), call(10), call(10)]
     assert sleep.call_args_list == [call(9), call(1)]
 
 
@@ -333,7 +383,7 @@ def test_command_polling_accepts_completion_on_final_deadline_check(
         CommandStatus(True, True),
     ]
     without_file_renames(adapter)
-    current_time = 0
+    current_time = 1000
 
     def monotonic() -> int:
         return current_time
@@ -353,7 +403,7 @@ def test_command_polling_accepts_completion_on_final_deadline_check(
     ).scan()
 
     assert result.analysis == WorkSummary(success=1)
-    adapter.get_command_status.assert_has_calls([call(10), call(10)])
+    assert adapter.get_command_status.call_args_list == [call(10), call(10)]
     sleep.assert_called_once_with(10)
 
 
@@ -364,7 +414,9 @@ def test_command_polling_rejects_check_after_deadline(
     adapter = configured_adapter(mocker, [item])
     adapter.get_command_status.return_value = CommandStatus(False, False)
     without_file_renames(adapter)
-    mocker.patch("renamarr.renamarr.time.monotonic", side_effect=[0.0, 0.0, 10.1])
+    mocker.patch(
+        "renamarr.renamarr.time.monotonic", side_effect=[1000.0, 1000.0, 1010.1]
+    )
     sleep = mocker.patch("renamarr.renamarr.time.sleep")
 
     result = Renamarr(
@@ -375,10 +427,14 @@ def test_command_polling_rejects_check_after_deadline(
     ).scan()
 
     assert result.analysis == WorkSummary(failed=1)
-    assert (
-        "Timed out waiting for media analysis command 10" in result.failures[0].message
+    assert result.failures == (
+        ScanFailure(
+            ScanPhase.ANALYSIS,
+            (1,),
+            "Timed out waiting for media analysis command 10 after 10 seconds",
+        ),
     )
-    adapter.get_command_status.assert_called_once_with(10)
+    assert adapter.get_command_status.call_args_list == [call(10)]
     sleep.assert_called_once_with(10)
 
 
@@ -444,18 +500,37 @@ def test_file_batch_planning_failure_marks_all_candidates_failed(
     adapter.start_file_rename.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "batches",
+    [
+        pytest.param([FileRenameBatch((1,), (10,), "missing item")], id="missing-item"),
+        pytest.param(
+            [FileRenameBatch((1, 1, 2), (10, 10, 20), "duplicate item")],
+            id="duplicate-item",
+        ),
+        pytest.param(
+            [FileRenameBatch((1, 2, 3), (10, 20, 30), "extra item")],
+            id="extra-item",
+        ),
+    ],
+)
 def test_invalid_file_batches_fail_before_starting_commands(
+    batches: list[FileRenameBatch],
     mocker: MockerFixture,
 ) -> None:
-    item = MediaItem(1, "A", "/root/A")
-    adapter = configured_adapter(mocker, [item])
-    adapter.build_file_rename_batches.return_value = []
+    items = [MediaItem(1, "A", "/root/A"), MediaItem(2, "B", "/root/B")]
+    adapter = configured_adapter(mocker, items)
+    adapter.build_file_rename_batches.return_value = batches
     adapter.build_file_rename_batches.side_effect = None
 
-    with pytest.raises(ValueError, match="must contain every candidate exactly once"):
+    with pytest.raises(
+        ValueError,
+        match="^File rename batches must contain every candidate exactly once$",
+    ):
         Renamarr("test", adapter).scan()
 
     adapter.start_file_rename.assert_not_called()
+    adapter.get_command_status.assert_not_called()
 
 
 def test_file_batch_failure_does_not_block_later_batches_or_folders(
@@ -464,11 +539,11 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(
     item_a = MediaItem(1, "A", "/root/old-a")
     item_b = MediaItem(2, "B", "/root/old-b")
     adapter = configured_adapter(mocker, [item_a, item_b])
+    file_batch_a = FileRenameBatch((1,), (10,), "A")
+    file_batch_b = FileRenameBatch((2,), (20,), "B")
+    folder_batch = FolderRenameBatch("/root", (item_a, item_b))
     adapter.build_file_rename_batches.side_effect = None
-    adapter.build_file_rename_batches.return_value = [
-        FileRenameBatch((1,), (10,), "A"),
-        FileRenameBatch((2,), (20,), "B"),
-    ]
+    adapter.build_file_rename_batches.return_value = [file_batch_a, file_batch_b]
     adapter.start_file_rename.side_effect = [
         ArrOperationError("rename failed"),
         21,
@@ -482,10 +557,13 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(
     assert result.failures == (
         ScanFailure(ScanPhase.FILE_RENAMES, (1,), "rename failed"),
     )
-    assert adapter.start_file_rename.call_count == 2
-    adapter.move_folder.assert_called_once_with(
-        FolderRenameBatch("/root", (item_a, item_b))
-    )
+    assert adapter.start_file_rename.call_args_list == [
+        call(file_batch_a),
+        call(file_batch_b),
+    ]
+    assert adapter.move_folder.call_args_list == [call(folder_batch)]
+    assert adapter.start_folder_rescan.call_args_list == [call(folder_batch)]
+    assert adapter.get_command_status.call_args_list == [call(21), call(30)]
 
 
 def test_root_folder_listing_failure_marks_every_item_failed(
@@ -573,12 +651,28 @@ def test_failed_folder_operations_continue_across_roots(
     result = Renamarr("test", adapter, rename_folders=True).scan()
 
     assert result.folder_renames == WorkSummary(failed=3)
-    assert [failure.message for failure in result.failures] == [
-        "move failed",
-        "rescan start failed",
-        "Folder rescan: NASA command 33 completed unsuccessfully",
+    batch_one = FolderRenameBatch("/one", (move_failed,))
+    batch_two = FolderRenameBatch("/two", (rescan_start_failed,))
+    batch_three = FolderRenameBatch("/three", (rescan_command_failed,))
+    assert result.failures == (
+        ScanFailure(ScanPhase.FOLDER_RENAMES, (1,), "move failed"),
+        ScanFailure(ScanPhase.FOLDER_RENAMES, (2,), "rescan start failed"),
+        ScanFailure(
+            ScanPhase.FOLDER_RENAMES,
+            (3,),
+            "Folder rescan: NASA command 33 completed unsuccessfully",
+        ),
+    )
+    assert adapter.move_folder.call_args_list == [
+        call(batch_one),
+        call(batch_two),
+        call(batch_three),
     ]
-    assert adapter.start_folder_rescan.call_count == 2
+    assert adapter.start_folder_rescan.call_args_list == [
+        call(batch_two),
+        call(batch_three),
+    ]
+    assert adapter.get_command_status.call_args_list == [call(33)]
 
 
 def test_root_folder_matching_uses_components_and_deepest_match() -> None:

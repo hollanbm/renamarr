@@ -2,24 +2,38 @@ import pytest
 from pytest_mock import MockerFixture
 
 from renamarr.adapter_factory import ArrService, create_arr_adapter
-from renamarr.radarr.radarr_adapter import RadarrAdapter
-from renamarr.sonarr.sonarr_adapter import SonarrAdapter
 
 
-def test_creates_radarr_adapter() -> None:
-    adapter = create_arr_adapter(ArrService.RADARR, "https://radarr.test", "radarr-key")
+def test_selects_radarr_adapter(mocker: MockerFixture) -> None:
+    radarr_adapter = mocker.patch(
+        "renamarr.adapter_factory.RadarrAdapter", autospec=True
+    )
+    sonarr_adapter = mocker.patch(
+        "renamarr.adapter_factory.SonarrAdapter", autospec=True
+    )
 
-    assert isinstance(adapter, RadarrAdapter)
-    assert adapter._client.configuration.host == "https://radarr.test"
-    assert adapter._client.configuration.api_key["X-Api-Key"] == "radarr-key"
+    assert (
+        create_arr_adapter(ArrService.RADARR, "https://radarr.test", "radarr-key")
+        is radarr_adapter.return_value
+    )
+    radarr_adapter.assert_called_once_with("https://radarr.test", "radarr-key")
+    sonarr_adapter.assert_not_called()
 
 
-def test_creates_sonarr_adapter() -> None:
-    adapter = create_arr_adapter(ArrService.SONARR, "https://sonarr.test", "sonarr-key")
+def test_selects_sonarr_adapter(mocker: MockerFixture) -> None:
+    radarr_adapter = mocker.patch(
+        "renamarr.adapter_factory.RadarrAdapter", autospec=True
+    )
+    sonarr_adapter = mocker.patch(
+        "renamarr.adapter_factory.SonarrAdapter", autospec=True
+    )
 
-    assert isinstance(adapter, SonarrAdapter)
-    assert adapter._client.configuration.host == "https://sonarr.test"
-    assert adapter._client.configuration.api_key["X-Api-Key"] == "sonarr-key"
+    assert (
+        create_arr_adapter(ArrService.SONARR, "https://sonarr.test", "sonarr-key")
+        is sonarr_adapter.return_value
+    )
+    sonarr_adapter.assert_called_once_with("https://sonarr.test", "sonarr-key")
+    radarr_adapter.assert_not_called()
 
 
 def test_rejects_unsupported_service_value() -> None:

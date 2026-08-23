@@ -27,9 +27,11 @@ from renamarr.radarr.radarr_adapter import RadarrAdapter
 
 @pytest.fixture
 def radarr_apis(mocker: MockerFixture) -> dict[str, MagicMock]:
-    mocker.patch("renamarr.radarr.radarr_adapter.ApiClient")
+    mocker.patch("renamarr.radarr.radarr_adapter.ApiClient", autospec=True)
     return {
-        name: mocker.patch(f"renamarr.radarr.radarr_adapter.{name}").return_value
+        name: mocker.patch(
+            f"renamarr.radarr.radarr_adapter.{name}", autospec=True
+        ).return_value
         for name in (
             "MovieApi",
             "MediaManagementConfigApi",
@@ -40,6 +42,36 @@ def radarr_apis(mocker: MockerFixture) -> dict[str, MagicMock]:
             "MovieEditorApi",
         )
     }
+
+
+def test_wires_generated_radarr_client(mocker: MockerFixture) -> None:
+    configuration = mocker.patch(
+        "renamarr.radarr.radarr_adapter.Configuration", autospec=True
+    )
+    api_client = mocker.patch("renamarr.radarr.radarr_adapter.ApiClient", autospec=True)
+    api_classes = [
+        mocker.patch(f"renamarr.radarr.radarr_adapter.{name}", autospec=True)
+        for name in (
+            "MovieApi",
+            "MediaManagementConfigApi",
+            "CommandApi",
+            "RenameMovieApi",
+            "RootFolderApi",
+            "MovieFolderApi",
+            "MovieEditorApi",
+        )
+    ]
+
+    adapter = RadarrAdapter("https://radarr.test", "radarr-key")
+
+    configuration.assert_called_once_with(
+        host="https://radarr.test",
+        api_key={"X-Api-Key": "radarr-key"},
+    )
+    api_client.assert_called_once_with(configuration.return_value)
+    assert adapter._client is api_client.return_value
+    for api_class in api_classes:
+        api_class.assert_called_once_with(api_client.return_value)
 
 
 @pytest.fixture
@@ -99,12 +131,17 @@ def test_starts_media_analysis_and_maps_command_status(
     assert adapter.get_command_status(17) == CommandStatus(False, False)
     assert adapter.get_command_status(17) == CommandStatus(True, False)
     assert adapter.get_command_status(17) == CommandStatus(True, True)
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RescanMovie",
         "priority": "high",
     }
-    command_api.get_command_by_id.assert_has_calls([call(17), call(17), call(17)])
+    assert command_api.get_command_by_id.call_args_list == [
+        call(17),
+        call(17),
+        call(17),
+    ]
 
 
 def test_maps_and_combines_file_rename_previews(
@@ -122,15 +159,19 @@ def test_maps_and_combines_file_rename_previews(
     ]
 
     assert adapter.get_file_rename_candidate(movie_a) is None
-    candidate_a = adapter.get_file_rename_candidate(movie_a)
-    assert candidate_a == FileRenameCandidate(movie_a, (10, 11), "Movie A")
+    candidate_b = adapter.get_file_rename_candidate(movie_b)
+    assert candidate_b == FileRenameCandidate(movie_b, (10, 11), "Movie B")
     assert adapter.build_file_rename_batches(()) == []
 
-    candidate_b = FileRenameCandidate(movie_b, (20,), "Movie B")
-    assert adapter.build_file_rename_batches((candidate_a, candidate_b)) == [
-        FileRenameBatch((1, 2), (10, 11, 20), "Movie A, Movie B")
+    movie_c = MediaItem(3, "Movie C", "/movies/Movie C")
+    candidate_c = FileRenameCandidate(movie_c, (20,), "Movie C")
+    assert adapter.build_file_rename_batches((candidate_b, candidate_c)) == [
+        FileRenameBatch((2, 3), (10, 11, 20), "Movie B, Movie C")
     ]
-    rename_api.list_rename.assert_has_calls([call(movie_id=[1]), call(movie_id=[1])])
+    assert rename_api.list_rename.call_args_list == [
+        call(movie_id=[1]),
+        call(movie_id=[2]),
+    ]
 
 
 def test_starts_aggregate_movie_rename(
@@ -141,6 +182,7 @@ def test_starts_aggregate_movie_rename(
     command_api.create_command.return_value = CommandResource(id=23)
 
     assert adapter.start_file_rename(batch) == 23
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RenameMovie",
@@ -172,12 +214,14 @@ def test_uses_radarr_folder_endpoints_and_payloads(
     assert adapter.get_expected_folder_name(movie_a) == "Movie A (2026)"
     assert adapter.move_folder(batch) is None
     assert adapter.start_folder_rescan(batch) == 29
+    root_folder_api.list_root_folder.assert_called_once_with()
     movie_folder_api.get_movie_folder_without_preload_content.assert_called_once_with(
         id=1
     )
     folder_response.read.assert_called_once_with()
     folder_response.release_conn.assert_called_once_with()
     movie_editor_api = radarr_apis["MovieEditorApi"]
+    movie_editor_api.put_movie_editor.assert_called_once()
     editor = movie_editor_api.put_movie_editor.call_args.args[0]
     assert isinstance(editor, MovieEditorResource)
     assert editor.model_dump(mode="json", by_alias=True, exclude_none=True) == {
@@ -185,6 +229,7 @@ def test_uses_radarr_folder_endpoints_and_payloads(
         "rootFolderPath": "/movies",
         "moveFiles": False,
     }
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RefreshMovie",
@@ -194,22 +239,33 @@ def test_uses_radarr_folder_endpoints_and_payloads(
 
 
 @pytest.mark.parametrize(
-    ("boundary", "api_name", "method_name"),
+    ("boundary", "api_name", "method_name", "error_context"),
     [
-        ("list", "MovieApi", "list_movie"),
-        ("setting", "MediaManagementConfigApi", "get_media_management_config"),
-        ("analysis", "CommandApi", "create_command"),
-        ("status", "CommandApi", "get_command_by_id"),
-        ("preview", "RenameMovieApi", "list_rename"),
-        ("rename", "CommandApi", "create_command"),
-        ("roots", "RootFolderApi", "list_root_folder"),
+        ("list", "MovieApi", "list_movie", "List Radarr movies"),
+        (
+            "setting",
+            "MediaManagementConfigApi",
+            "get_media_management_config",
+            "Read Radarr media-management settings",
+        ),
+        ("analysis", "CommandApi", "create_command", "Start Radarr media analysis"),
+        ("status", "CommandApi", "get_command_by_id", "Read Radarr command status"),
+        (
+            "preview",
+            "RenameMovieApi",
+            "list_rename",
+            "Preview Radarr file rename for Movie",
+        ),
+        ("rename", "CommandApi", "create_command", "Start Radarr file rename"),
+        ("roots", "RootFolderApi", "list_root_folder", "List Radarr root folders"),
         (
             "folder",
             "MovieFolderApi",
             "get_movie_folder_without_preload_content",
+            "Resolve Radarr folder for Movie",
         ),
-        ("move", "MovieEditorApi", "put_movie_editor"),
-        ("rescan", "CommandApi", "create_command"),
+        ("move", "MovieEditorApi", "put_movie_editor", "Move Radarr movie folders"),
+        ("rescan", "CommandApi", "create_command", "Start Radarr folder rescan"),
     ],
 )
 def test_translates_api_errors_at_every_boundary(
@@ -218,6 +274,7 @@ def test_translates_api_errors_at_every_boundary(
     boundary: str,
     api_name: str,
     method_name: str,
+    error_context: str,
 ) -> None:
     item = MediaItem(1, "Movie", "/movies/Movie")
     file_batch = FileRenameBatch((1,), (10,), "Movie")
@@ -234,14 +291,14 @@ def test_translates_api_errors_at_every_boundary(
         "move": lambda: adapter.move_folder(folder_batch),
         "rescan": lambda: adapter.start_folder_rescan(folder_batch),
     }
-    getattr(radarr_apis[api_name], method_name).side_effect = ApiException(
-        reason="broken"
-    )
+    api_error = ApiException(reason="broken")
+    getattr(radarr_apis[api_name], method_name).side_effect = api_error
 
-    with pytest.raises(ArrOperationError, match="failed:") as error:
+    with pytest.raises(ArrOperationError) as error:
         operations[boundary]()
 
-    assert isinstance(error.value.__cause__, ApiException)
+    assert str(error.value).split(" failed:", maxsplit=1)[0] == error_context
+    assert error.value.__cause__ is api_error
     assert "broken" in str(error.value)
 
 

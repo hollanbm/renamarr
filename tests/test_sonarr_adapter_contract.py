@@ -27,9 +27,11 @@ from renamarr.sonarr.sonarr_adapter import SonarrAdapter
 
 @pytest.fixture
 def sonarr_apis(mocker: MockerFixture) -> dict[str, MagicMock]:
-    mocker.patch("renamarr.sonarr.sonarr_adapter.ApiClient")
+    mocker.patch("renamarr.sonarr.sonarr_adapter.ApiClient", autospec=True)
     return {
-        name: mocker.patch(f"renamarr.sonarr.sonarr_adapter.{name}").return_value
+        name: mocker.patch(
+            f"renamarr.sonarr.sonarr_adapter.{name}", autospec=True
+        ).return_value
         for name in (
             "SeriesApi",
             "MediaManagementConfigApi",
@@ -40,6 +42,36 @@ def sonarr_apis(mocker: MockerFixture) -> dict[str, MagicMock]:
             "SeriesEditorApi",
         )
     }
+
+
+def test_wires_generated_sonarr_client(mocker: MockerFixture) -> None:
+    configuration = mocker.patch(
+        "renamarr.sonarr.sonarr_adapter.Configuration", autospec=True
+    )
+    api_client = mocker.patch("renamarr.sonarr.sonarr_adapter.ApiClient", autospec=True)
+    api_classes = [
+        mocker.patch(f"renamarr.sonarr.sonarr_adapter.{name}", autospec=True)
+        for name in (
+            "SeriesApi",
+            "MediaManagementConfigApi",
+            "CommandApi",
+            "RenameEpisodeApi",
+            "RootFolderApi",
+            "SeriesFolderApi",
+            "SeriesEditorApi",
+        )
+    ]
+
+    adapter = SonarrAdapter("https://sonarr.test", "sonarr-key")
+
+    configuration.assert_called_once_with(
+        host="https://sonarr.test",
+        api_key={"X-Api-Key": "sonarr-key"},
+    )
+    api_client.assert_called_once_with(configuration.return_value)
+    assert adapter._client is api_client.return_value
+    for api_class in api_classes:
+        api_class.assert_called_once_with(api_client.return_value)
 
 
 @pytest.fixture
@@ -99,12 +131,17 @@ def test_starts_media_analysis_and_maps_command_status(
     assert adapter.get_command_status(17) == CommandStatus(False, False)
     assert adapter.get_command_status(17) == CommandStatus(True, False)
     assert adapter.get_command_status(17) == CommandStatus(True, True)
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RescanSeries",
         "priority": "high",
     }
-    command_api.get_command_by_id.assert_has_calls([call(17), call(17), call(17)])
+    assert command_api.get_command_by_id.call_args_list == [
+        call(17),
+        call(17),
+        call(17),
+    ]
 
 
 def test_maps_episode_previews_and_builds_one_batch_per_series(
@@ -130,17 +167,21 @@ def test_maps_episode_previews_and_builds_one_batch_per_series(
     ]
 
     assert adapter.get_file_rename_candidate(show_a) is None
-    candidate_a = adapter.get_file_rename_candidate(show_a)
-    assert candidate_a == FileRenameCandidate(
-        show_a, (10, 20), "Show A: S01E01, S02E03-04"
+    candidate_b = adapter.get_file_rename_candidate(show_b)
+    assert candidate_b == FileRenameCandidate(
+        show_b, (10, 20), "Show B: S01E01, S02E03-04"
     )
-    candidate_b = FileRenameCandidate(show_b, (30,), "Show B: S03E05")
-    assert adapter.build_file_rename_batches((candidate_a, candidate_b)) == [
-        FileRenameBatch((1,), (10, 20), "Show A: S01E01, S02E03-04"),
-        FileRenameBatch((2,), (30,), "Show B: S03E05"),
+    show_c = MediaItem(3, "Show C", "/tv/Show C")
+    candidate_c = FileRenameCandidate(show_c, (30,), "Show C: S03E05")
+    assert adapter.build_file_rename_batches((candidate_b, candidate_c)) == [
+        FileRenameBatch((2,), (10, 20), "Show B: S01E01, S02E03-04"),
+        FileRenameBatch((3,), (30,), "Show C: S03E05"),
     ]
     assert adapter.build_file_rename_batches(()) == []
-    rename_api.list_rename.assert_has_calls([call(series_id=1), call(series_id=1)])
+    assert rename_api.list_rename.call_args_list == [
+        call(series_id=1),
+        call(series_id=2),
+    ]
 
 
 def test_starts_series_file_rename(
@@ -151,6 +192,7 @@ def test_starts_series_file_rename(
     command_api.create_command.return_value = CommandResource(id=23)
 
     assert adapter.start_file_rename(batch) == 23
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RenameFiles",
@@ -183,12 +225,14 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
     assert adapter.get_expected_folder_name(show_a) == "Show A (2026)"
     assert adapter.move_folder(batch) is None
     assert adapter.start_folder_rescan(batch) == 29
+    root_folder_api.list_root_folder.assert_called_once_with()
     series_folder_api.get_series_folder_without_preload_content.assert_called_once_with(
         id=1
     )
     folder_response.read.assert_called_once_with()
     folder_response.release_conn.assert_called_once_with()
     series_editor_api = sonarr_apis["SeriesEditorApi"]
+    series_editor_api.put_series_editor.assert_called_once()
     editor = series_editor_api.put_series_editor.call_args.args[0]
     assert isinstance(editor, SeriesEditorResource)
     assert editor.model_dump(mode="json", by_alias=True, exclude_none=True) == {
@@ -196,6 +240,7 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
         "rootFolderPath": "/tv",
         "moveFiles": False,
     }
+    command_api.create_command.assert_called_once()
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RescanSeries",
@@ -205,22 +250,33 @@ def test_uses_sonarr_folder_endpoints_and_payloads(
 
 
 @pytest.mark.parametrize(
-    ("boundary", "api_name", "method_name"),
+    ("boundary", "api_name", "method_name", "error_context"),
     [
-        ("list", "SeriesApi", "list_series"),
-        ("setting", "MediaManagementConfigApi", "get_media_management_config"),
-        ("analysis", "CommandApi", "create_command"),
-        ("status", "CommandApi", "get_command_by_id"),
-        ("preview", "RenameEpisodeApi", "list_rename"),
-        ("rename", "CommandApi", "create_command"),
-        ("roots", "RootFolderApi", "list_root_folder"),
+        ("list", "SeriesApi", "list_series", "List Sonarr series"),
+        (
+            "setting",
+            "MediaManagementConfigApi",
+            "get_media_management_config",
+            "Read Sonarr media-management settings",
+        ),
+        ("analysis", "CommandApi", "create_command", "Start Sonarr media analysis"),
+        ("status", "CommandApi", "get_command_by_id", "Read Sonarr command status"),
+        (
+            "preview",
+            "RenameEpisodeApi",
+            "list_rename",
+            "Preview Sonarr file rename for Show",
+        ),
+        ("rename", "CommandApi", "create_command", "Start Sonarr file rename"),
+        ("roots", "RootFolderApi", "list_root_folder", "List Sonarr root folders"),
         (
             "folder",
             "SeriesFolderApi",
             "get_series_folder_without_preload_content",
+            "Resolve Sonarr folder for Show",
         ),
-        ("move", "SeriesEditorApi", "put_series_editor"),
-        ("rescan", "CommandApi", "create_command"),
+        ("move", "SeriesEditorApi", "put_series_editor", "Move Sonarr series folders"),
+        ("rescan", "CommandApi", "create_command", "Start Sonarr folder rescan"),
     ],
 )
 def test_translates_api_errors_at_every_boundary(
@@ -229,6 +285,7 @@ def test_translates_api_errors_at_every_boundary(
     boundary: str,
     api_name: str,
     method_name: str,
+    error_context: str,
 ) -> None:
     item = MediaItem(1, "Show", "/tv/Show")
     file_batch = FileRenameBatch((1,), (10,), "S01E01")
@@ -245,14 +302,14 @@ def test_translates_api_errors_at_every_boundary(
         "move": lambda: adapter.move_folder(folder_batch),
         "rescan": lambda: adapter.start_folder_rescan(folder_batch),
     }
-    getattr(sonarr_apis[api_name], method_name).side_effect = ApiException(
-        reason="broken"
-    )
+    api_error = ApiException(reason="broken")
+    getattr(sonarr_apis[api_name], method_name).side_effect = api_error
 
-    with pytest.raises(ArrOperationError, match="failed:") as error:
+    with pytest.raises(ArrOperationError) as error:
         operations[boundary]()
 
-    assert isinstance(error.value.__cause__, ApiException)
+    assert str(error.value).split(" failed:", maxsplit=1)[0] == error_context
+    assert error.value.__cause__ is api_error
     assert "broken" in str(error.value)
 
 

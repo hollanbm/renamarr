@@ -167,24 +167,29 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
     assert radarr_config["renamarr"]["analyze_files"] is True
 
 
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
 @pytest.mark.parametrize(
-    ("service", "section", "field"),
+    "renamarr_config",
     [
-        ("sonarr", "renamarr", "enabled"),
-        ("sonarr", "renamarr", "analyze_files"),
-        ("sonarr", "renamarr", "rename_folders"),
-        ("sonarr", "renamarr", "log_to_file"),
-        ("radarr", "renamarr", "enabled"),
-        ("radarr", "renamarr", "analyze_files"),
-        ("radarr", "renamarr", "rename_folders"),
-        ("radarr", "renamarr", "log_to_file"),
+        pytest.param({"enabled": "true"}, id="enabled"),
+        pytest.param({"analyze_files": "true"}, id="analyze-files"),
+        pytest.param({"rename_folders": "true"}, id="rename-folders"),
+        pytest.param({"log_to_file": "true"}, id="log-to-file"),
+        pytest.param(
+            {"hourly_job": "true", "schedule": {"enabled": False}},
+            id="deprecated-hourly-job",
+        ),
+        pytest.param(
+            {"schedule": {"enabled": "true"}},
+            id="schedule-enabled",
+        ),
     ],
 )
 def test_boolean_fields_reject_non_bool_values(
-    service: str, section: str, field: str
+    service: str, renamarr_config: dict[str, object]
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
-        section: {field: "true"}
+        "renamarr": renamarr_config
     }
 
     with pytest.raises(SchemaError):
@@ -312,6 +317,7 @@ def test_deprecated_hourly_job_does_not_hide_invalid_schedule(
         {"days": 31},
         {"hours": 721},
         {"minutes": 43201},
+        {"days": 30, "minutes": 1},
     ],
 )
 def test_schedule_rejects_intervals_over_thirty_days(
@@ -329,20 +335,45 @@ def test_schedule_rejects_intervals_over_thirty_days(
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+def test_enabled_schedule_rejects_zero_interval(service: str) -> None:
+    instance_config: dict[str, object] = minimal_instance_config() | {
+        "renamarr": {
+            "schedule": {
+                "enabled": True,
+                "interval": {"days": 0, "hours": 0, "minutes": 0},
+            }
+        }
+    }
+
+    with pytest.raises(
+        SchemaError,
+        match=(
+            "renamarr.schedule.interval must be greater than zero when scheduling "
+            "is enabled"
+        ),
+    ):
+        validate_config({service: [instance_config]})
+
+
+@pytest.mark.parametrize("service", ["sonarr", "radarr"])
 @pytest.mark.parametrize(
-    "interval",
+    ("field", "value"),
     [
-        {"days": 0, "hours": 0, "minutes": 0},
-        {"days": -1},
-        {"hours": True},
-        {"minutes": 1.5},
+        pytest.param("days", -1, id="negative"),
+        pytest.param("hours", True, id="boolean"),
+        pytest.param("minutes", 1.5, id="non-integer"),
     ],
 )
-def test_enabled_schedule_rejects_invalid_interval(
-    service: str, interval: dict[str, object]
+def test_schedule_rejects_invalid_interval_components_when_disabled(
+    service: str, field: str, value: object
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
-        "renamarr": {"schedule": {"enabled": True, "interval": interval}}
+        "renamarr": {
+            "schedule": {
+                "enabled": False,
+                "interval": {field: value},
+            }
+        }
     }
 
     with pytest.raises(SchemaError):
