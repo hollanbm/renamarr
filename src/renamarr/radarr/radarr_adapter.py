@@ -1,14 +1,26 @@
 from collections.abc import Sequence
+from json import loads
 
-from pycliarr.api import RadarrCli
-from pycliarr.api.exceptions import CliArrError
-
-from renamarr.adapter_helpers import (
-    as_dict,
-    command_id,
-    send_command,
-    translate_api_error,
+from pydantic import Field
+from radarr import (
+    ApiClient,
+    CommandApi,
+    CommandPriority,
+    CommandResource,
+    Configuration,
+    MediaManagementConfigApi,
+    MovieApi,
+    MovieEditorApi,
+    MovieEditorResource,
+    MovieFolderApi,
+    RenameMovieApi,
+    RootFolderApi,
 )
+from radarr import CommandResult as RadarrCommandResult
+from radarr import CommandStatus as RadarrCommandStatus
+from radarr.rest import ApiException
+
+from renamarr.adapter_helpers import translate_api_error
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -18,21 +30,56 @@ from renamarr.models.media import (
 )
 
 
+class _RadarrCommandResource(CommandResource):
+    """Add command-specific fields omitted from Radarr's OpenAPI schema."""
+
+    movie_ids: list[int] | None = Field(default=None, alias="movieIds")
+
+
+def _required[Value](value: Value | None, message: str) -> Value:
+    if value is None:
+        raise TypeError(message)
+    return value
+
+
+def _command_id(response: CommandResource) -> int:
+    return _required(response.id, "Expected a numeric command ID from Radarr")
+
+
 class RadarrAdapter:
-    """Normalize pycliarr's Radarr client for the shared Renamarr engine."""
+    """Normalize radarr-py's generated client for the Renamarr engine."""
 
     def __init__(self, url: str, api_key: str) -> None:
-        self._client = RadarrCli(url, api_key)
+        configuration = Configuration(
+            host=url,
+            api_key={"X-Api-Key": api_key},
+        )
+        self._client = ApiClient(configuration)
+        self._movie_api = MovieApi(self._client)
+        self._media_management_api = MediaManagementConfigApi(self._client)
+        self._command_api = CommandApi(self._client)
+        self._rename_api = RenameMovieApi(self._client)
+        self._root_folder_api = RootFolderApi(self._client)
+        self._movie_folder_api = MovieFolderApi(self._client)
+        self._movie_editor_api = MovieEditorApi(self._client)
 
     def list_media_items(self) -> list[MediaItem]:
         """Return the movies in the Radarr library."""
         movies = translate_api_error(
-            "Radarr", CliArrError, "List", "movies", self._client.get_movie
+            "Radarr",
+            ApiException,
+            "List",
+            "movies",
+            self._movie_api.list_movie,
         )
         if not isinstance(movies, list):
             raise TypeError("Expected a list of movies from Radarr")
         return [
-            MediaItem(id=movie.id, title=movie.title, path=movie.path)
+            MediaItem(
+                id=_required(movie.id, "Expected a movie ID from Radarr"),
+                title=_required(movie.title, "Expected a movie title from Radarr"),
+                path=_required(movie.path, "Expected a movie path from Radarr"),
+            )
             for movie in movies
         ]
 
@@ -40,71 +87,68 @@ class RadarrAdapter:
         """Return whether Radarr is configured to analyze media files."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Read",
             "media-management settings",
-            lambda: self._client.request_get(path="/api/v3/config/mediamanagement"),
+            self._media_management_api.get_media_management_config,
         )
-        enabled = as_dict("Radarr", response).get("enableMediaInfo")
-        if not isinstance(enabled, bool):
-            raise TypeError("Expected enableMediaInfo to be a boolean")
-        return enabled
+        return _required(
+            response.enable_media_info,
+            "Expected enableMediaInfo to be a boolean",
+        )
 
     def start_media_analysis(self) -> int:
         """Start a full Radarr movie rescan and return its command ID."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Start",
             "media analysis",
-            lambda: send_command(
-                self._client, {"name": "RescanMovie", "priority": "high"}
+            lambda: self._command_api.create_command(
+                _RadarrCommandResource(
+                    name="RescanMovie",
+                    priority=CommandPriority.HIGH,
+                )
             ),
         )
-        return command_id("Radarr", response)
+        return _command_id(response)
 
     def get_command_status(self, command_id: int) -> CommandStatus:
         """Return the normalized state of a Radarr command."""
-        response = as_dict(
+        response = translate_api_error(
             "Radarr",
-            translate_api_error(
-                "Radarr",
-                CliArrError,
-                "Read",
-                "command status",
-                lambda: self._client.get_command(cid=command_id),
-            ),
+            ApiException,
+            "Read",
+            "command status",
+            lambda: self._command_api.get_command_by_id(command_id),
         )
         return CommandStatus(
-            completed=response.get("status") == "completed",
-            successful=response.get("result") == "successful",
+            completed=response.status is RadarrCommandStatus.COMPLETED,
+            successful=response.result is RadarrCommandResult.SUCCESSFUL,
         )
 
     def get_file_rename_candidate(self, item: MediaItem) -> FileRenameCandidate | None:
         """Return a file-rename candidate when Radarr has a rename preview."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Preview",
             f"file rename for {item.title}",
-            lambda: self._client.request_get(
-                path="/api/v3/rename", url_params={"movieId": item.id}
-            ),
+            lambda: self._rename_api.list_rename(movie_id=[item.id]),
         )
         if not isinstance(response, list):
             raise TypeError("Expected a list of rename previews from Radarr")
         if not response:
             return None
-        file_ids: list[int] = []
-        for preview in response:
-            preview_dict = as_dict("Radarr", preview)
-            movie_file_id = preview_dict.get("movieFileId")
-            if type(movie_file_id) is not int:
-                raise TypeError("Expected a movie file ID in Radarr rename preview")
-            file_ids.append(movie_file_id)
         return FileRenameCandidate(
             item=item,
-            file_ids=tuple(file_ids),
+            file_ids=tuple(
+                _required(
+                    preview.movie_file_id,
+                    "Expected a movie file ID in Radarr rename preview",
+                )
+                for preview in response
+            ),
             description=item.title,
         )
 
@@ -132,45 +176,63 @@ class RadarrAdapter:
         """Start a Radarr RenameMovie command for a batch."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Start",
             "file rename",
-            lambda: send_command(
-                self._client,
-                {"name": "RenameMovie", "movieIds": list(batch.item_ids)},
+            lambda: self._command_api.create_command(
+                _RadarrCommandResource(
+                    name="RenameMovie",
+                    movie_ids=list(batch.item_ids),
+                )
             ),
         )
-        return command_id("Radarr", response)
+        return _command_id(response)
 
     def list_root_folders(self) -> list[str]:
         """Return configured Radarr root-folder paths."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "List",
             "root folders",
-            self._client.get_root_folder,
+            self._root_folder_api.list_root_folder,
         )
         if not isinstance(response, list):
             raise TypeError("Expected a list of root folders from Radarr")
-        paths: list[str] = []
-        for root_folder in response:
-            path = as_dict("Radarr", root_folder).get("path")
-            if not isinstance(path, str):
-                raise TypeError("Expected a root-folder path from Radarr")
-            paths.append(path)
-        return paths
+        return [
+            _required(root.path, "Expected a root-folder path from Radarr")
+            for root in response
+        ]
 
     def get_expected_folder_name(self, item: MediaItem) -> str:
         """Return the folder name Radarr expects for a movie."""
-        response = translate_api_error(
+
+        def get_folder_payload() -> bytes:
+            response = self._movie_folder_api.get_movie_folder_without_preload_content(
+                id=item.id
+            )
+            try:
+                payload = response.read()
+            finally:
+                response.release_conn()
+            if not 200 <= response.status <= 299:
+                raise ApiException(
+                    http_resp=response,
+                    body=payload.decode("utf-8", errors="replace"),
+                )
+            return payload
+
+        payload = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Resolve",
             f"folder for {item.title}",
-            lambda: self._client.request_get(path=f"/api/v3/movie/{item.id}/folder"),
+            get_folder_payload,
         )
-        folder = as_dict("Radarr", response).get("folder")
+        folder_response = loads(payload)
+        if not isinstance(folder_response, dict):
+            raise TypeError("Expected an object response from Radarr")
+        folder = folder_response.get("folder")
         if not isinstance(folder, str):
             raise TypeError("Expected a folder name from Radarr")
         return folder
@@ -179,16 +241,15 @@ class RadarrAdapter:
         """Move a batch of Radarr movie folders through the public API."""
         translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Move",
             "movie folders",
-            lambda: self._client.request_put(
-                path="/api/v3/movie/editor",
-                json_data={
-                    "rootFolderPath": batch.root_folder_path,
-                    "movieIds": [item.id for item in batch.items],
-                    "moveFiles": batch.move_files,
-                },
+            lambda: self._movie_editor_api.put_movie_editor(
+                MovieEditorResource(
+                    root_folder_path=batch.root_folder_path,
+                    movie_ids=list(batch.item_ids),
+                    move_files=batch.move_files,
+                )
             ),
         )
 
@@ -196,16 +257,15 @@ class RadarrAdapter:
         """Start a Radarr refresh for movies whose folders moved."""
         response = translate_api_error(
             "Radarr",
-            CliArrError,
+            ApiException,
             "Start",
             "folder rescan",
-            lambda: send_command(
-                self._client,
-                {
-                    "priority": "high",
-                    "name": "RefreshMovie",
-                    "movieIds": [item.id for item in batch.items],
-                },
+            lambda: self._command_api.create_command(
+                _RadarrCommandResource(
+                    name="RefreshMovie",
+                    priority=CommandPriority.HIGH,
+                    movie_ids=list(batch.item_ids),
+                )
             ),
         )
-        return command_id("Radarr", response)
+        return _command_id(response)

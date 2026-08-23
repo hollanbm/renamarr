@@ -3,21 +3,21 @@ from pytest_mock import MockerFixture
 
 from renamarr.adapter_factory import ArrService, create_arr_adapter
 from renamarr.radarr.radarr_adapter import RadarrAdapter
-from renamarr.sonarr_py.sonarr_py_adapter import SonarrPyAdapter
+from renamarr.sonarr.sonarr_adapter import SonarrAdapter
 
 
 def test_creates_radarr_adapter() -> None:
     adapter = create_arr_adapter(ArrService.RADARR, "https://radarr.test", "radarr-key")
 
     assert isinstance(adapter, RadarrAdapter)
-    assert adapter._client.host_url == "https://radarr.test"
-    assert adapter._client.api_key == "radarr-key"
+    assert adapter._client.configuration.host == "https://radarr.test"
+    assert adapter._client.configuration.api_key["X-Api-Key"] == "radarr-key"
 
 
 def test_creates_sonarr_adapter() -> None:
     adapter = create_arr_adapter(ArrService.SONARR, "https://sonarr.test", "sonarr-key")
 
-    assert isinstance(adapter, SonarrPyAdapter)
+    assert isinstance(adapter, SonarrAdapter)
     assert adapter._client.configuration.host == "https://sonarr.test"
     assert adapter._client.configuration.api_key["X-Api-Key"] == "sonarr-key"
 
