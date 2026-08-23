@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from healthcheck import check_health, main
 from renamarr.healthcheck.health_reporter import HealthReporter
@@ -32,7 +33,7 @@ def test_reporter_writes_initializing_state_atomically(tmp_path: Path) -> None:
 
 
 def test_reporter_preserves_health_file_when_temporary_write_fails(
-    tmp_path: Path, mocker
+    tmp_path: Path, mocker: MockerFixture
 ) -> None:
     path = tmp_path / "health.json"
     reporter = HealthReporter(
@@ -60,7 +61,9 @@ def test_reporter_preserves_health_file_when_temporary_write_fails(
     assert (tmp_path / ".health.json.tmp").read_text(encoding="utf-8") == "{"
 
 
-def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
+def test_reporter_throttles_idle_heartbeat(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
     clock = mocker.Mock(side_effect=[100.0, 101.0, 105.0, 111.0])
     reporter = HealthReporter(path=path, clock=clock, heartbeat_interval=10.0)
@@ -75,7 +78,9 @@ def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
     )
 
 
-def test_running_job_starts_and_joins_heartbeat_thread(tmp_path: Path, mocker) -> None:
+def test_running_job_starts_and_joins_heartbeat_thread(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
     event_factory = mocker.patch(
         "renamarr.healthcheck.health_reporter.Event", autospec=True

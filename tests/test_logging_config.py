@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from io import StringIO
 from pathlib import Path
 from sys import stderr, stdout
+from unittest.mock import MagicMock
 
 import pytest
 from loguru import logger
@@ -59,7 +60,7 @@ class TestLoggingConfigurator:
         logger_remove.assert_called_once_with()
         logger_add.assert_called_once()
         assert logger_add.call_args.args == (stdout,)
-        assert logger_add.call_args.kwargs["level"] == log_level
+        assert logger_add.call_args.kwargs["level"] == log_level.upper()
         configured_format = logger_add.call_args.kwargs["format"]
         assert (
             all(
@@ -186,7 +187,7 @@ class TestLoggingConfigurator:
         assert logger_add.call_args.kwargs["retention"] == "7 days"
 
     def test_configure_instance_file_warns_when_sink_setup_fails(
-        self, mock_loguru_warning, mocker: MockerFixture
+        self, mock_loguru_warning: MagicMock, mocker: MockerFixture
     ) -> None:
         mocker.patch.dict(
             os.environ,

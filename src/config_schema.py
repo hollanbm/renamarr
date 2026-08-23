@@ -115,7 +115,9 @@ RENAMARR_SCHEMA = And(
             Optional("analyze_files", default=False): bool,
             Optional("rename_folders", default=False): bool,
             Optional("log_to_file", default=False): bool,
-            Optional("schedule", default=DEFAULT_SCHEDULE): SCHEDULE_SCHEMA,
+            Optional(
+                "schedule", default=lambda: dict(DEFAULT_SCHEDULE)
+            ): SCHEDULE_SCHEMA,
             Optional(
                 "command_polling",
                 default=DEFAULT_COMMAND_POLLING,

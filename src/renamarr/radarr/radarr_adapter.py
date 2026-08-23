@@ -20,7 +20,7 @@ from radarr import CommandResult as RadarrCommandResult
 from radarr import CommandStatus as RadarrCommandStatus
 from radarr.rest import ApiException
 
-from renamarr.adapter_helpers import translate_api_error
+from renamarr.adapter_helpers import require, translate_api_error
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -36,14 +36,8 @@ class _RadarrCommandResource(CommandResource):
     movie_ids: list[int] | None = Field(default=None, alias="movieIds")
 
 
-def _required[Value](value: Value | None, message: str) -> Value:
-    if value is None:
-        raise TypeError(message)
-    return value
-
-
 def _command_id(response: CommandResource) -> int:
-    return _required(response.id, "Expected a numeric command ID from Radarr")
+    return require(response.id, "Expected a numeric command ID from Radarr")
 
 
 class RadarrAdapter:
@@ -76,9 +70,9 @@ class RadarrAdapter:
             raise TypeError("Expected a list of movies from Radarr")
         return [
             MediaItem(
-                id=_required(movie.id, "Expected a movie ID from Radarr"),
-                title=_required(movie.title, "Expected a movie title from Radarr"),
-                path=_required(movie.path, "Expected a movie path from Radarr"),
+                id=require(movie.id, "Expected a movie ID from Radarr"),
+                title=require(movie.title, "Expected a movie title from Radarr"),
+                path=require(movie.path, "Expected a movie path from Radarr"),
             )
             for movie in movies
         ]
@@ -92,7 +86,7 @@ class RadarrAdapter:
             "media-management settings",
             self._media_management_api.get_media_management_config,
         )
-        return _required(
+        return require(
             response.enable_media_info,
             "Expected enableMediaInfo to be a boolean",
         )
@@ -143,7 +137,7 @@ class RadarrAdapter:
         return FileRenameCandidate(
             item=item,
             file_ids=tuple(
-                _required(
+                require(
                     preview.movie_file_id,
                     "Expected a movie file ID in Radarr rename preview",
                 )
@@ -200,7 +194,7 @@ class RadarrAdapter:
         if not isinstance(response, list):
             raise TypeError("Expected a list of root folders from Radarr")
         return [
-            _required(root.path, "Expected a root-folder path from Radarr")
+            require(root.path, "Expected a root-folder path from Radarr")
             for root in response
         ]
 

@@ -21,7 +21,7 @@ from sonarr import CommandResult as SonarrCommandResult
 from sonarr import CommandStatus as SonarrCommandStatus
 from sonarr.rest import ApiException
 
-from renamarr.adapter_helpers import translate_api_error
+from renamarr.adapter_helpers import require, translate_api_error
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -39,22 +39,16 @@ class _SonarrCommandResource(CommandResource):
     files: list[int] | None = None
 
 
-def _required[Value](value: Value | None, message: str) -> Value:
-    if value is None:
-        raise TypeError(message)
-    return value
-
-
 def _command_id(response: CommandResource) -> int:
-    return _required(response.id, "Expected a numeric command ID from Sonarr")
+    return require(response.id, "Expected a numeric command ID from Sonarr")
 
 
 def _episode_label(preview: RenameEpisodeResource) -> str:
-    season_number = _required(
+    season_number = require(
         preview.season_number,
         "Expected a season number in Sonarr rename preview",
     )
-    episode_numbers = _required(
+    episode_numbers = require(
         preview.episode_numbers,
         "Expected episode numbers in Sonarr rename preview",
     )
@@ -93,9 +87,9 @@ class SonarrAdapter:
             raise TypeError("Expected a list of series from Sonarr")
         return [
             MediaItem(
-                id=_required(show.id, "Expected a series ID from Sonarr"),
-                title=_required(show.title, "Expected a series title from Sonarr"),
-                path=_required(show.path, "Expected a series path from Sonarr"),
+                id=require(show.id, "Expected a series ID from Sonarr"),
+                title=require(show.title, "Expected a series title from Sonarr"),
+                path=require(show.path, "Expected a series path from Sonarr"),
             )
             for show in series
         ]
@@ -109,7 +103,7 @@ class SonarrAdapter:
             "media-management settings",
             self._media_management_api.get_media_management_config,
         )
-        return _required(
+        return require(
             response.enable_media_info,
             "Expected enableMediaInfo to be a boolean",
         )
@@ -160,7 +154,7 @@ class SonarrAdapter:
         return FileRenameCandidate(
             item=item,
             file_ids=tuple(
-                _required(
+                require(
                     preview.episode_file_id,
                     "Expected an episode file ID in Sonarr rename preview",
                 )
@@ -214,7 +208,7 @@ class SonarrAdapter:
         if not isinstance(response, list):
             raise TypeError("Expected a list of root folders from Sonarr")
         return [
-            _required(root.path, "Expected a root-folder path from Sonarr")
+            require(root.path, "Expected a root-folder path from Sonarr")
             for root in response
         ]
 

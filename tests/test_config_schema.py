@@ -103,6 +103,23 @@ def test_omitted_renamarr_defaults_are_independent_between_services() -> None:
     assert radarr_schedule["enabled"] is True
 
 
+def test_partial_renamarr_schedule_defaults_are_independent_between_instances() -> None:
+    validated = validate_config(
+        {
+            "sonarr": [
+                minimal_instance_config() | {"renamarr": {"enabled": True}},
+                minimal_instance_config() | {"renamarr": {"analyze_files": True}},
+            ]
+        }
+    )
+    first_schedule = validated["sonarr"][0]["renamarr"]["schedule"]
+    second_schedule = validated["sonarr"][1]["renamarr"]["schedule"]
+
+    assert first_schedule is not second_schedule
+    first_schedule["enabled"] = False
+    assert second_schedule["enabled"] is True
+
+
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 def test_present_empty_service_list_is_rejected(service: str) -> None:
     with pytest.raises(SchemaError):

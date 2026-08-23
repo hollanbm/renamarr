@@ -331,7 +331,11 @@ def test_does_not_translate_unexpected_errors(
             MediaManagementConfigResource(),
             "Expected enableMediaInfo",
         ),
-        ("analysis", CommandResource(), "Expected a numeric command ID"),
+        (
+            "analysis",
+            CommandResource(),
+            "^Expected a numeric command ID from Sonarr$",
+        ),
         ("preview", {}, "Expected a list of rename previews"),
         ("roots", {}, "Expected a list of root folders"),
     ],

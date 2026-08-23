@@ -39,7 +39,7 @@ class LoggingConfigurator:
         """Configure the default stdout sink."""
         self._configure_records()
         logger.remove()
-        logger.add(stdout, format=self._logger_format, level=self._log_level)
+        logger.add(stdout, format=self._logger_format, level=self._log_level.upper())
 
     def configure_instance_file(self, service: str, instance_name: str) -> bool:
         """Configure a file sink for one service instance.

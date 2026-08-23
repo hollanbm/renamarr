@@ -133,7 +133,9 @@ class TestMain:
         )
         renamarr.return_value.scan.assert_called_once_with()
 
-    def test_init_loads_dotenv_before_configuring_logging(self, mocker) -> None:
+    def test_init_loads_dotenv_before_configuring_logging(
+        self, mocker: MockerFixture
+    ) -> None:
         load_dotenv = mocker.patch("main.load_dotenv")
         initialization = mocker.Mock()
         initialization.attach_mock(load_dotenv, "load_dotenv")
@@ -166,7 +168,7 @@ class TestMain:
 
     @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
     def test_log_to_file_configures_instance_sink(
-        self, config, service: ArrService, mocker
+        self, config: Config, service: ArrService, mocker: MockerFixture
     ) -> None:
         instance_config = getattr(config, service.value)[0]
         instance_config.renamarr.enabled = True
@@ -282,7 +284,7 @@ class TestMain:
 
     @pytest.mark.parametrize("service", ["sonarr", "radarr"])
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
-        self, config, service, mocker
+        self, config: Config, service: str, mocker: MockerFixture
     ) -> None:
         service_config = getattr(config, service)[0]
         arr_service = ArrService(service)
@@ -341,7 +343,9 @@ class TestMain:
             mocker.call(None, None, None),
         ]
 
-    def test_start_runs_every_enabled_instance(self, config, mocker) -> None:
+    def test_start_runs_every_enabled_instance(
+        self, config: Config, mocker: MockerFixture
+    ) -> None:
         enabled_instances = [
             (ArrService.SONARR, config.sonarr[0]),
             (ArrService.SONARR, config.sonarr[1]),
@@ -386,7 +390,7 @@ class TestMain:
         self.scheduler_loop.assert_not_called()
 
     def test_external_cron_does_not_disable_explicit_renamarr_schedule(
-        self, config, mocker
+        self, config: Config, mocker: MockerFixture
     ) -> None:
         config.radarr[0].renamarr.enabled = True
         config.radarr[0].renamarr.schedule.enabled = True
