@@ -13,6 +13,10 @@ from renamarr.models.media import (
 class ArrAdapter(Protocol):
     """Normalized operations required by the shared Renamarr workflow."""
 
+    def close(self) -> None:
+        """Release resources owned by the service client."""
+        ...
+
     def list_media_items(self) -> list[MediaItem]:
         """Return all media items from the configured service."""
         ...

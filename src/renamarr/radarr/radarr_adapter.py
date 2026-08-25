@@ -57,6 +57,10 @@ class RadarrAdapter:
         self._movie_folder_api = MovieFolderApi(self._client)
         self._movie_editor_api = MovieEditorApi(self._client)
 
+    def close(self) -> None:
+        """Release the generated client's HTTP connection pools."""
+        self._client.rest_client.pool_manager.clear()
+
     def list_media_items(self) -> list[MediaItem]:
         """Return the movies in the Radarr library."""
         movies = translate_api_error(

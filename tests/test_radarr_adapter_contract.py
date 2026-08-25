@@ -49,6 +49,8 @@ def test_wires_generated_radarr_client(mocker: MockerFixture) -> None:
         "renamarr.radarr.radarr_adapter.Configuration", autospec=True
     )
     api_client = mocker.patch("renamarr.radarr.radarr_adapter.ApiClient", autospec=True)
+    pool_manager = mocker.Mock()
+    api_client.return_value.rest_client = mocker.Mock(pool_manager=pool_manager)
     api_classes = [
         mocker.patch(f"renamarr.radarr.radarr_adapter.{name}", autospec=True)
         for name in (
@@ -72,6 +74,10 @@ def test_wires_generated_radarr_client(mocker: MockerFixture) -> None:
     assert adapter._client is api_client.return_value
     for api_class in api_classes:
         api_class.assert_called_once_with(api_client.return_value)
+
+    adapter.close()
+
+    pool_manager.clear.assert_called_once_with()
 
 
 @pytest.fixture

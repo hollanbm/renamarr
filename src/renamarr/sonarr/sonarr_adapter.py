@@ -74,6 +74,10 @@ class SonarrAdapter:
         self._series_folder_api = SeriesFolderApi(self._client)
         self._series_editor_api = SeriesEditorApi(self._client)
 
+    def close(self) -> None:
+        """Release the generated client's HTTP connection pools."""
+        self._client.rest_client.pool_manager.clear()
+
     def list_media_items(self) -> list[MediaItem]:
         """Return the series in the Sonarr library."""
         series = translate_api_error(

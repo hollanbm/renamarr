@@ -70,13 +70,16 @@ class Main:
                     url=config.url,
                     api_key=config.api_key,
                 )
-                Renamarr(
-                    name=config.name,
-                    adapter=adapter,
-                    analyze_files=config.renamarr.analyze_files,
-                    rename_folders=config.renamarr.rename_folders,
-                    command_polling=config.renamarr.command_polling,
-                ).scan()
+                try:
+                    Renamarr(
+                        name=config.name,
+                        adapter=adapter,
+                        analyze_files=config.renamarr.analyze_files,
+                        rename_folders=config.renamarr.rename_folders,
+                        command_polling=config.renamarr.command_polling,
+                    ).scan()
+                finally:
+                    adapter.close()
             except Exception:  # noqa: BLE001 - A failed job must not stop the scheduler.
                 logger.exception(
                     "Unexpected failure while running Renamarr for "

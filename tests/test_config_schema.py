@@ -20,10 +20,12 @@ def minimal_instance_config() -> dict[str, str]:
     }
 
 
-def _renamarr_config(validated: dict[str, object], service: str) -> dict[str, object]:
+def _renamarr_config(
+    validated: dict[str, object], service: str, instance_index: int = 0
+) -> dict[str, object]:
     service_configs = validated[service]
     assert isinstance(service_configs, list)
-    instance_config = service_configs[0]
+    instance_config = service_configs[instance_index]
     assert isinstance(instance_config, dict)
     renamarr_config = instance_config["renamarr"]
     assert isinstance(renamarr_config, dict)
@@ -112,9 +114,13 @@ def test_partial_renamarr_schedule_defaults_are_independent_between_instances() 
             ]
         }
     )
-    first_schedule = validated["sonarr"][0]["renamarr"]["schedule"]
-    second_schedule = validated["sonarr"][1]["renamarr"]["schedule"]
+    first_schedule = _renamarr_config(validated, "sonarr")["schedule"]
+    second_schedule = _renamarr_config(validated, "sonarr", instance_index=1)[
+        "schedule"
+    ]
 
+    assert isinstance(first_schedule, dict)
+    assert isinstance(second_schedule, dict)
     assert first_schedule is not second_schedule
     first_schedule["enabled"] = False
     assert second_schedule["enabled"] is True
