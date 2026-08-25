@@ -9,10 +9,6 @@ sonarr:
       log_to_file: false
       schedule:
         enabled: false
-    series_scanner:
-      enabled: true
-      hourly_job: false
-      hours_before_air: 4
 radarr:
   - name: radarr
     url: https://radarr.tld:7878

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from healthcheck import check_health, main
 from renamarr.healthcheck.health_reporter import HealthReporter
@@ -31,31 +32,88 @@ def test_reporter_writes_initializing_state_atomically(tmp_path: Path) -> None:
     assert not (tmp_path / ".health.json.tmp").exists()
 
 
-def test_reporter_throttles_idle_heartbeat(tmp_path: Path, mocker) -> None:
+def test_reporter_preserves_health_file_when_temporary_write_fails(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
-    clock = mocker.Mock(side_effect=[0.0, 1.0, 5.0, 11.0])
+    reporter = HealthReporter(
+        path=path,
+        clock=mocker.Mock(side_effect=[100.0, 101.0]),
+    )
+    original_contents = path.read_text(encoding="utf-8")
+    original_write_text = Path.write_text
+
+    def write_partial_then_fail(target: Path, contents: str, *, encoding: str) -> int:
+        original_write_text(target, contents[:1], encoding=encoding)
+        raise OSError("interrupted write")
+
+    mocker.patch.object(
+        Path,
+        "write_text",
+        autospec=True,
+        side_effect=write_partial_then_fail,
+    )
+
+    with pytest.raises(OSError, match="^interrupted write$"):
+        reporter.idle()
+
+    assert path.read_text(encoding="utf-8") == original_contents
+    assert (tmp_path / ".health.json.tmp").read_text(encoding="utf-8") == "{"
+
+
+def test_reporter_throttles_idle_heartbeat(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    path = tmp_path / "health.json"
+    clock = mocker.Mock(side_effect=[100.0, 101.0, 105.0, 111.0])
     reporter = HealthReporter(path=path, clock=clock, heartbeat_interval=10.0)
     reporter.idle()
 
     reporter.heartbeat()
-    assert json.loads(path.read_text(encoding="utf-8"))["heartbeat"] == 1.0
+    assert json.loads(path.read_text(encoding="utf-8"))["heartbeat"] == 101.0
 
     reporter.heartbeat()
     assert json.loads(path.read_text(encoding="utf-8")) == health_payload(
-        heartbeat=11.0
+        heartbeat=111.0
     )
 
 
-def test_running_job_starts_and_joins_heartbeat_thread(tmp_path: Path, mocker) -> None:
+def test_running_job_starts_and_joins_heartbeat_thread(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     path = tmp_path / "health.json"
-    thread = mocker.patch("renamarr.healthcheck.health_reporter.Thread")
-    reporter = HealthReporter(path=path, clock=mocker.Mock(side_effect=[0.0, 1.0, 2.0]))
+    event_factory = mocker.patch(
+        "renamarr.healthcheck.health_reporter.Event", autospec=True
+    )
+    thread_factory = mocker.patch(
+        "renamarr.healthcheck.health_reporter.Thread", autospec=True
+    )
+    event = event_factory.return_value
+    thread = thread_factory.return_value
+    lifecycle: list[str] = []
+    thread.start.side_effect = lambda: lifecycle.append("start")
+    event.set.side_effect = lambda: lifecycle.append("stop")
+    thread.join.side_effect = lambda: lifecycle.append("join")
+    reporter = HealthReporter(
+        path=path,
+        clock=mocker.Mock(side_effect=[100.0, 101.0, 102.0]),
+    )
 
     with reporter.running_job():
         assert json.loads(path.read_text(encoding="utf-8"))["state"] == "running"
+        assert lifecycle == ["start"]
 
-    thread.return_value.start.assert_called_once_with()
-    thread.return_value.join.assert_called_once_with()
+    event_factory.assert_called_once_with()
+    thread_factory.assert_called_once_with(
+        target=reporter._heartbeat_until_stopped,
+        args=(event,),
+        daemon=True,
+        name="renamarr-heartbeat",
+    )
+    thread.start.assert_called_once_with()
+    event.set.assert_called_once_with()
+    thread.join.assert_called_once_with()
+    assert lifecycle == ["start", "stop", "join"]
     assert json.loads(path.read_text(encoding="utf-8"))["state"] == "idle"
 
 
@@ -89,10 +147,10 @@ def test_job_heartbeat_refreshes_until_stopped(tmp_path: Path, mocker) -> None:
 @pytest.mark.parametrize(
     ("heartbeat", "now", "expected"),
     [
-        pytest.param(100.0, 100.0, True, id="current"),
-        pytest.param(100.0, 130.0, True, id="maximum-age"),
-        pytest.param(100.0, 130.1, False, id="stale"),
-        pytest.param(100.0, 99.9, False, id="future"),
+        pytest.param(100.0, 100.0, (True, "healthy"), id="current"),
+        pytest.param(100.0, 130.0, (True, "healthy"), id="maximum-age"),
+        pytest.param(100.0, 130.1, (False, "heartbeat is stale"), id="stale"),
+        pytest.param(100.0, 99.9, (False, "heartbeat is stale"), id="future"),
     ],
 )
 def test_check_health_validates_age_for_every_state(
@@ -100,14 +158,12 @@ def test_check_health_validates_age_for_every_state(
     state: HealthState,
     heartbeat: float,
     now: float,
-    expected: bool,
+    expected: tuple[bool, str],
 ) -> None:
     path = tmp_path / "health.json"
     write_health(path, health_payload(state=state, heartbeat=heartbeat))
 
-    healthy, _ = check_health(path=path, clock=lambda: now)
-
-    assert healthy is expected
+    assert check_health(path=path, clock=lambda: now) == expected
 
 
 @pytest.mark.parametrize(
@@ -120,6 +176,21 @@ def test_check_health_validates_age_for_every_state(
             '{"version":1,"state":"idle","heartbeat":100,"extra":true}',
             "heartbeat schema is invalid",
             id="unexpected-field",
+        ),
+        pytest.param(
+            '{"state":"idle","heartbeat":100}',
+            "heartbeat schema is invalid",
+            id="missing-version",
+        ),
+        pytest.param(
+            '{"version":1,"heartbeat":100}',
+            "heartbeat schema is invalid",
+            id="missing-state",
+        ),
+        pytest.param(
+            '{"version":1,"state":"idle"}',
+            "heartbeat schema is invalid",
+            id="missing-heartbeat",
         ),
     ],
 )
