@@ -20,16 +20,32 @@ def minimal_instance_config() -> dict[str, str]:
     }
 
 
-def _renamarr_config(
+def _instance_config(
     validated: dict[str, object], service: str, instance_index: int = 0
 ) -> dict[str, object]:
     service_configs = validated[service]
     assert isinstance(service_configs, list)
     instance_config = service_configs[instance_index]
     assert isinstance(instance_config, dict)
+    return instance_config
+
+
+def _renamarr_config(
+    validated: dict[str, object], service: str, instance_index: int = 0
+) -> dict[str, object]:
+    instance_config = _instance_config(validated, service, instance_index)
     renamarr_config = instance_config["renamarr"]
     assert isinstance(renamarr_config, dict)
     return renamarr_config
+
+
+def _schedule_config(
+    validated: dict[str, object], service: str, instance_index: int = 0
+) -> dict[str, object]:
+    renamarr_config = _renamarr_config(validated, service, instance_index)
+    schedule_config = renamarr_config["schedule"]
+    assert isinstance(schedule_config, dict)
+    return schedule_config
 
 
 def test_omitted_services_default_to_empty_lists() -> None:
@@ -179,15 +195,17 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
         }
     )
 
-    sonarr_config = validated["sonarr"][0]
-    radarr_config = validated["radarr"][0]
+    sonarr_config = _instance_config(validated, "sonarr")
+    radarr_config = _instance_config(validated, "radarr")
+    sonarr_renamarr = _renamarr_config(validated, "sonarr")
+    radarr_renamarr = _renamarr_config(validated, "radarr")
 
     assert "unexpected" not in sonarr_config
-    assert "unexpected" not in sonarr_config["renamarr"]
+    assert "unexpected" not in sonarr_renamarr
     assert "unexpected" not in radarr_config
-    assert "unexpected" not in radarr_config["renamarr"]
-    assert sonarr_config["renamarr"]["rename_folders"] is True
-    assert radarr_config["renamarr"]["analyze_files"] is True
+    assert "unexpected" not in radarr_renamarr
+    assert sonarr_renamarr["rename_folders"] is True
+    assert radarr_renamarr["analyze_files"] is True
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
@@ -241,7 +259,7 @@ def test_schedule_interval_is_validated(
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["schedule"] == {
+    assert _schedule_config(validated, service) == {
         "enabled": True,
         "interval": expected,
     }
@@ -260,9 +278,7 @@ def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["schedule"]["interval"] == Interval(
-        0, 0, 0
-    )
+    assert _schedule_config(validated, service)["interval"] == Interval(0, 0, 0)
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
@@ -276,8 +292,8 @@ def test_deprecated_hourly_job_sets_schedule_enabled_without_parse_warning(
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["hourly_job"] is hourly_job
-    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is hourly_job
+    assert _renamarr_config(validated, service)["hourly_job"] is hourly_job
+    assert _schedule_config(validated, service)["enabled"] is hourly_job
     mock_loguru_warning.assert_not_called()
 
 
@@ -294,7 +310,7 @@ def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["schedule"] == {
+    assert _schedule_config(validated, service) == {
         "enabled": False,
         "interval": Interval(days=0, hours=0, minutes=30),
     }
@@ -317,7 +333,7 @@ def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
 
     validated = validate_config({service: [instance_config]})
 
-    assert validated[service][0]["renamarr"]["schedule"]["enabled"] is schedule_enabled
+    assert _schedule_config(validated, service)["enabled"] is schedule_enabled
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])

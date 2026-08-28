@@ -2,6 +2,7 @@ import os
 from collections.abc import Iterator
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Protocol
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,6 +21,37 @@ from renamarr.protocols import ArrAdapter
 
 # disable config caching
 configparser.hold_an_instance = False
+
+
+class _IntervalConfig(Protocol):
+    total_minutes: int
+
+
+class _ScheduleConfig(Protocol):
+    enabled: bool
+    interval: _IntervalConfig
+
+
+class _RenamarrConfig(Protocol):
+    enabled: bool
+    hourly_job: bool
+    analyze_files: bool
+    rename_folders: bool
+    schedule: _ScheduleConfig
+    command_polling: CommandPollingSettings
+
+
+class _ServiceConfig(Protocol):
+    name: str
+    url: str
+    api_key: str
+    renamarr: _RenamarrConfig
+
+
+def _service_config(
+    config: Config, service: str, instance_index: int = 0
+) -> _ServiceConfig:
+    return getattr(config, service)[instance_index]
 
 
 class TestMain:
@@ -244,7 +276,7 @@ class TestMain:
         mock_loguru_warning: MagicMock,
         mocker: MockerFixture,
     ) -> None:
-        service_config = config.sonarr[0]
+        service_config = _service_config(config, "sonarr")
         service_config.renamarr.enabled = True
         service_config.renamarr.hourly_job = True
         mocker.patch("pyconfigparser.configparser.get_config", return_value=config)
@@ -366,10 +398,10 @@ class TestMain:
         self, config: Config, mocker: MockerFixture
     ) -> None:
         enabled_instances = [
-            (ArrService.SONARR, config.sonarr[0]),
-            (ArrService.SONARR, config.sonarr[1]),
-            (ArrService.RADARR, config.radarr[0]),
-            (ArrService.RADARR, config.radarr[1]),
+            (ArrService.SONARR, _service_config(config, "sonarr")),
+            (ArrService.SONARR, _service_config(config, "sonarr", 1)),
+            (ArrService.RADARR, _service_config(config, "radarr")),
+            (ArrService.RADARR, _service_config(config, "radarr", 1)),
         ]
         for _, instance_config in enabled_instances:
             instance_config.renamarr.enabled = True
@@ -412,8 +444,9 @@ class TestMain:
     def test_external_cron_does_not_disable_explicit_renamarr_schedule(
         self, config: Config, mocker: MockerFixture
     ) -> None:
-        config.radarr[0].renamarr.enabled = True
-        config.radarr[0].renamarr.schedule.enabled = True
+        service_config = _service_config(config, "radarr")
+        service_config.renamarr.enabled = True
+        service_config.renamarr.schedule.enabled = True
         mocker.patch.dict(os.environ, {"EXTERNAL_CRON": "TRUE"})
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         renamarr = mocker.patch("main.Renamarr")
