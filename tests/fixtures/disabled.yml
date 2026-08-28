@@ -21,3 +21,15 @@ radarr:
     api_key: radarr1-api-key
     renamarr:
       enabled: false
+
+lidarr:
+  - name: lidarr
+    url: https://lidarr.tld
+    api_key: lidarr-api-key
+    renamarr:
+      enabled: false
+  - name: lidarr1
+    url: https://lidarr1.tld
+    api_key: lidarr1-api-key
+    renamarr:
+      enabled: false

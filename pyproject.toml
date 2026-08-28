@@ -12,6 +12,7 @@ dependencies = [
   "sonarr",
   "pydantic>=2,<3",
   "radarr>=1.2.1",
+  "lidarr>=1.2.1",
 ]
 
 [dependency-groups]
@@ -38,6 +39,8 @@ environments = [
 [tool.uv.sources]
 sonarr = { git = "https://github.com/devopsarr/sonarr-py.git", tag = "v1.1.1" }
 radarr = { git = "https://github.com/devopsarr/radarr-py.git", tag = "v1.2.1" }
+lidarr = { git = "https://github.com/devopsarr/lidarr-py.git", tag = "v1.2.1" }
+
 
 [tool.ty.analysis]
 # These dependencies expose incomplete or overly broad type information.

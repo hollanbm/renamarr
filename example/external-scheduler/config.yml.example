@@ -20,3 +20,14 @@ radarr:
       log_to_file: false
       schedule:
         enabled: false
+lidarr:
+  - name: music
+    url: https://lidarr.tld:8686
+    api_key: not-a-real-api-key
+    renamarr:
+      enabled: true
+      analyze_files: false
+      rename_folders: true
+      log_to_file: true
+      schedule:
+        enabled: false
