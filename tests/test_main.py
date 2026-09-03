@@ -201,7 +201,7 @@ class TestMain:
         assert run_pending.call_count == 2
         assert sleep.call_args_list == [mocker.call(1), mocker.call(1)]
 
-    @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
+    @pytest.mark.parametrize("service", list(ArrService))
     def test_log_to_file_configures_instance_sink(
         self, config: Config, service: ArrService, mocker: MockerFixture
     ) -> None:
@@ -237,10 +237,14 @@ class TestMain:
 
         self.logging_configurator.configure_instance_file.assert_not_called()
 
-    def test_sonarr_renamarr_scan(self, config, mocker) -> None:
-        config.sonarr[0].renamarr.enabled = True
-        config.sonarr[0].renamarr.analyze_files = True
-        config.sonarr[0].renamarr.rename_folders = True
+    @pytest.mark.parametrize("service", list(ArrService))
+    def test_renamarr_scan(
+        self, config: Config, service: ArrService, mocker: MockerFixture
+    ) -> None:
+        service_config = _service_config(config, service.value)
+        service_config.renamarr.enabled = True
+        service_config.renamarr.analyze_files = True
+        service_config.renamarr.rename_folders = True
         mocker.patch("pyconfigparser.configparser.get_config").return_value = config
         mocker.patch.object(Job, "do")
 
@@ -253,16 +257,16 @@ class TestMain:
         Main().start()
 
         create_arr_adapter.assert_called_once_with(
-            service=ArrService.SONARR,
-            url=config.sonarr[0].url,
-            api_key=config.sonarr[0].api_key,
+            service=service,
+            url=service_config.url,
+            api_key=service_config.api_key,
         )
         renamarr.assert_called_once_with(
-            name=config.sonarr[0].name,
+            name=service_config.name,
             adapter=adapter,
             analyze_files=True,
             rename_folders=True,
-            command_polling=config.sonarr[0].renamarr.command_polling,
+            command_polling=service_config.renamarr.command_polling,
         )
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
@@ -325,7 +329,7 @@ class TestMain:
             config=service_config,
         )
 
-    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+    @pytest.mark.parametrize("service", [service.value for service in ArrService])
     def test_default_renamarr_schedule_runs_immediately_and_hourly(
         self, config: Config, service: str, mocker: MockerFixture
     ) -> None:
@@ -402,6 +406,8 @@ class TestMain:
             (ArrService.SONARR, _service_config(config, "sonarr", 1)),
             (ArrService.RADARR, _service_config(config, "radarr")),
             (ArrService.RADARR, _service_config(config, "radarr", 1)),
+            (ArrService.LIDARR, _service_config(config, "lidarr")),
+            (ArrService.LIDARR, _service_config(config, "lidarr", 1)),
         ]
         for _, instance_config in enabled_instances:
             instance_config.renamarr.enabled = True
@@ -461,7 +467,7 @@ class TestMain:
         assert jobs[0].unit == "minutes"
         self.scheduler_loop.assert_called_once_with()
 
-    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+    @pytest.mark.parametrize("service", [service.value for service in ArrService])
     def test_deprecated_hourly_job_warns_before_and_after_renamarr_job(
         self, config, service: str, mock_loguru_warning, mocker
     ) -> None:
@@ -606,7 +612,7 @@ class TestMain:
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
 
-    @pytest.mark.parametrize("service", ["sonarr", "radarr"])
+    @pytest.mark.parametrize("service", [service.value for service in ArrService])
     def test_disabled_renamarr_schedule_runs_once(
         self, config, service, mocker
     ) -> None:

@@ -127,75 +127,34 @@ RENAMARR_SCHEMA = And(
     ),
 )
 
+
+def _service_schema(service: str) -> And:
+    required_fields = {
+        field: And(
+            lambda value: value is not None,
+            Use(str),
+            lambda value: len(value) > 0,
+            error=f"{service}[].{field} is a required field",
+        )
+        for field in ("name", "url", "api_key")
+    }
+    return And(
+        lambda instances: len(instances),
+        [
+            required_fields
+            | {
+                Optional(
+                    "renamarr",
+                    default=_renamarr_defaults,
+                    ignore_extra_keys=True,
+                ): RENAMARR_SCHEMA,
+            }
+        ],
+        ignore_extra_keys=True,
+    )
+
+
 CONFIG_SCHEMA = {
-    Optional(
-        "sonarr",
-        default=[],
-        ignore_extra_keys=True,
-    ): And(
-        lambda n: len(n),
-        [
-            {
-                "name": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="sonarr[].name is a required field",
-                ),
-                "url": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="sonarr[].url is a required field",
-                ),
-                "api_key": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="sonarr[].api_key is a required field",
-                ),
-                Optional(
-                    "renamarr",
-                    default=_renamarr_defaults,
-                    ignore_extra_keys=True,
-                ): RENAMARR_SCHEMA,
-            }
-        ],
-        ignore_extra_keys=True,
-    ),
-    Optional(
-        "radarr",
-        default=[],
-        ignore_extra_keys=True,
-    ): And(
-        lambda n: len(n),
-        [
-            {
-                "name": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="radarr[].name is a required field",
-                ),
-                "url": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="radarr[].url is a required field",
-                ),
-                "api_key": And(
-                    lambda s: s is not None,
-                    Use(str),
-                    lambda s: len(s) > 0,
-                    error="radarr[].api_key is a required field",
-                ),
-                Optional(
-                    "renamarr",
-                    default=_renamarr_defaults,
-                    ignore_extra_keys=True,
-                ): RENAMARR_SCHEMA,
-            }
-        ],
-        ignore_extra_keys=True,
-    ),
+    Optional(service, default=[], ignore_extra_keys=True): _service_schema(service)
+    for service in ("sonarr", "radarr", "lidarr")
 }

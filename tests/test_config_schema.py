@@ -7,6 +7,8 @@ from config_schema import CONFIG_SCHEMA
 from interval import Interval
 from renamarr.models.command import CommandPollingSettings
 
+ARR_SERVICES = ("sonarr", "radarr", "lidarr")
+
 
 def validate_config(config: dict[str, object]) -> dict[str, object]:
     return Schema(CONFIG_SCHEMA).validate(config)
@@ -49,13 +51,14 @@ def _schedule_config(
 
 
 def test_omitted_services_default_to_empty_lists() -> None:
-    assert validate_config({}) == {"sonarr": [], "radarr": []}
+    assert validate_config({}) == {"sonarr": [], "radarr": [], "lidarr": []}
 
 
 def test_minimal_sonarr_config_receives_defaults() -> None:
     validated = validate_config({"sonarr": [minimal_instance_config()]})
 
     assert validated["radarr"] == []
+    assert validated["lidarr"] == []
     assert validated["sonarr"] == [
         {
             "name": "instance",
@@ -80,7 +83,33 @@ def test_minimal_radarr_config_receives_defaults() -> None:
     validated = validate_config({"radarr": [minimal_instance_config()]})
 
     assert validated["sonarr"] == []
+    assert validated["lidarr"] == []
     assert validated["radarr"] == [
+        {
+            "name": "instance",
+            "url": "https://instance.tld",
+            "api_key": "api-key",
+            "renamarr": {
+                "enabled": False,
+                "analyze_files": False,
+                "rename_folders": False,
+                "log_to_file": False,
+                "schedule": {
+                    "enabled": True,
+                    "interval": Interval(days=0, hours=1, minutes=0),
+                },
+                "command_polling": CommandPollingSettings(),
+            },
+        }
+    ]
+
+
+def test_minimal_lidarr_config_receives_defaults() -> None:
+    validated = validate_config({"lidarr": [minimal_instance_config()]})
+
+    assert validated["sonarr"] == []
+    assert validated["radarr"] == []
+    assert validated["lidarr"] == [
         {
             "name": "instance",
             "url": "https://instance.tld",
@@ -142,13 +171,13 @@ def test_partial_renamarr_schedule_defaults_are_independent_between_instances() 
     assert second_schedule["enabled"] is True
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_present_empty_service_list_is_rejected(service: str) -> None:
     with pytest.raises(SchemaError):
         validate_config({service: []})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize("field", ["name", "url", "api_key"])
 def test_required_service_fields_reject_missing_values(
     service: str, field: str
@@ -160,7 +189,7 @@ def test_required_service_fields_reject_missing_values(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize("field", ["name", "url", "api_key"])
 def test_required_service_fields_reject_empty_values(service: str, field: str) -> None:
     instance_config = minimal_instance_config() | {field: ""}
@@ -208,7 +237,7 @@ def test_extra_service_and_nested_keys_are_ignored() -> None:
     assert radarr_renamarr["analyze_files"] is True
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     "renamarr_config",
     [
@@ -237,7 +266,7 @@ def test_boolean_fields_reject_non_bool_values(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     ("configured", "expected"),
     [
@@ -265,7 +294,7 @@ def test_schedule_interval_is_validated(
     }
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {
@@ -281,7 +310,7 @@ def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
     assert _schedule_config(validated, service)["interval"] == Interval(0, 0, 0)
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize("hourly_job", [True, False])
 def test_deprecated_hourly_job_sets_schedule_enabled_without_parse_warning(
     service: str, hourly_job: bool, mock_loguru_warning: MagicMock
@@ -297,7 +326,7 @@ def test_deprecated_hourly_job_sets_schedule_enabled_without_parse_warning(
     mock_loguru_warning.assert_not_called()
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
     service: str,
 ) -> None:
@@ -316,7 +345,7 @@ def test_deprecated_hourly_job_sets_enabled_on_custom_schedule(
     }
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     ("hourly_job", "schedule_enabled"),
     [(False, True), (True, False)],
@@ -336,7 +365,7 @@ def test_schedule_enabled_takes_precedence_over_deprecated_hourly_job(
     assert _schedule_config(validated, service)["enabled"] is schedule_enabled
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize("schedule", [None, "hourly"])
 def test_deprecated_hourly_job_does_not_hide_invalid_schedule(
     service: str, schedule: object
@@ -349,7 +378,7 @@ def test_deprecated_hourly_job_does_not_hide_invalid_schedule(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     "interval",
     [
@@ -373,7 +402,7 @@ def test_schedule_rejects_intervals_over_thirty_days(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_enabled_schedule_rejects_zero_interval(service: str) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {
@@ -394,7 +423,7 @@ def test_enabled_schedule_rejects_zero_interval(service: str) -> None:
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -419,7 +448,7 @@ def test_schedule_rejects_invalid_interval_components_when_disabled(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_omitted_command_polling_receives_defaults(service: str) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {"enabled": True}
@@ -433,7 +462,7 @@ def test_omitted_command_polling_receives_defaults(service: str) -> None:
     )
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize(
     ("configured", "expected"),
     [
@@ -474,7 +503,7 @@ def test_command_polling_is_validated(
     assert renamarr_config["command_polling"] == expected
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 @pytest.mark.parametrize("field", ["timeout_seconds", "check_interval_seconds"])
 @pytest.mark.parametrize("value", [0, -1, True, False, 1.5, "1"])
 def test_command_polling_rejects_invalid_integer_values(
@@ -488,7 +517,7 @@ def test_command_polling_rejects_invalid_integer_values(
         validate_config({service: [instance_config]})
 
 
-@pytest.mark.parametrize("service", ["sonarr", "radarr"])
+@pytest.mark.parametrize("service", ARR_SERVICES)
 def test_command_polling_rejects_check_interval_over_timeout(service: str) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {

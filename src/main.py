@@ -133,6 +133,7 @@ class Main:
         service_configs = (
             (ArrService.SONARR, config.sonarr),
             (ArrService.RADARR, config.radarr),
+            (ArrService.LIDARR, config.lidarr),
         )
         for service, configs in service_configs:
             instance_config: _ArrInstanceConfig
