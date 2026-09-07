@@ -32,7 +32,7 @@
       "groupName": "ruff"
     },
     {
-      "matchDepNames": ["mise"],
+      "matchPackageNames": ["jdx/mise"],
       "groupName": "mise",
       "minimumGroupSize": 2
     },
@@ -79,20 +79,7 @@
       "customType": "regex",
       "managerFilePatterns": ["/^mise\\.toml$/"],
       "matchStrings": ["min_version = \"(?<currentValue>[^\"]+)\""],
-      "depNameTemplate": "mise",
-      "packageNameTemplate": "jdx/mise",
-      "datasourceTemplate": "github-releases",
-      "extractVersionTemplate": "^v?(?<version>.*)$",
-      "versioningTemplate": "semver"
-    },
-    {
-      "customType": "regex",
-      "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
-      "matchStrings": [
-        "uses: jdx/mise-action@(?<actionSha>[a-f0-9]+)\\s+# v(?<actionVersion>\\d+\\.\\d+\\.\\d+)\\n\\s+with:\\n\\s+version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
-      ],
-      "autoReplaceStringTemplate": "uses: jdx/mise-action@{{{actionSha}}}  # v{{{actionVersion}}}\n        with:\n          version: {{{newValue}}}",
-      "depNameTemplate": "mise",
+      "depNameTemplate": "jdx/mise",
       "packageNameTemplate": "jdx/mise",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v?(?<version>.*)$",
