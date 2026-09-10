@@ -39,7 +39,6 @@ WORKDIR /renamarr
 USER 65532:65532
 
 # default settings
-ENV LOGURU_DIAGNOSE="NO"
 ENV LOG_LEVEL="INFO"
 ENV CONFIG_DIR="/"
 ENV LOG_DIR="/logs"
