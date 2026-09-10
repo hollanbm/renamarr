@@ -1,8 +1,10 @@
+import logging
 from collections.abc import Sequence
 from unittest.mock import MagicMock, call
 
 import pytest
 from pytest_mock import MockerFixture
+from structlog.contextvars import bound_contextvars, get_contextvars
 
 from renamarr.exceptions import ArrOperationError
 from renamarr.models.command import CommandPollingSettings, CommandStatus
@@ -62,10 +64,10 @@ def without_file_renames(adapter: MagicMock) -> None:
 
 
 def test_scan_runs_shared_workflow_in_sorted_order(
-    mock_loguru_debug: MagicMock,
-    mock_loguru_info: MagicMock,
+    caplog: pytest.LogCaptureFixture,
     mocker: MockerFixture,
 ) -> None:
+    caplog.set_level(logging.DEBUG, logger="renamarr")
     item_b = MediaItem(2, "B", "/root/nested/old-b")
     item_a = MediaItem(1, "A", "/root/old-a")
     adapter = configured_adapter(mocker, [item_b, item_a])
@@ -75,12 +77,14 @@ def test_scan_runs_shared_workflow_in_sorted_order(
     folder_batch_a = FolderRenameBatch("/root", (item_a,))
     folder_batch_b = FolderRenameBatch("/root/nested", (item_b,))
 
-    result = Renamarr(
-        "test",
-        adapter,
-        analyze_files=True,
-        rename_folders=True,
-    ).scan()
+    with bound_contextvars(arr_type="sonarr", instance="outer"):
+        result = Renamarr(
+            "test",
+            adapter,
+            analyze_files=True,
+            rename_folders=True,
+        ).scan()
+        assert get_contextvars() == {"arr_type": "sonarr", "instance": "outer"}
 
     assert result == ScanResult(
         items_found=2,
@@ -110,19 +114,66 @@ def test_scan_runs_shared_workflow_in_sorted_order(
         call.start_folder_rescan(folder_batch_b),
         call.get_command_status(31),
     ]
-    assert mock_loguru_debug.call_args_list[-1] == call(
-        "Items found: 2 | analysis: [ success=2, failed=0, skipped=0 ]"
-    )
-    assert mock_loguru_info.call_args_list[-1] == call(
-        "Finished Renamarr successfully | "
-        "file renames: [ success=2, failed=0, skipped=0 ] | "
-        "folder renames: [ success=2, failed=0, skipped=0 ]"
-    )
+    assert all(record.name == "renamarr.renamarr" for record in caplog.records)
+    assert all(record.__dict__["arr_type"] == "sonarr" for record in caplog.records)
+    assert all(record.__dict__["instance"] == "test" for record in caplog.records)
+    assert all("item" not in record.__dict__ for record in caplog.records)
+    assert get_contextvars() == {}
+    file_events = [
+        record
+        for record in caplog.records
+        if record.getMessage()
+        in {"Renaming files", "File rename completed successfully"}
+    ]
+    assert len(file_events) == 2
+    assert all(record.__dict__["description"] == "A, B" for record in file_events)
+    assert all(record.__dict__["item_ids"] == (1, 2) for record in file_events)
+    folder_events = [
+        record
+        for record in caplog.records
+        if record.getMessage()
+        in {"Renaming folders", "Folder workflow completed successfully"}
+    ]
+    assert [
+        (
+            record.__dict__["titles"],
+            record.__dict__["item_ids"],
+            record.__dict__["root_folder"],
+        )
+        for record in folder_events
+    ] == [
+        (("A",), (1,), "/root"),
+        (("A",), (1,), "/root"),
+        (("B",), (2,), "/root/nested"),
+        (("B",), (2,), "/root/nested"),
+    ]
+    debug_summary, summary = caplog.records[-2:]
+    assert debug_summary.levelno == logging.DEBUG
+    assert debug_summary.getMessage() == "Items found"
+    assert debug_summary.__dict__["items_found"] == 2
+    assert debug_summary.__dict__["analysis_success"] == 2
+    assert summary.levelno == logging.INFO
+    assert summary.getMessage() == "Finished Renamarr successfully"
+    expected_summary = {
+        "items_found": 2,
+        "analysis_success": 2,
+        "analysis_failed": 0,
+        "analysis_skipped": 0,
+        "file_renames_success": 2,
+        "file_renames_failed": 0,
+        "file_renames_skipped": 0,
+        "folder_renames_success": 2,
+        "folder_renames_failed": 0,
+        "folder_renames_skipped": 0,
+        "failure_count": 0,
+    }
+    assert {key: summary.__dict__[key] for key in expected_summary} == expected_summary
 
 
 def test_scan_skips_disabled_analysis_and_folder_renames(
-    mock_loguru_info: MagicMock, mocker: MockerFixture
+    caplog: pytest.LogCaptureFixture, mocker: MockerFixture
 ) -> None:
+    caplog.set_level(logging.INFO, logger="renamarr")
     item = MediaItem(1, "Item", "/root/Item")
     adapter = configured_adapter(mocker, [item])
     without_file_renames(adapter)
@@ -135,14 +186,18 @@ def test_scan_skips_disabled_analysis_and_folder_renames(
     assert result.successful
     adapter.is_media_analysis_enabled.assert_not_called()
     adapter.list_root_folders.assert_not_called()
-    assert mock_loguru_info.call_args_list[-1] == call(
-        "Finished Renamarr successfully | "
-        "file renames: [ success=0, failed=0, skipped=1 ] | "
-        "folder renames: [ success=0, failed=0, skipped=1 ]"
-    )
+    summary = caplog.records[-1]
+    assert summary.levelno == logging.INFO
+    assert summary.getMessage() == "Finished Renamarr successfully"
+    assert summary.__dict__["analysis_skipped"] == 1
+    assert summary.__dict__["file_renames_skipped"] == 1
+    assert summary.__dict__["folder_renames_skipped"] == 1
 
 
-def test_scan_skips_analysis_disabled_by_service(mocker: MockerFixture) -> None:
+def test_scan_skips_analysis_disabled_by_service(
+    caplog: pytest.LogCaptureFixture, mocker: MockerFixture
+) -> None:
+    caplog.set_level(logging.WARNING, logger="renamarr")
     items = [
         MediaItem(2, "Item B", "/root/Item B"),
         MediaItem(1, "Item A", "/root/Item A"),
@@ -156,6 +211,13 @@ def test_scan_skips_analysis_disabled_by_service(mocker: MockerFixture) -> None:
     assert result.analysis == WorkSummary(skipped=2)
     assert result.successful
     adapter.start_media_analysis.assert_not_called()
+    assert caplog.record_tuples == [
+        (
+            "renamarr.renamarr",
+            logging.WARNING,
+            "Media analysis is disabled in the Arr service",
+        )
+    ]
 
 
 @pytest.mark.parametrize(
@@ -170,9 +232,10 @@ def test_scan_skips_analysis_disabled_by_service(mocker: MockerFixture) -> None:
 def test_scan_ends_after_library_discovery_failure(
     library: list[MediaItem] | ArrOperationError,
     message: str,
-    mock_loguru_error: MagicMock,
+    caplog: pytest.LogCaptureFixture,
     mocker: MockerFixture,
 ) -> None:
+    caplog.set_level(logging.ERROR, logger="renamarr")
     adapter = configured_adapter(mocker, [])
     if isinstance(library, ArrOperationError):
         adapter.list_media_items.side_effect = library
@@ -186,14 +249,15 @@ def test_scan_ends_after_library_discovery_failure(
     assert not result.successful
     adapter.get_file_rename_candidate.assert_not_called()
     adapter.list_root_folders.assert_not_called()
-    assert mock_loguru_error.call_args_list == [
-        call(message),
-        call(
-            "Finished Renamarr with 1 failures | "
-            "file renames: [ success=0, failed=0, skipped=0 ] | "
-            "folder renames: [ success=0, failed=0, skipped=0 ]"
-        ),
+    assert caplog.record_tuples == [
+        ("renamarr.renamarr", logging.ERROR, message),
+        ("renamarr.renamarr", logging.ERROR, "Finished Renamarr with failures"),
     ]
+    failure, summary = caplog.records
+    assert failure.__dict__["phase"] == "discovery"
+    assert failure.__dict__["item_ids"] == ()
+    assert summary.__dict__["items_found"] == 0
+    assert summary.__dict__["failure_count"] == 1
 
 
 @pytest.mark.parametrize(
@@ -228,20 +292,27 @@ def test_scan_propagates_unexpected_adapter_errors(
         without_file_renames(adapter)
     getattr(adapter, operation).side_effect = RuntimeError("programming error")
 
-    with pytest.raises(RuntimeError, match="programming error"):
-        Renamarr(
-            "test",
-            adapter,
-            analyze_files=analyze_files,
-            rename_folders=rename_folders,
-        ).scan()
+    with bound_contextvars(arr_type="radarr", instance="outer", item="outer item"):
+        with pytest.raises(RuntimeError, match="programming error"):
+            Renamarr(
+                "test",
+                adapter,
+                analyze_files=analyze_files,
+                rename_folders=rename_folders,
+            ).scan()
+        assert get_contextvars() == {
+            "arr_type": "radarr",
+            "instance": "outer",
+            "item": "outer item",
+        }
+    assert get_contextvars() == {}
 
 
 def test_analysis_failure_is_recorded_and_discovery_continues(
-    mock_loguru_debug: MagicMock,
-    mock_loguru_error: MagicMock,
+    caplog: pytest.LogCaptureFixture,
     mocker: MockerFixture,
 ) -> None:
+    caplog.set_level(logging.DEBUG, logger="renamarr")
     items = [
         MediaItem(2, "Item B", "/root/Item B"),
         MediaItem(1, "Item A", "/root/Item A"),
@@ -258,17 +329,22 @@ def test_analysis_failure_is_recorded_and_discovery_continues(
         ScanFailure(ScanPhase.ANALYSIS, (1, 2), "analysis failed"),
     )
     assert not result.successful
-    assert mock_loguru_debug.call_args_list[-1] == call(
-        "Items found: 2 | analysis: [ success=0, failed=2, skipped=0 ]"
-    )
-    assert mock_loguru_error.call_args_list == [
-        call("analysis failed"),
-        call(
-            "Finished Renamarr with 1 failures | "
-            "file renames: [ success=0, failed=0, skipped=2 ] | "
-            "folder renames: [ success=0, failed=0, skipped=2 ]"
-        ),
+    debug_summary = caplog.records[-2]
+    assert debug_summary.getMessage() == "Items found"
+    assert debug_summary.__dict__["items_found"] == 2
+    assert debug_summary.__dict__["analysis_failed"] == 2
+    failures = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert [record.getMessage() for record in failures] == [
+        "analysis failed",
+        "Finished Renamarr with failures",
     ]
+    failure, summary = failures
+    assert failure.__dict__["phase"] == "analysis"
+    assert failure.__dict__["item_ids"] == (1, 2)
+    assert summary.__dict__["analysis_failed"] == 2
+    assert summary.__dict__["file_renames_skipped"] == 2
+    assert summary.__dict__["folder_renames_skipped"] == 2
+    assert summary.__dict__["failure_count"] == 1
 
 
 def test_completed_unsuccessful_analysis_command_is_recorded(
@@ -451,8 +527,9 @@ def test_command_status_check_error_is_recorded(mocker: MockerFixture) -> None:
 
 
 def test_file_preview_failures_and_noops_do_not_block_other_items(
-    mock_loguru_error: MagicMock, mocker: MockerFixture
+    caplog: pytest.LogCaptureFixture, mocker: MockerFixture
 ) -> None:
+    caplog.set_level(logging.DEBUG, logger="renamarr")
     failed = MediaItem(1, "A", "/root/A")
     skipped = MediaItem(2, "B", "/root/B")
     renamed = MediaItem(3, "C", "/root/C")
@@ -467,21 +544,37 @@ def test_file_preview_failures_and_noops_do_not_block_other_items(
 
     adapter.get_file_rename_candidate.side_effect = preview
 
-    result = Renamarr("test", adapter).scan()
+    with bound_contextvars(arr_type="sonarr"):
+        result = Renamarr("test", adapter).scan()
 
     assert result.file_renames == WorkSummary(success=1, failed=1, skipped=1)
     assert result.failures == (
         ScanFailure(ScanPhase.FILE_RENAMES, (1,), "preview failed"),
     )
     adapter.start_file_rename.assert_called_once()
-    assert mock_loguru_error.call_args_list == [
-        call("preview failed"),
-        call(
-            "Finished Renamarr with 1 failures | "
-            "file renames: [ success=1, failed=1, skipped=1 ] | "
-            "folder renames: [ success=0, failed=0, skipped=3 ]"
-        ),
+    failures = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert [record.getMessage() for record in failures] == [
+        "preview failed",
+        "Finished Renamarr with failures",
     ]
+    failure, summary = failures
+    assert failure.__dict__["phase"] == "file_renames"
+    assert failure.__dict__["item_ids"] == (1,)
+    assert failure.__dict__["item"] == "A"
+    skipped_event = next(
+        record
+        for record in caplog.records
+        if record.getMessage() == "No files need renaming"
+    )
+    assert skipped_event.__dict__["item"] == "B"
+    assert "item" not in summary.__dict__
+    assert all(record.__dict__["arr_type"] == "sonarr" for record in caplog.records)
+    assert summary.__dict__["file_renames_success"] == 1
+    assert summary.__dict__["file_renames_failed"] == 1
+    assert summary.__dict__["file_renames_skipped"] == 1
+    assert summary.__dict__["folder_renames_skipped"] == 3
+    assert summary.__dict__["failure_count"] == 1
+    assert get_contextvars() == {}
 
 
 def test_file_batch_planning_failure_marks_all_candidates_failed(
@@ -583,8 +676,10 @@ def test_root_folder_listing_failure_marks_every_item_failed(
 
 
 def test_folder_planning_isolated_failures_and_noops_continue(
+    caplog: pytest.LogCaptureFixture,
     mocker: MockerFixture,
 ) -> None:
+    caplog.set_level(logging.DEBUG, logger="renamarr")
     unmatched = MediaItem(1, "A", "/missing/A")
     lookup_failed = MediaItem(2, "B", "/root/B")
     correct = MediaItem(3, "C", "/root/C")
@@ -620,6 +715,22 @@ def test_folder_planning_isolated_failures_and_noops_continue(
     adapter.move_folder.assert_called_once_with(
         FolderRenameBatch("/root", (renamed_a, renamed_b))
     )
+    failures = [
+        record
+        for record in caplog.records
+        if record.__dict__.get("phase") == "folder_renames"
+    ]
+    assert [
+        (record.__dict__["item"], record.__dict__["item_ids"]) for record in failures
+    ] == [("A", (1,)), ("B", (2,))]
+    skipped_event = next(
+        record
+        for record in caplog.records
+        if record.getMessage() == "Media folder is already correctly named"
+    )
+    assert skipped_event.__dict__["item"] == "C"
+    assert "item" not in caplog.records[-1].__dict__
+    assert get_contextvars() == {}
 
 
 def test_failed_folder_operations_continue_across_roots(

@@ -1,25 +1,25 @@
-from unittest.mock import MagicMock
+import logging
+from collections.abc import Iterator
 
 import pytest
-from loguru import logger
-from pytest_mock import MockerFixture
+import structlog
 
 
-@pytest.fixture
-def mock_loguru_error(mocker) -> None:
-    return mocker.patch.object(logger, "error")
-
-
-@pytest.fixture
-def mock_loguru_debug(mocker: MockerFixture) -> MagicMock:
-    return mocker.patch.object(logger, "debug")
-
-
-@pytest.fixture
-def mock_loguru_info(mocker: MockerFixture) -> MagicMock:
-    return mocker.patch.object(logger, "info")
-
-
-@pytest.fixture
-def mock_loguru_warning(mocker: MockerFixture) -> MagicMock:
-    return mocker.patch.object(logger, "warning")
+@pytest.fixture(autouse=True)
+def configure_test_logging(caplog: pytest.LogCaptureFixture) -> Iterator[None]:
+    structlog.contextvars.clear_contextvars()
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.render_to_log_kwargs,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=False,
+    )
+    caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.DEBUG, logger="renamarr")
+    yield
+    structlog.contextvars.clear_contextvars()
+    structlog.reset_defaults()
