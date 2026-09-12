@@ -9,6 +9,7 @@ services:
       LOG_LEVEL: DEBUG
     read_only: true  # Restrict writes to explicit mounts.
     restart: 'no'
+    stop_grace_period: 35s
     tmpfs:
       - /tmp  # Required for the heartbeat with read_only enabled.
     volumes:

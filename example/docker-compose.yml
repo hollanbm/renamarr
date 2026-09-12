@@ -5,6 +5,7 @@ services:
     # user: 1000:1000  # if using the log_to_file feature, recommended to set the container user to match the host user to avoid permission issues with log files.
     read_only: true  # Restrict writes to explicit mounts.
     restart: unless-stopped
+    stop_grace_period: 35s
     tmpfs:
       - /tmp  # Required for the heartbeat with read_only enabled.
     volumes:
