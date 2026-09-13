@@ -14,7 +14,6 @@ dependencies = [
   "structlog>=26.1.0,<27",
   "opentelemetry-api>=1.44.0,<2",
   "opentelemetry-sdk>=1.44.0,<2",
-  "opentelemetry-exporter-otlp-proto-http>=1.44.0,<2",
   "opentelemetry-instrumentation-logging>=0.65b0,<0.66",
   "opentelemetry-distro>=0.65b0,<0.66",
   "opentelemetry-exporter-otlp>=1.44.0,<2",

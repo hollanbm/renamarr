@@ -79,7 +79,7 @@ Renamarr uses structlog with Python's standard logging. Logs are always written 
 
 Both formats include a UTC timestamp, level, logger name, and the available `arr_type`, `instance`, and `item` context. Text output uses colors only when stdout is an interactive terminal; files never contain colors. `LOG_LEVEL=DEBUG` adds source locations. Exception tracebacks do not include local-variable dumps. Third-party libraries log at `WARNING` or above, subject to the configured output level.
 
-`arr_type` identifies the Arr application (`sonarr` or `radarr`), and `instance` is its configured name. The OpenTelemetry resource attribute `service.name` identifies Renamarr itself and defaults to `renamarr`. Resource attributes are attached to OTLP records and are not automatically included in local output.
+`arr_type` identifies the Arr application (`sonarr` or `radarr`), and `instance` is its configured name. The OpenTelemetry resource attribute `service.name` identifies Renamarr itself. The Docker image sets `OTEL_SERVICE_NAME=renamarr`; other deployments use the SDK's service-name detection unless configured explicitly. Resource attributes are attached to OTLP records and are not automatically included in local output.
 
 Messages have separate structured properties, such as a batch `description`, folder `titles`, and affected `item_ids`. For example, text output includes:
 
@@ -110,13 +110,13 @@ _To avoid permission issues when creating log files, set the user option in dock
 
 #### Logging Configuration and Defaults
 
-| Environment Variable | Description                                                                                                                 | Default  |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `LOG_LEVEL`          | Case-insensitive standard logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. `DEBUG` adds source locations. | `INFO`   |
-| `LOG_FORMAT`         | `text` or `json`, applied to stdout and instance files.                                                                     | `text`   |
-| `LOG_DIR`            | Directory containing per-instance log files.                                                                                | `/logs`  |
-| `LOG_ROTATION`       | Daily rotation time in local time, using `HH:MM` (24-hour clock).                                                           | `00:00`  |
-| `LOG_RETENTION`      | Positive whole number of days, such as `1 day` or `7 days`.                                                                 | `7 days` |
+| Environment Variable | Description                                                                                                                    | Default  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `LOG_LEVEL`          | Case-insensitive application logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. `DEBUG` adds source locations. | `INFO`   |
+| `LOG_FORMAT`         | `text` or `json`, applied to stdout and instance files.                                                                        | `text`   |
+| `LOG_DIR`            | Directory containing per-instance log files.                                                                                   | `/logs`  |
+| `LOG_ROTATION`       | Daily rotation time in local time, using `HH:MM` (24-hour clock).                                                              | `00:00`  |
+| `LOG_RETENTION`      | Positive whole number of days, such as `1 day` or `7 days`.                                                                    | `7 days` |
 
 Rotation happens on the first log record emitted after the scheduled time. After rollover, archives whose modification time is at least `LOG_RETENTION` days old are removed. Cleanup recognizes both new `<name>.log.YYYY-MM-DD` archives and legacy Loguru `<name>.YYYY-MM-DD_HH-MM-SS_microseconds.log` archives, including numbered collision suffixes. It preserves the active file and other instances' archives. Quiet instances are cleaned up when they next rotate.
 
@@ -124,36 +124,44 @@ Rotation and retention accept only the syntax shown above; other former Loguru o
 
 ### OpenTelemetry Logs
 
-OTLP export is optional and sends logs alongside the existing stdout output. To send logs to an existing Grafana Alloy OTLP/HTTP receiver reachable as `alloy:4318`, add these variables to the Renamarr service's Compose configuration:
+OpenTelemetry manages provider setup, exporter selection, resource detection, batching, and process-exit cleanup. Exporters are disabled when their environment variables are unset. OTLP log export sends logs alongside the existing stdout output and supports both HTTP/protobuf and gRPC.
+
+To send logs to an existing Grafana Alloy OTLP/HTTP receiver reachable as `alloy:4318`, add these variables to the Renamarr service's Compose configuration:
 
 ```yaml
 environment:
   OTEL_LOGS_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
 ```
 
-The exporter appends `/v1/logs` to the base endpoint. Alloy must have an OTLP receiver listening for HTTP traffic on that address and a logs pipeline connected to your destination. Alternatively, configure `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://alloy:4318/v1/logs`; this complete URL overrides the base endpoint and is used as supplied.
+With HTTP/protobuf, the exporter appends `/v1/logs` to the base endpoint. Alloy must have an OTLP receiver listening for HTTP traffic on that address and a logs pipeline connected to your destination. Alternatively, configure `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://alloy:4318/v1/logs`; this complete HTTP logs URL overrides the base endpoint and is used as supplied.
 
-| Environment Variable               | Description                                                                               | Default                        |
-| ---------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
-| `OTEL_LOGS_EXPORTER`               | `otlp` enables export; `none` disables it.                                                | `none`                         |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`      | Base HTTP endpoint; `/v1/logs` is appended.                                               | `http://localhost:4318`        |
-| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | Complete logs URL overriding the base endpoint.                                           | Derived from the base endpoint |
-| `OTEL_EXPORTER_OTLP_PROTOCOL`      | Export protocol; only `http/protobuf` is supported.                                       | `http/protobuf`                |
-| `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` | Logs-specific protocol overriding the general setting; only `http/protobuf` is supported. | General protocol setting       |
-| `OTEL_SERVICE_NAME`                | OpenTelemetry `service.name` resource attribute.                                          | `renamarr`                     |
-| `OTEL_SDK_DISABLED`                | `true` disables OTLP export, even when requested.                                         | `false`                        |
+For gRPC, use `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` and `OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4317`, with a matching gRPC receiver. gRPC is the SDK's default protocol when none is specified.
+
+| Environment Variable               | Description                                                                               | Default                                                      |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `OTEL_LOGS_EXPORTER`               | SDK log exporter selection, such as `otlp` or `console`; `none` disables export.          | Unset: no exporter                                           |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`      | OTLP endpoint; HTTP/protobuf appends `/v1/logs` for logs.                                 | gRPC: `http://localhost:4317`; HTTP: `http://localhost:4318` |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | Logs endpoint overriding the general endpoint; use a complete logs URL for HTTP/protobuf. | Derived from the general endpoint                            |
+| `OTEL_EXPORTER_OTLP_PROTOCOL`      | `grpc` or `http/protobuf`.                                                                | `grpc`                                                       |
+| `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL` | Logs-specific protocol overriding the general setting.                                    | General protocol setting                                     |
+| `OTEL_SERVICE_NAME`                | OpenTelemetry `service.name` resource attribute.                                          | Docker: `renamarr`; otherwise SDK detection                  |
+| `OTEL_SDK_DISABLED`                | `true` disables SDK telemetry recording.                                                  | `false`                                                      |
+| `OTEL_PYTHON_LOG_HANDLER_LEVEL`    | Additional minimum level for the OpenTelemetry logging handler.                           | `NOTSET`: no additional filtering                            |
 
 The SDK also reads standard environment settings:
 
-- `OTEL_RESOURCE_ATTRIBUTES` for additional resource properties. A `service.name` here overrides the default; `OTEL_SERVICE_NAME` takes precedence over it.
+- `OTEL_RESOURCE_ATTRIBUTES` for additional resource properties, including `service.name`. `OTEL_SERVICE_NAME` takes precedence over a `service.name` resource attribute. Without either setting, the SDK uses an `unknown_service` name, which may include the executable name.
 - `OTEL_EXPORTER_OTLP_HEADERS` for authentication headers; `OTEL_EXPORTER_OTLP_CERTIFICATE`, `OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE`, and `OTEL_EXPORTER_OTLP_CLIENT_KEY` for TLS certificate paths.
-- `OTEL_EXPORTER_OTLP_TIMEOUT` for the HTTP export timeout in seconds and `OTEL_EXPORTER_OTLP_COMPRESSION` for compression. The corresponding `OTEL_EXPORTER_OTLP_LOGS_*` variables override these general exporter settings, including headers and certificates.
+- `OTEL_EXPORTER_OTLP_TIMEOUT` for the export timeout in seconds and `OTEL_EXPORTER_OTLP_COMPRESSION` for compression. The corresponding `OTEL_EXPORTER_OTLP_LOGS_*` variables override these general exporter settings, including headers and certificates.
 - `OTEL_BLRP_SCHEDULE_DELAY` (milliseconds), `OTEL_BLRP_MAX_QUEUE_SIZE`, and `OTEL_BLRP_MAX_EXPORT_BATCH_SIZE` for batching.
 
-OTLP records carry the event message as their body, structured properties as attributes, and native exception information. If an active OpenTelemetry span exists, its trace and span IDs are included in exported logs and local output. Renamarr does not yet create traces or metrics.
+`LOG_LEVEL` controls which application events are emitted; `OTEL_PYTHON_LOG_HANDLER_LEVEL` can further restrict exported logs. `LOG_FORMAT` continues to control Renamarr's local rendering. Selecting the SDK's `console` exporter adds its own output format separately.
 
-Exporter and HTTP transport diagnostics stay local to prevent export feedback loops. An unreachable collector leaves local logging and jobs operational. Pending logs are drained during normal completion and SIGINT/SIGTERM shutdown; the supplied Compose files allow a 35-second stop grace period.
+OTLP records carry the event message as their body, structured properties as attributes, and native exception information. If an active OpenTelemetry span exists, exported logs include its trace and span IDs. Local output includes these IDs independently of whether log export is enabled. Renamarr does not yet add application tracing or metrics instrumentation. The SDK also honors `OTEL_TRACES_EXPORTER` and `OTEL_METRICS_EXPORTER`; leaving them unset keeps those exporters disabled.
+
+Exporter and transport diagnostics stay local to prevent export feedback loops. An unreachable collector leaves local logging and jobs operational. The SDK drains pending telemetry when the process exits normally, including Renamarr's SIGINT/SIGTERM exit path. The supplied Compose files allow a 35-second stop grace period for log export; increase it when enabling additional signals or exporters that need more shutdown time.
 
 Choose one ingestion route for Renamarr in Alloy: either receive native OTLP logs or collect its stdout. Collecting both into the same backend duplicates application logs. `LOG_FORMAT` controls local rendering independently of OTLP.
 

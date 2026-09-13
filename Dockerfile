@@ -42,6 +42,7 @@ USER 65532:65532
 ENV LOG_LEVEL="INFO"
 ENV CONFIG_DIR="/"
 ENV LOG_DIR="/logs"
+ENV OTEL_SERVICE_NAME="renamarr"
 
 # activate venv
 ENV PATH="/renamarr/.venv/bin:$PATH"

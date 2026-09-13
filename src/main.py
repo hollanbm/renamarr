@@ -1,3 +1,4 @@
+import atexit
 import os
 import signal
 from collections.abc import Callable, Iterator
@@ -20,6 +21,7 @@ from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.logging_config import LoggingConfigurator
 from renamarr.models.command import CommandPollingSettings
 from renamarr.renamarr import Renamarr
+from renamarr.telemetry import configure_telemetry
 
 logger = get_logger("renamarr.main")
 
@@ -58,6 +60,9 @@ class Main:
         self._health_reporter = HealthReporter()
         self._logging_configurator = LoggingConfigurator()
         self._termination_signal: int | None = None
+        self._previous_signal_handlers: dict[
+            int, Callable[[int, FrameType | None], object] | int | None
+        ] = {}
 
     def __renamarr_job(self, service: ArrService, config: _ArrInstanceConfig) -> None:
         with (
@@ -111,36 +116,37 @@ class Main:
             sleep(1)
 
     def start(self) -> None:
-        """Run configured jobs and close logging resources on every exit path."""
+        """Run configured jobs with SDK and local cleanup registered for exit."""
         self._termination_signal = None
-        previous_handlers: dict[
-            int, Callable[[int, FrameType | None], object] | int | None
-        ] = {}
         try:
-            for signum in (signal.SIGINT, signal.SIGTERM):
-                previous_handlers[signum] = signal.signal(
-                    signum, self._request_termination
-                )
-            self._logging_configurator.configure_stdout()
-            self._logging_configurator.configure_otlp()
+            try:
+                for signum in (signal.SIGINT, signal.SIGTERM):
+                    self._previous_signal_handlers[signum] = signal.signal(
+                        signum, self._request_termination
+                    )
+                self._logging_configurator.configure_stdout()
+            finally:
+                atexit.register(self._shutdown_local_logging)
+            configure_telemetry()
             self._start()
         finally:
-            for signum in previous_handlers:
+            for signum in self._previous_signal_handlers:
                 signal.signal(signum, signal.SIG_IGN)
-            try:
+            if self._termination_signal is not None:
                 try:
-                    if self._termination_signal is not None:
-                        logger.info(
-                            "Shutdown requested",
-                            signal_number=self._termination_signal,
-                        )
+                    logger.info(
+                        "Shutdown requested",
+                        signal_number=self._termination_signal,
+                    )
                 finally:
-                    self._logging_configurator.shutdown()
-            finally:
-                for signum, handler in previous_handlers.items():
-                    signal.signal(signum, handler)
-                if self._termination_signal is not None:
                     raise SystemExit(128 + self._termination_signal) from None
+
+    def _shutdown_local_logging(self) -> None:
+        try:
+            self._logging_configurator.shutdown()
+        finally:
+            for signum, handler in self._previous_signal_handlers.items():
+                signal.signal(signum, handler)
 
     def _request_termination(self, signum: int, _frame: FrameType | None) -> NoReturn:
         self._termination_signal = signum

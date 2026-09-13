@@ -1,189 +1,120 @@
+import json
 import logging
 import os
+import subprocess
+import sys
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from threading import Thread
-from unittest.mock import MagicMock
 
+import grpc
 import pytest
-from opentelemetry._logs import get_logger_provider
+from opentelemetry._logs import NoOpLoggerProvider
+from opentelemetry.instrumentation.logging.handler import LoggingHandler
 from opentelemetry.proto.collector.logs.v1.logs_service_pb2 import (
     ExportLogsServiceRequest,
+    ExportLogsServiceResponse,
 )
-from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
-from opentelemetry.trace import (
-    NonRecordingSpan,
-    SpanContext,
-    TraceFlags,
-    use_span,
+from opentelemetry.proto.collector.logs.v1.logs_service_pb2_grpc import (
+    LogsServiceServicer,
+    add_LogsServiceServicer_to_server,
 )
 from pytest_mock import MockerFixture
+from structlog.contextvars import bound_contextvars
 
-from renamarr.telemetry import Telemetry, configure_telemetry
+from renamarr.telemetry import configure_telemetry
+
+_EMIT_LOGS = """
+import logging
+import structlog
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags, use_span
+from structlog.contextvars import bound_contextvars
+from renamarr.telemetry import configure_telemetry
+
+configure_telemetry()
+logging.getLogger().setLevel(logging.INFO)
+structlog.configure(
+    processors=[structlog.contextvars.merge_contextvars,
+                structlog.stdlib.render_to_log_kwargs],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+)
+span = NonRecordingSpan(SpanContext(123, 456, False, TraceFlags(1)))
+with bound_contextvars(arr_type="sonarr", instance="shows", item="Example"):
+    with use_span(span):
+        try:
+            raise ValueError("rename failed")
+        except ValueError:
+            structlog.get_logger("renamarr.test").exception(
+                "Batch failed", renamed_count=12, dry_run=True,
+            )
+        logging.getLogger("sonarr.rest").warning(
+            "Dependency event", extra={"arr_type": "radarr"},
+        )
+"""
 
 
-@pytest.fixture(autouse=True)
-def telemetry_environment(mocker: MockerFixture) -> None:
-    mocker.patch.dict(os.environ, {}, clear=True)
-
-
-@pytest.fixture
-def sdk(mocker: MockerFixture) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock]:
-    mocker.patch.dict(os.environ, {"OTEL_LOGS_EXPORTER": "otlp"})
-    provider = mocker.patch("renamarr.telemetry.LoggerProvider", autospec=True)
-    exporter = mocker.patch("renamarr.telemetry.OTLPLogExporter", autospec=True)
-    processor = mocker.patch(
-        "renamarr.telemetry.BatchLogRecordProcessor", autospec=True
+def _run_telemetry(
+    environment: dict[str, str], script: str = _EMIT_LOGS
+) -> subprocess.CompletedProcess[str]:
+    clean_environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("OTEL_")
+    }
+    clean_environment.update(
+        PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"),
+        OTEL_BLRP_SCHEDULE_DELAY="60000",
     )
-    handler = mocker.patch("renamarr.telemetry.LoggingHandler", autospec=True)
-    return provider, exporter, processor, handler
+    clean_environment.update(environment)
+    return subprocess.run(
+        [sys.executable, "-c", script],
+        env=clean_environment,
+        capture_output=True,
+        # Allow posix_spawn to avoid forking while the gRPC receiver has threads.
+        close_fds=False,
+        text=True,
+        timeout=15,
+        check=False,
+    )
 
 
-@pytest.mark.parametrize(
-    "environment",
-    [
-        {},
-        {"OTEL_LOGS_EXPORTER": "none"},
-        {"OTEL_LOGS_EXPORTER": " NONE "},
-        {"OTEL_SDK_DISABLED": "TRUE", "OTEL_LOGS_EXPORTER": "invalid"},
-    ],
-    ids=["default", "none", "normalized", "sdk-disabled"],
-)
-def test_disabled_export_does_not_initialize_sdk(
-    environment: dict[str, str], mocker: MockerFixture
-) -> None:
-    mocker.patch.dict(os.environ, environment)
-    provider = mocker.patch("renamarr.telemetry.LoggerProvider")
-
-    assert configure_telemetry(logging.INFO) is None
-
-    provider.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    ("environment", "message"),
-    [
-        ({"OTEL_LOGS_EXPORTER": "console"}, "OTEL_LOGS_EXPORTER"),
-        ({"OTEL_LOGS_EXPORTER": ""}, "OTEL_LOGS_EXPORTER"),
-        (
-            {"OTEL_LOGS_EXPORTER": "otlp", "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc"},
-            "http/protobuf",
-        ),
-        (
-            {"OTEL_LOGS_EXPORTER": "otlp", "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "grpc"},
-            "http/protobuf",
-        ),
-    ],
-    ids=["unknown-exporter", "empty-exporter", "global-protocol", "logs-protocol"],
-)
-def test_unsupported_export_configuration_is_rejected(
-    environment: dict[str, str], message: str, mocker: MockerFixture
-) -> None:
-    mocker.patch.dict(os.environ, environment)
-
-    with pytest.raises(ValueError, match=message):
-        configure_telemetry(logging.INFO)
-
-
-@pytest.mark.parametrize(
-    ("environment", "service_name"),
-    [
-        ({}, "renamarr"),
-        (
-            {"OTEL_RESOURCE_ATTRIBUTES": "service.name=resource,host.name=example"},
-            "resource",
-        ),
-        (
-            {
-                "OTEL_SERVICE_NAME": "application",
-                "OTEL_RESOURCE_ATTRIBUTES": "service.name=resource,host.name=example",
-                "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
-                "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "http/protobuf",
-            },
-            "application",
-        ),
-    ],
-    ids=["default", "resource", "service-and-protocol-override"],
-)
-def test_configuration_preserves_resource_precedence_and_owns_its_provider(
-    environment: dict[str, str],
-    service_name: str,
-    sdk: tuple[MagicMock, MagicMock, MagicMock, MagicMock],
+def test_configuration_delegates_to_sdk_and_preserves_local_handlers(
     mocker: MockerFixture,
 ) -> None:
-    mocker.patch.dict(os.environ, environment)
-    provider, exporter, processor, handler = sdk
-    global_provider = get_logger_provider()
-    root_handlers = logging.getLogger().handlers.copy()
-
-    telemetry = configure_telemetry(logging.DEBUG)
-
-    assert telemetry is not None
-    resource = provider.call_args.kwargs["resource"]
-    assert resource.attributes["service.name"] == service_name
-    assert provider.call_args.kwargs["shutdown_on_exit"] is False
-    exporter.assert_called_once_with()
-    processor.assert_called_once_with(exporter.return_value)
-    provider.return_value.add_log_record_processor.assert_called_once_with(
-        processor.return_value
+    configurator = mocker.patch(
+        "renamarr.telemetry.OpenTelemetryConfigurator", autospec=True
     )
-    handler.assert_called_once_with(
-        level=logging.DEBUG, logger_provider=provider.return_value
-    )
-    assert telemetry.handler is handler.return_value
-    assert get_logger_provider() is global_provider
-    assert logging.getLogger().handlers == root_handlers
-    telemetry.shutdown()
+    instrumentor = mocker.patch("renamarr.telemetry.LoggingInstrumentor", autospec=True)
+    operations = mocker.Mock()
+    operations.attach_mock(configurator.return_value.configure, "configure")
+    operations.attach_mock(instrumentor.return_value.instrument, "instrument")
+    local_handler = logging.NullHandler()
+    with closing(LoggingHandler(logger_provider=NoOpLoggerProvider())) as handler:
+        mocker.patch.object(logging.getLogger(), "handlers", [local_handler, handler])
+
+        assert configure_telemetry() is None
+
+        assert operations.mock_calls == [
+            mocker.call.configure(),
+            mocker.call.instrument(set_logging_format=False),
+        ]
+        assert len(handler.filters) == 1
+        assert local_handler.filters == []
 
 
-@pytest.mark.parametrize(
-    "phase", ["exporter", "processor", "register", "handler", "filter"]
-)
-def test_partial_configuration_closes_all_initialized_resources(
-    phase: str, sdk: tuple[MagicMock, MagicMock, MagicMock, MagicMock]
+def test_sdk_configuration_failure_propagates_before_instrumentation(
+    mocker: MockerFixture,
 ) -> None:
-    provider, exporter, processor, handler = sdk
-    failing_operation = {
-        "exporter": exporter,
-        "processor": processor,
-        "register": provider.return_value.add_log_record_processor,
-        "handler": handler,
-        "filter": handler.return_value.addFilter,
-    }[phase]
-    failing_operation.side_effect = RuntimeError("setup failed")
+    configurator = mocker.patch("renamarr.telemetry.OpenTelemetryConfigurator")
+    instrumentor = mocker.patch("renamarr.telemetry.LoggingInstrumentor")
+    configurator.return_value.configure.side_effect = RuntimeError("invalid setting")
 
-    with pytest.raises(RuntimeError, match="setup failed"):
-        configure_telemetry(logging.INFO)
+    with pytest.raises(RuntimeError, match="invalid setting"):
+        configure_telemetry()
 
-    provider.return_value.shutdown.assert_called_once_with()
-    assert exporter.return_value.shutdown.call_count == (phase == "processor")
-    assert processor.return_value.shutdown.call_count == (phase == "register")
-    assert handler.return_value.close.call_count == (phase == "filter")
-
-
-@pytest.mark.parametrize("failure", [None, "provider", "handler"])
-def test_shutdown_drains_before_closing_and_stays_idempotent_after_failure(
-    failure: str | None, mocker: MockerFixture
-) -> None:
-    provider = mocker.Mock()
-    handler = mocker.Mock(spec=logging.Handler)
-    calls = mocker.Mock()
-    calls.attach_mock(provider, "provider")
-    calls.attach_mock(handler, "handler")
-    telemetry = Telemetry(handler, provider)
-    if failure is not None:
-        operation = provider.shutdown if failure == "provider" else handler.close
-        operation.side_effect = RuntimeError("shutdown failed")
-        with pytest.raises(RuntimeError, match="shutdown failed"):
-            telemetry.shutdown()
-    else:
-        telemetry.shutdown()
-    telemetry.shutdown()
-
-    assert calls.mock_calls == [
-        mocker.call.provider.shutdown(),
-        mocker.call.handler.close(),
-    ]
+    instrumentor.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -200,20 +131,23 @@ def test_shutdown_drains_before_closing_and_stays_idempotent_after_failure(
         ("httpx", False),
     ],
 )
-def test_exporter_diagnostics_are_filtered_without_hiding_application_logs(
+def test_export_filter_keeps_context_and_excludes_exporter_diagnostics(
     name: str, exported: bool, mocker: MockerFixture
 ) -> None:
-    mocker.patch.dict(os.environ, {"OTEL_LOGS_EXPORTER": "otlp"})
-    exporter = InMemoryLogRecordExporter()
-    mocker.patch("renamarr.telemetry.OTLPLogExporter", return_value=exporter)
-    telemetry = configure_telemetry(logging.INFO)
-    assert telemetry is not None
+    mocker.patch("renamarr.telemetry.OpenTelemetryConfigurator")
+    mocker.patch("renamarr.telemetry.LoggingInstrumentor")
+    handler = LoggingHandler(logger_provider=NoOpLoggerProvider())
+    mocker.patch.object(logging.getLogger(), "handlers", [handler])
+    configure_telemetry()
     record = logging.LogRecord(name, logging.ERROR, __file__, 1, "An event", (), None)
+    record.__dict__["arr_type"] = "radarr"
 
-    telemetry.handler.handle(record)
-    telemetry.shutdown()
+    with bound_contextvars(arr_type="sonarr", instance="shows"):
+        assert bool(handler.filter(record)) is exported
 
-    assert len(exporter.get_finished_logs()) == int(exported)
+    assert record.__dict__["arr_type"] == "radarr"
+    assert record.__dict__["instance"] == "shows"
+    handler.close()
 
 
 @pytest.fixture
@@ -245,52 +179,51 @@ def otlp_receiver() -> Iterator[
             worker.join(timeout=2)
 
 
-@pytest.mark.parametrize("logs_endpoint", [False, True], ids=["base-url", "logs-url"])
-def test_http_export_preserves_attributes_exceptions_trace_and_endpoint_precedence(
+@pytest.mark.parametrize(
+    ("environment", "service_name", "logs_endpoint"),
+    [
+        ({}, "unknown_service", False),
+        ({"OTEL_RESOURCE_ATTRIBUTES": "service.name=resource"}, "resource", True),
+        (
+            {
+                "OTEL_SERVICE_NAME": "application",
+                "OTEL_RESOURCE_ATTRIBUTES": "service.name=resource",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+                "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "http/protobuf",
+            },
+            "application",
+            True,
+        ),
+    ],
+    ids=["sdk-defaults", "resource-service", "signal-and-service-overrides"],
+)
+def test_sdk_http_export_preserves_attributes_and_flushes_on_process_exit(
+    environment: dict[str, str],
+    service_name: str,
     logs_endpoint: bool,
     otlp_receiver: tuple[str, list[tuple[str, str | None, ExportLogsServiceRequest]]],
-    mocker: MockerFixture,
 ) -> None:
     endpoint, received = otlp_receiver
-    environment = {
+    settings = {
         "OTEL_LOGS_EXPORTER": "otlp",
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
         "OTEL_EXPORTER_OTLP_ENDPOINT": endpoint,
         "OTEL_EXPORTER_OTLP_HEADERS": "x-test-token=base",
         "OTEL_EXPORTER_OTLP_LOGS_HEADERS": "x-test-token=logs",
-        "OTEL_RESOURCE_ATTRIBUTES": "deployment.environment.name=test",
-        "OTEL_BLRP_SCHEDULE_DELAY": "60000",
     }
+    settings.update(environment)
+    settings["OTEL_RESOURCE_ATTRIBUTES"] = (
+        settings.get("OTEL_RESOURCE_ATTRIBUTES", "")
+        + ",deployment.environment.name=test"
+    ).lstrip(",")
     if logs_endpoint:
-        environment["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:1/unused"
-        environment["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = f"{endpoint}/custom/logs"
-    mocker.patch.dict(os.environ, environment)
-    telemetry = configure_telemetry(logging.INFO)
-    assert telemetry is not None
-    logger = logging.getLogger("renamarr.telemetry_test")
-    previous_level = logger.level
-    logger.setLevel(logging.INFO)
-    mocker.patch.object(logger, "handlers", [telemetry.handler])
-    mocker.patch.object(logger, "propagate", False)
-    span = NonRecordingSpan(SpanContext(123, 456, False, TraceFlags(1)))
+        settings["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:1/unused"
+        settings["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = f"{endpoint}/custom/logs"
 
-    try:
-        with use_span(span):
-            try:
-                raise ValueError("rename failed")
-            except ValueError:
-                logger.exception(
-                    "Batch failed",
-                    extra={
-                        "arr_type": "sonarr",
-                        "instance": "shows",
-                        "item": "Example",
-                        "renamed_count": 12,
-                    },
-                )
-    finally:
-        telemetry.shutdown()
-        logger.setLevel(previous_level)
+    result = _run_telemetry(settings)
 
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
     assert len(received) == 1
     path, token, request = received[0]
     assert path == ("/custom/logs" if logs_endpoint else "/v1/logs")
@@ -300,15 +233,20 @@ def test_http_export_preserves_attributes_exceptions_trace_and_endpoint_preceden
         attribute.key: attribute.value.string_value
         for attribute in resource_logs.resource.attributes
     }
-    assert resource["service.name"] == "renamarr"
+    assert resource["service.name"].startswith(service_name)
     assert resource["deployment.environment.name"] == "test"
-    record = resource_logs.scope_logs[0].log_records[0]
+    records = [
+        record for scope in resource_logs.scope_logs for record in scope.log_records
+    ]
+    assert len(records) == 2
+    record, dependency_record = records
     assert record.body.string_value == "Batch failed"
     attributes = {attribute.key: attribute.value for attribute in record.attributes}
     assert attributes["arr_type"].string_value == "sonarr"
     assert attributes["instance"].string_value == "shows"
     assert attributes["item"].string_value == "Example"
     assert attributes["renamed_count"].int_value == 12
+    assert attributes["dry_run"].bool_value is True
     assert attributes["exception.type"].string_value == "ValueError"
     assert attributes["exception.message"].string_value == "rename failed"
     assert (
@@ -316,32 +254,173 @@ def test_http_export_preserves_attributes_exceptions_trace_and_endpoint_preceden
     )
     assert int.from_bytes(record.trace_id) == 123
     assert int.from_bytes(record.span_id) == 456
+    dependency_attributes = {
+        attribute.key: attribute.value for attribute in dependency_record.attributes
+    }
+    assert dependency_attributes["arr_type"].string_value == "radarr"
+    assert dependency_attributes["instance"].string_value == "shows"
 
 
-def test_export_failure_leaves_local_logging_operational(
-    caplog: pytest.LogCaptureFixture, mocker: MockerFixture
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {},
+        {"OTEL_LOGS_EXPORTER": "none"},
+        {"OTEL_LOGS_EXPORTER": "otlp", "OTEL_SDK_DISABLED": "true"},
+        {"OTEL_LOGS_EXPORTER": "otlp", "OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION": "false"},
+    ],
+    ids=["default", "none", "sdk-disabled", "logging-instrumentation-disabled"],
+)
+def test_sdk_settings_disable_log_export(
+    environment: dict[str, str],
+    otlp_receiver: tuple[str, list[tuple[str, str | None, ExportLogsServiceRequest]]],
 ) -> None:
-    mocker.patch.dict(os.environ, {"OTEL_LOGS_EXPORTER": "otlp"})
-    exporter = mocker.patch(
-        "renamarr.telemetry.OTLPLogExporter", autospec=True
-    ).return_value
-    exporter.export.side_effect = RuntimeError("collector unavailable")
-    telemetry = configure_telemetry(logging.WARNING)
-    assert telemetry is not None
-    root = logging.getLogger()
-    root.addHandler(telemetry.handler)
-    try:
-        logging.getLogger("renamarr.telemetry_test").warning("Job completed")
-        telemetry.shutdown()
-        logging.getLogger("renamarr.telemetry_test").warning(
-            "Local logging still works"
-        )
-    finally:
-        root.removeHandler(telemetry.handler)
-        telemetry.shutdown()
+    endpoint, received = otlp_receiver
+    result = _run_telemetry(
+        {
+            "OTEL_EXPORTER_OTLP_ENDPOINT": endpoint,
+            "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+            **environment,
+        }
+    )
 
-    assert "Job completed" in caplog.text
-    assert "collector unavailable" in caplog.text
-    assert "Local logging still works" in caplog.text
-    exporter.export.assert_called_once()
-    exporter.shutdown.assert_called_once()
+    assert result.returncode == 0, result.stderr
+    assert received == []
+
+
+@pytest.mark.parametrize(
+    ("environment", "message"),
+    [
+        ({"OTEL_LOGS_EXPORTER": "invalid"}, "Requested component 'invalid' not found"),
+        (
+            {"OTEL_LOGS_EXPORTER": "otlp", "OTEL_EXPORTER_OTLP_PROTOCOL": "invalid"},
+            "Unsupported OTLP protocol 'invalid' is configured",
+        ),
+    ],
+    ids=["unknown-exporter", "unknown-protocol"],
+)
+def test_sdk_rejects_invalid_export_configuration(
+    environment: dict[str, str], message: str
+) -> None:
+    result = _run_telemetry(environment)
+
+    assert result.returncode != 0
+    assert message in result.stderr
+
+
+def test_sdk_supports_console_exporter() -> None:
+    result = _run_telemetry(
+        {"OTEL_LOGS_EXPORTER": "console"},
+        """
+import logging
+from renamarr.telemetry import configure_telemetry
+configure_telemetry()
+logging.getLogger("renamarr").warning("Console event", extra={"count": 12})
+""",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    record = json.loads(result.stdout)
+    assert record["body"] == "Console event"
+    assert record["attributes"]["count"] == 12
+
+
+@pytest.mark.parametrize("legacy_handler", [False, True], ids=["current", "legacy"])
+def test_export_failures_remain_local_without_feedback_into_exporter(
+    legacy_handler: bool,
+) -> None:
+    result = _run_telemetry(
+        {
+            "OTEL_LOGS_EXPORTER": "otlp",
+            "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+            "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": str(
+                legacy_handler
+            ).lower(),
+        },
+        """
+import logging
+import os
+import sys
+import warnings
+from opentelemetry._logs import get_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from renamarr.telemetry import configure_telemetry
+
+export_count = 0
+exported_messages = []
+def fail_export(self, batch):
+    global export_count
+    export_count += 1
+    exported_messages.extend(record.log_record.body for record in batch)
+    raise RuntimeError("collector unavailable")
+
+OTLPLogExporter.export = fail_export
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+legacy_handler = os.environ["OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"] == "true"
+with warnings.catch_warnings(record=True) as recorded:
+    warnings.simplefilter("error")
+    warnings.filterwarnings(
+        "always", category=DeprecationWarning,
+        message=r"The `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED` environment variable .*",
+    )
+    warnings.filterwarnings(
+        "always", category=DeprecationWarning,
+        message=r"`LoggingHandler` in `opentelemetry-sdk` is deprecated\\. .*",
+    )
+    configure_telemetry()
+assert len(recorded) == (2 if legacy_handler else 0), recorded
+logging.getLogger("renamarr").warning("Job completed")
+get_logger_provider().force_flush()
+logging.getLogger("renamarr").warning("Local logging still works")
+get_logger_provider().force_flush()
+assert export_count == 2, export_count
+if legacy_handler:
+    assert exported_messages.pop(0).startswith("Skipping installation of LoggingHandler")
+assert exported_messages == ["Job completed", "Local logging still works"], exported_messages
+""",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert "Job completed" in result.stdout
+    assert "Local logging still works" in result.stdout
+    assert "RuntimeError: collector unavailable" in result.stdout
+
+
+def test_sdk_defaults_to_grpc_and_flushes_on_process_exit() -> None:
+    received: list[ExportLogsServiceRequest] = []
+
+    class Receiver(LogsServiceServicer):
+        def Export(
+            self, request: ExportLogsServiceRequest, context: grpc.ServicerContext
+        ) -> ExportLogsServiceResponse:
+            received.append(request)
+            return ExportLogsServiceResponse()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        server = grpc.server(executor)
+        add_LogsServiceServicer_to_server(Receiver(), server)
+        port = server.add_insecure_port("127.0.0.1:0")
+        server.start()
+        try:
+            result = _run_telemetry(
+                {
+                    "OTEL_LOGS_EXPORTER": "otlp",
+                    "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{port}",
+                }
+            )
+        finally:
+            server.stop(grace=0).wait(timeout=2)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert len(received) == 1
+    records = [
+        record
+        for resource in received[0].resource_logs
+        for scope in resource.scope_logs
+        for record in scope.log_records
+    ]
+    assert len(records) == 2
+    assert records[0].body.string_value == "Batch failed"

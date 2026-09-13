@@ -1,19 +1,18 @@
-"""Optional OpenTelemetry log export and its owned resources."""
+"""OpenTelemetry-managed configuration with Renamarr's logging integration."""
 
 import logging
-import os
-from contextlib import ExitStack
-from dataclasses import dataclass, field
 
-from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.distro import OpenTelemetryConfigurator
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
-from opentelemetry.sdk._logs import LoggerProvider
-from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.sdk.resources import OTELResourceDetector, Resource
+from opentelemetry.sdk._logs import LoggingHandler as SDKLoggingHandler
+from structlog.contextvars import get_contextvars
 
 
-class _ExcludeExporterDiagnostics(logging.Filter):
+class _ExportFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
+        for key, value in get_contextvars().items():
+            record.__dict__.setdefault(key, value)
         return record.name.split(".", 1)[0] not in {
             "opentelemetry",
             "requests",
@@ -23,66 +22,14 @@ class _ExcludeExporterDiagnostics(logging.Filter):
         }
 
 
-@dataclass
-class Telemetry:
-    """An unattached OTLP handler and its independently owned SDK provider."""
+def configure_telemetry() -> None:
+    """Configure process-wide telemetry using OpenTelemetry's environment settings.
 
-    handler: logging.Handler
-    _provider: LoggerProvider
-    _closed: bool = field(default=False, init=False)
-
-    def shutdown(self) -> None:
-        """Drain pending logs and close resources at most once."""
-        if self._closed:
-            return
-        self._closed = True
-        try:
-            self._provider.shutdown()
-        finally:
-            self.handler.close()
-
-
-def configure_telemetry(level: int) -> Telemetry | None:
-    """Create optional OTLP/HTTP log export from standard OTEL settings.
-
-    The caller attaches the handler and owns shutdown. No global providers are
-    installed, so future metrics and tracing configuration stays independent.
-
-    Raises:
-        ValueError: An enabled exporter or protocol is unsupported.
+    OpenTelemetry owns providers, exporters, and shutdown. Renamarr preserves its
+    local formatting and keeps exporter diagnostics out of the export pipeline.
     """
-    if os.getenv("OTEL_SDK_DISABLED", "false").lower() == "true":
-        return None
-    exporter_name = os.getenv("OTEL_LOGS_EXPORTER", "none").strip().lower()
-    if exporter_name == "none":
-        return None
-    if exporter_name != "otlp":
-        raise ValueError("OTEL_LOGS_EXPORTER must be 'none' or 'otlp'")
-    protocol = os.getenv(
-        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
-        os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf"),
-    )
-    if protocol != "http/protobuf":
-        raise ValueError("OTLP log export supports only the 'http/protobuf' protocol")
-
-    resource = Resource.create({"service.name": "renamarr"}).merge(
-        OTELResourceDetector().detect()
-    )
-    with ExitStack() as resources:
-        provider = LoggerProvider(resource=resource, shutdown_on_exit=False)
-        resources.callback(provider.shutdown)
-        with ExitStack() as exporter_resources:
-            exporter = OTLPLogExporter()
-            exporter_resources.callback(exporter.shutdown)
-            processor = BatchLogRecordProcessor(exporter)
-            exporter_resources.pop_all()
-        with ExitStack() as processor_resources:
-            processor_resources.callback(processor.shutdown)
-            provider.add_log_record_processor(processor)
-            processor_resources.pop_all()
-        handler = LoggingHandler(level=level, logger_provider=provider)
-        resources.callback(handler.close)
-        handler.addFilter(_ExcludeExporterDiagnostics())
-        telemetry = Telemetry(handler, provider)
-        resources.pop_all()
-        return telemetry
+    OpenTelemetryConfigurator().configure()
+    LoggingInstrumentor().instrument(set_logging_format=False)
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, LoggingHandler | SDKLoggingHandler):
+            handler.addFilter(_ExportFilter())

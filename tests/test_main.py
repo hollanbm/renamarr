@@ -4,7 +4,7 @@ import select
 import signal
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from textwrap import dedent
 from typing import Protocol
@@ -78,6 +78,20 @@ class TestMain:
         self.logging_configurator_factory = mocker.patch(
             "main.LoggingConfigurator", return_value=self.logging_configurator
         )
+
+    @pytest.fixture(autouse=True)
+    def mock_exit_callbacks(self, mocker: MockerFixture) -> Iterator[None]:
+        self.exit_callbacks: list[Callable[[], object]] = []
+        self.register_exit = mocker.patch(
+            "main.atexit.register", side_effect=self.exit_callbacks.append
+        )
+        self.configure_telemetry = mocker.patch("main.configure_telemetry")
+        yield
+        self.run_exit_callbacks()
+
+    def run_exit_callbacks(self) -> None:
+        while self.exit_callbacks:
+            self.exit_callbacks.pop()()
 
     @pytest.fixture
     def config_dir(self, mocker: MockerFixture) -> None:
@@ -189,7 +203,7 @@ class TestMain:
             mocker.call.logging_configurator(),
         ]
         self.logging_configurator.configure_stdout.assert_not_called()
-        self.logging_configurator.configure_otlp.assert_not_called()
+        self.configure_telemetry.assert_not_called()
 
     def test_scheduler_loop_runs_pending_and_updates_health(
         self, mocker: MockerFixture
@@ -206,13 +220,15 @@ class TestMain:
         assert run_pending.call_count == 2
         assert sleep.call_args_list == [mocker.call(1), mocker.call(1)]
 
-    def test_start_configures_logging_before_application_and_shuts_down(
+    def test_start_registers_local_shutdown_before_sdk_setup_and_application(
         self, mocker: MockerFixture
     ) -> None:
         application = Main()
         run_application = mocker.patch.object(application, "_start")
         lifecycle = mocker.Mock()
         lifecycle.attach_mock(self.logging_configurator, "logging")
+        lifecycle.attach_mock(self.register_exit, "register_exit")
+        lifecycle.attach_mock(self.configure_telemetry, "configure_telemetry")
         lifecycle.attach_mock(run_application, "application")
         previous_handlers = {
             signum: signal.getsignal(signum)
@@ -223,34 +239,42 @@ class TestMain:
 
         assert lifecycle.mock_calls == [
             mocker.call.logging.configure_stdout(),
-            mocker.call.logging.configure_otlp(),
+            mocker.call.register_exit(application._shutdown_local_logging),
+            mocker.call.configure_telemetry(),
             mocker.call.application(),
-            mocker.call.logging.shutdown(),
         ]
+        self.logging_configurator.shutdown.assert_not_called()
+        self.run_exit_callbacks()
+        self.logging_configurator.shutdown.assert_called_once_with()
         for signum, handler in previous_handlers.items():
             assert signal.getsignal(signum) == handler
 
     @pytest.mark.parametrize(
-        "failure_point", ["configure_stdout", "configure_otlp", "_start"]
+        "failure_point", ["configure_stdout", "configure_telemetry", "_start"]
     )
-    def test_start_shuts_down_after_partial_setup_or_application_error(
+    def test_start_keeps_local_exit_callback_after_setup_or_application_error(
         self, failure_point: str, mocker: MockerFixture
     ) -> None:
         application = Main()
         run_application = mocker.patch.object(application, "_start")
         error = RuntimeError("lifecycle failure")
-        if failure_point == "_start":
-            run_application.side_effect = error
-        else:
-            getattr(self.logging_configurator, failure_point).side_effect = error
+        operations = {
+            "configure_stdout": self.logging_configurator.configure_stdout,
+            "configure_telemetry": self.configure_telemetry,
+            "_start": run_application,
+        }
+        operations[failure_point].side_effect = error
 
         with pytest.raises(RuntimeError, match="lifecycle failure") as excinfo:
             application.start()
 
         assert excinfo.value is error
+        self.register_exit.assert_called_once_with(application._shutdown_local_logging)
+        self.logging_configurator.shutdown.assert_not_called()
+        self.run_exit_callbacks()
         self.logging_configurator.shutdown.assert_called_once_with()
 
-    def test_start_restores_handlers_after_shutdown_error(
+    def test_exit_callback_restores_signal_handlers_after_local_shutdown_error(
         self, mocker: MockerFixture
     ) -> None:
         application = Main()
@@ -261,18 +285,18 @@ class TestMain:
             for signum in (signal.SIGINT, signal.SIGTERM)
         }
 
+        application.start()
+
         with pytest.raises(RuntimeError, match="shutdown failed"):
-            application.start()
+            self.run_exit_callbacks()
 
         for signum, handler in previous_handlers.items():
             assert signal.getsignal(signum) == handler
 
     @pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM])
-    @pytest.mark.parametrize("shutdown_fails", [False, True])
-    def test_signal_drains_logging_ignores_repeated_signals_and_preserves_exit_code(
+    def test_signal_ignores_repeated_signals_through_sdk_exit_and_local_cleanup(
         self,
         signum: signal.Signals,
-        shutdown_fails: bool,
         caplog: pytest.LogCaptureFixture,
         mocker: MockerFixture,
     ) -> None:
@@ -285,20 +309,29 @@ class TestMain:
             for handled_signal in (signal.SIGINT, signal.SIGTERM)
         }
 
-        def shutdown() -> None:
+        lifecycle: list[str] = []
+
+        def sdk_shutdown() -> None:
+            lifecycle.append("sdk")
             for handled_signal in (signal.SIGINT, signal.SIGTERM):
                 assert signal.getsignal(handled_signal) == signal.SIG_IGN
                 signal.raise_signal(handled_signal)
-            if shutdown_fails:
-                raise RuntimeError("shutdown failed")
 
-        self.logging_configurator.shutdown.side_effect = shutdown
+        self.configure_telemetry.side_effect = lambda: self.exit_callbacks.append(
+            sdk_shutdown
+        )
+        self.logging_configurator.shutdown.side_effect = lambda: lifecycle.append(
+            "local"
+        )
 
         with pytest.raises(SystemExit) as excinfo:
             application.start()
 
         assert excinfo.value.code == 128 + signum
+        self.logging_configurator.shutdown.assert_not_called()
+        self.run_exit_callbacks()
         self.logging_configurator.shutdown.assert_called_once_with()
+        assert lifecycle == ["sdk", "local"]
         assert [record.message for record in caplog.records] == ["Shutdown requested"]
         assert caplog.records[0].__dict__["signal_number"] == signum
         for handled_signal, handler in previous_handlers.items():
@@ -322,6 +355,7 @@ class TestMain:
         with pytest.raises(ValueError, match="signal setup failed"):
             application.start()
 
+        self.run_exit_callbacks()
         assert signal_handler.call_args_list == [
             mocker.call(signal.SIGINT, application._request_termination),
             mocker.call(signal.SIGTERM, application._request_termination),
@@ -349,6 +383,7 @@ class TestMain:
 
         assert excinfo.value.code == 128 + signal.SIGTERM
         broken_output.assert_called_once()
+        self.run_exit_callbacks()
         self.logging_configurator.shutdown.assert_called_once_with()
 
     @pytest.mark.parametrize("cleanup_fails", [False, True])
@@ -379,12 +414,13 @@ class TestMain:
 
         assert excinfo.value.code == 128 + signal.SIGTERM
         adapter.close.assert_called_once_with()
+        self.run_exit_callbacks()
         self.logging_configurator.shutdown.assert_called_once_with()
         every.assert_not_called()
         assert caplog.records[-1].message == "Shutdown requested"
         assert "instance" not in caplog.records[-1].__dict__
 
-    def test_process_sigterm_flushes_logs_and_exits_with_signal_status(
+    def test_process_sigterm_drains_sdk_at_exit_before_closing_local_logs(
         self, tmp_path: Path
     ) -> None:
         script = dedent("""\
@@ -397,6 +433,7 @@ class TestMain:
                 def shutdown(self):
                     super().shutdown()
                     Path(sys.argv[1]).write_text("closed", encoding="utf-8")
+                    print("local logging closed", flush=True)
 
             class WaitingMain(main.Main):
                 def _start(self):
@@ -411,7 +448,11 @@ class TestMain:
         shutdown_marker = tmp_path / "shutdown"
         environment = os.environ | {
             "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
-            "OTEL_LOGS_EXPORTER": "none",
+            "OTEL_LOGS_EXPORTER": "console",
+            "OTEL_TRACES_EXPORTER": "none",
+            "OTEL_METRICS_EXPORTER": "none",
+            "OTEL_BLRP_SCHEDULE_DELAY": "60000",
+            "OTEL_SDK_DISABLED": "false",
             "LOG_FORMAT": "json",
             "LOG_LEVEL": "INFO",
         }
@@ -442,7 +483,10 @@ class TestMain:
 
         assert process.returncode == 128 + signal.SIGTERM
         assert shutdown_marker.read_text(encoding="utf-8") == "closed"
-        assert "Shutdown requested" in output
+        assert '"body": "Shutdown requested"' in output
+        assert output.index('"body": "Shutdown requested"') < output.index(
+            "local logging closed"
+        )
 
     @pytest.mark.parametrize("service", [ArrService.SONARR, ArrService.RADARR])
     def test_log_to_file_configures_instance_sink(
@@ -758,7 +802,7 @@ class TestMain:
             ),
         ],
     )
-    def test_configuration_error_is_logged_and_exits_after_logging_shutdown(
+    def test_configuration_error_is_logged_and_keeps_exit_cleanup(
         self,
         error_type: type[ConfigError | ConfigFileNotFoundError],
         expected_message: str,
@@ -779,6 +823,8 @@ class TestMain:
         assert record.__dict__["error"] == str(exception)
         assert record.__dict__["phase"] == "configuration"
         assert record.__dict__["config_dir"] == os.getenv("CONFIG_DIR", "/")
+        self.logging_configurator.shutdown.assert_not_called()
+        self.run_exit_callbacks()
         self.logging_configurator.shutdown.assert_called_once_with()
 
     def test_config_dir_not_found_error(

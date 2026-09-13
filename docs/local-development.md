@@ -46,7 +46,7 @@ The default `LOG_FORMAT=text` gives readable stdout and instance files; stdout u
 LOG_FORMAT=json uv run python src/main.py
 ```
 
-JSON output contains one object per line. Run summaries expose numeric outcome counts, and scoped context adds `arr_type`, `instance`, and `item` where available. `arr_type` is `sonarr` or `radarr`, and `instance` is its configured name. The separate OTLP resource attribute `service.name` identifies Renamarr and defaults to `renamarr`. `LOG_LEVEL` accepts standard levels without regard to case, and `DEBUG` includes source locations. Tracebacks exclude local variables.
+JSON output contains one object per line. Run summaries expose numeric outcome counts, and scoped context adds `arr_type`, `instance`, and `item` where available. `arr_type` is `sonarr` or `radarr`, and `instance` is its configured name. The separate OTLP resource attribute `service.name` identifies Renamarr. Set `OTEL_SERVICE_NAME=renamarr` for local runs to match the Docker image's default; without a configured service name, the SDK uses an `unknown_service` name. `LOG_LEVEL` accepts standard levels without regard to case, and `DEBUG` includes source locations. Tracebacks exclude local variables.
 
 For file logging, enable an instance's `renamarr.log_to_file` option. `LOG_ROTATION` accepts daily local-time `HH:MM`; `LOG_RETENTION` accepts positive whole-day values such as `1 day` or `7 days`. Rotation and age-based cleanup happen on the next emitted record after the boundary, including cleanup of legacy Loguru archives. If the file cannot be opened, Renamarr warns on stdout and continues.
 
@@ -54,13 +54,17 @@ To export logs to an existing Alloy or OpenTelemetry Collector HTTP receiver on 
 
 ```shell
 OTEL_LOGS_EXPORTER=otlp \
+OTEL_SERVICE_NAME=renamarr \
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 uv run python src/main.py
 ```
 
-The base endpoint becomes `http://localhost:4318/v1/logs`. Use `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` for a complete logs URL. Export is disabled by default and supports only `http/protobuf`; `OTEL_SDK_DISABLED=true` disables it explicitly. `OTEL_SERVICE_NAME` defaults to `renamarr`. See [OpenTelemetry Logs](../README.md#opentelemetry-logs) for resource, authentication, TLS, timeout, and batch settings.
+For HTTP/protobuf, the base endpoint becomes `http://localhost:4318/v1/logs`. Use `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` for a complete HTTP logs URL. gRPC is also supported and is the SDK's default protocol; use `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` for a gRPC receiver.
 
-Stdout remains available during OTLP export. Collect only one of those routes into the same backend. Normal exit and SIGINT/SIGTERM drain pending logs; Compose examples allow 35 seconds for shutdown. Tracing and metrics instrumentation are not enabled by these settings.
+The OpenTelemetry configurator manages exporter selection, resources, batching, and process-exit cleanup. Exporters remain disabled when `OTEL_LOGS_EXPORTER`, `OTEL_TRACES_EXPORTER`, and `OTEL_METRICS_EXPORTER` are unset. `OTEL_SDK_DISABLED=true` disables SDK telemetry recording. `OTEL_PYTHON_LOG_HANDLER_LEVEL` can filter exported logs further without changing local output. See [OpenTelemetry Logs](../README.md#opentelemetry-logs) for resource, authentication, TLS, timeout, and batch settings.
+
+Stdout remains available during OTLP export. Collect only one of those routes into the same backend. The SDK drains pending telemetry at process exit, including normal completion and Renamarr's SIGINT/SIGTERM exit path. Compose examples allow 35 seconds for log export shutdown; additional signals or exporters may need more time. Renamarr does not yet add application tracing or metrics instrumentation.
 
 ## direnv
 

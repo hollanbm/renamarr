@@ -13,8 +13,6 @@ from opentelemetry.trace import get_current_span
 from structlog.contextvars import bound_contextvars, get_contextvars
 from structlog.typing import EventDict, Processor
 
-from renamarr.telemetry import Telemetry, configure_telemetry
-
 logger = structlog.stdlib.get_logger(__name__)
 
 
@@ -73,7 +71,7 @@ class _DailyFileHandler(TimedRotatingFileHandler):
 
 
 class LoggingConfigurator:
-    """Own Renamarr's local logging handlers and optional OTLP export."""
+    """Configure Renamarr's local logging output."""
 
     def __init__(self) -> None:
         level_name = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -88,7 +86,6 @@ class LoggingConfigurator:
         self._logger_levels: dict[logging.Logger, int] = {}
         self._stdout_handler: logging.Handler | None = None
         self._file_handlers: dict[tuple[str, str], logging.Handler] = {}
-        self._telemetry: Telemetry | None = None
 
     def configure_stdout(self) -> None:
         """Configure structlog and the default stdout handler once."""
@@ -112,16 +109,6 @@ class LoggingConfigurator:
         handler = logging.StreamHandler(sys.stdout)
         self._configure_handler(handler, colors=sys.stdout.isatty())
         self._stdout_handler = handler
-
-    def configure_otlp(self) -> None:
-        """Attach opt-in OTLP export without changing local output."""
-        if self._telemetry is not None:
-            return
-        telemetry = configure_telemetry(self._log_level)
-        if telemetry is not None:
-            telemetry.handler.addFilter(_RecordContext())
-            logging.getLogger().addHandler(telemetry.handler)
-            self._telemetry = telemetry
 
     def configure_instance_file(self, arr_type: str, instance_name: str) -> bool:
         """Add an instance's daily rotating file, returning whether it is usable."""
@@ -156,7 +143,7 @@ class LoggingConfigurator:
         return True
 
     def shutdown(self) -> None:
-        """Drain OTLP once, then remove and close all owned local handlers."""
+        """Remove and close Renamarr's local handlers."""
         root = logging.getLogger()
         with ExitStack() as cleanup:
             for configured_logger, level in self._logger_levels.items():
@@ -168,10 +155,6 @@ class LoggingConfigurator:
             self._handlers.clear()
             self._file_handlers.clear()
             self._stdout_handler = None
-            telemetry, self._telemetry = self._telemetry, None
-            if telemetry is not None:
-                root.removeHandler(telemetry.handler)
-                telemetry.shutdown()
 
     def _configure_handler(self, handler: logging.Handler, *, colors: bool) -> None:
         processors: list[Processor] = [

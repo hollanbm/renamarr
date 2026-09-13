@@ -8,14 +8,12 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
-from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags, use_span
 from pytest_mock import MockerFixture
 from structlog.contextvars import bound_contextvars
 from structlog.stdlib import get_logger
 
 from renamarr.logging_config import LoggingConfigurator
-from renamarr.telemetry import Telemetry
 
 logger = get_logger("renamarr.config_test")
 type ConfigureLogging = Callable[[dict[str, str]], LoggingConfigurator]
@@ -305,70 +303,33 @@ def test_unwritable_file_logs_a_contextual_warning_and_keeps_stdout(
     assert "instance" not in continuation
 
 
-def test_stdout_and_otlp_configuration_are_idempotent_and_preserve_raw_events(
-    configure_logging: ConfigureLogging, output: StringIO, mocker: MockerFixture
+def test_local_output_preserves_trace_context_without_otlp_export(
+    configure_logging: ConfigureLogging, output: StringIO
 ) -> None:
-    exporter = InMemoryLogRecordExporter()
-    mocker.patch("renamarr.telemetry.OTLPLogExporter", return_value=exporter)
-    configurator = configure_logging(
-        {"LOG_FORMAT": "json", "OTEL_LOGS_EXPORTER": "otlp"}
-    )
+    configurator = configure_logging({"LOG_FORMAT": "json"})
     configurator.configure_stdout()
-    configurator.configure_otlp()
-    configurator.configure_otlp()
     span = NonRecordingSpan(SpanContext(123, 456, False, TraceFlags(1)))
     with use_span(span), bound_contextvars(arr_type="sonarr", instance="shows"):
-        try:
-            raise ValueError("failure")
-        except ValueError:
-            logger.exception("Failed", count=2, retried=False)
-    configurator.shutdown()
-    configurator.shutdown()
+        logger.info("Renamed", count=2, retried=False)
 
     event = json.loads(output.getvalue())
     assert event["trace_id"] == f"{123:032x}"
     assert event["span_id"] == f"{456:016x}"
-    assert "ValueError: failure" in event["exception"]
-    records = exporter.get_finished_logs()
-    assert len(records) == 1
-    record = records[0].log_record
-    assert record.body == "Failed"
-    assert record.trace_id == 123 and record.span_id == 456
-    assert record.attributes is not None
-    assert record.attributes["count"] == 2
-    assert record.attributes["retried"] is False
-    assert record.attributes["arr_type"] == "sonarr"
-    assert "service" not in record.attributes
-    assert record.attributes["exception.type"] == "ValueError"
+    assert event["arr_type"] == "sonarr"
+    assert event["count"] == 2
+    assert event["retried"] is False
 
 
-def test_disabled_otlp_leaves_handlers_unchanged(
+def test_shutdown_is_idempotent_and_preserves_handlers_owned_by_other_libraries(
     configure_logging: ConfigureLogging,
 ) -> None:
+    root = logging.getLogger()
+    application = logging.getLogger("renamarr")
+    original_handlers = root.handlers.copy()
+    original_levels = (root.level, application.level)
     configurator = configure_logging({})
-    handlers = logging.getLogger().handlers.copy()
-    configurator.configure_otlp()
-    assert logging.getLogger().handlers == handlers
-
-
-def test_shutdown_keeps_local_handlers_for_diagnostics_and_closes_them_after_failure(
-    configure_logging: ConfigureLogging, output: StringIO, mocker: MockerFixture
-) -> None:
-    original_handlers = logging.getLogger().handlers.copy()
-    configurator = configure_logging({})
-    telemetry = mocker.Mock(spec=Telemetry, handler=logging.NullHandler())
-    mocker.patch("renamarr.logging_config.configure_telemetry", return_value=telemetry)
-
-    def fail_shutdown() -> None:
-        logging.getLogger("opentelemetry").warning("Exporter shutdown failed")
-        raise RuntimeError("shutdown failed")
-
-    telemetry.shutdown.side_effect = fail_shutdown
-    configurator.configure_otlp()
-    with pytest.raises(RuntimeError, match="shutdown failed"):
-        configurator.shutdown()
+    configurator.shutdown()
     configurator.shutdown()
 
-    assert "Exporter shutdown failed" in output.getvalue()
-    assert logging.getLogger().handlers == original_handlers
-    telemetry.shutdown.assert_called_once_with()
+    assert root.handlers == original_handlers
+    assert (root.level, application.level) == original_levels
