@@ -5,6 +5,7 @@ services:
     # user: 1000:1000  # If file logging is enabled, match the host user to avoid permission issues.
     read_only: true
     restart: 'no'
+    stop_grace_period: 35s
     tmpfs:
       - /tmp
     volumes:
