@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import pytest
 from schema import Schema, SchemaError
 
@@ -284,7 +282,7 @@ def test_disabled_schedule_accepts_zero_interval(service: str) -> None:
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
 @pytest.mark.parametrize("hourly_job", [True, False])
 def test_deprecated_hourly_job_sets_schedule_enabled_without_parse_warning(
-    service: str, hourly_job: bool, mock_loguru_warning: MagicMock
+    service: str, hourly_job: bool, caplog: pytest.LogCaptureFixture
 ) -> None:
     instance_config: dict[str, object] = minimal_instance_config() | {
         "renamarr": {"hourly_job": hourly_job}
@@ -294,7 +292,7 @@ def test_deprecated_hourly_job_sets_schedule_enabled_without_parse_warning(
 
     assert _renamarr_config(validated, service)["hourly_job"] is hourly_job
     assert _schedule_config(validated, service)["enabled"] is hourly_job
-    mock_loguru_warning.assert_not_called()
+    assert not caplog.records
 
 
 @pytest.mark.parametrize("service", ["sonarr", "radarr"])
