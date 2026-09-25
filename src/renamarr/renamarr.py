@@ -5,7 +5,8 @@ from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import NoReturn
 
-from loguru import logger
+from structlog.contextvars import bound_contextvars
+from structlog.stdlib import get_logger
 
 from renamarr.exceptions import ArrOperationError
 from renamarr.models.command import CommandPollingSettings
@@ -14,6 +15,7 @@ from renamarr.models.scan import ScanFailure, ScanPhase, ScanResult, WorkSummary
 from renamarr.protocols import ArrAdapter
 
 _DEFAULT_COMMAND_POLLING = CommandPollingSettings()
+logger = get_logger(__name__)
 
 
 class _WorkOutcome(StrEnum):
@@ -41,7 +43,7 @@ class Renamarr:
 
     def scan(self) -> ScanResult:
         """Run a scan and return its structured outcome."""
-        with logger.contextualize(instance=self.name):
+        with bound_contextvars(instance=self.name):
             logger.info("Starting Renamarr")
             failures: list[ScanFailure] = []
             analysis_outcome, analysis_error = self._analyze_media()
@@ -123,7 +125,7 @@ class Renamarr:
         candidates: list[FileRenameCandidate] = []
 
         for item in items:
-            with logger.contextualize(item=item.title):
+            with bound_contextvars(item=item.title):
                 try:
                     candidate = self.adapter.get_file_rename_candidate(item)
                 except ArrOperationError as error:
@@ -159,7 +161,9 @@ class Renamarr:
             )
 
         for batch in batches:
-            logger.info(f"Renaming files: {batch.description}")
+            logger.info(
+                "Renaming files", description=batch.description, item_ids=batch.item_ids
+            )
             try:
                 command_id = self.adapter.start_file_rename(batch)
                 self._wait_for_command(command_id, f"file rename: {batch.description}")
@@ -173,7 +177,11 @@ class Renamarr:
 
             for item_id in batch.item_ids:
                 outcomes[item_id] = _WorkOutcome.SUCCEEDED
-            logger.info(f"File rename completed successfully: {batch.description}")
+            logger.info(
+                "File rename completed successfully",
+                description=batch.description,
+                item_ids=batch.item_ids,
+            )
 
         return self._summarize(outcomes.values())
 
@@ -193,7 +201,7 @@ class Renamarr:
 
         grouped_items: dict[str, list[MediaItem]] = {}
         for item in items:
-            with logger.contextualize(item=item.title):
+            with bound_contextvars(item=item.title):
                 root_folder = self._find_root_folder(item, root_folders)
                 if root_folder is None:
                     outcomes[item.id] = _WorkOutcome.FAILED
@@ -226,7 +234,12 @@ class Renamarr:
 
         for root_folder, batch_items in grouped_items.items():
             batch = FolderRenameBatch(root_folder, tuple(batch_items))
-            logger.info(f"Renaming folders: {', '.join(batch.titles)}")
+            logger.info(
+                "Renaming folders",
+                titles=batch.titles,
+                item_ids=batch.item_ids,
+                root_folder=batch.root_folder_path,
+            )
             try:
                 self.adapter.move_folder(batch)
                 command_id = self.adapter.start_folder_rescan(batch)
@@ -244,7 +257,10 @@ class Renamarr:
             for item_id in batch.item_ids:
                 outcomes[item_id] = _WorkOutcome.SUCCEEDED
             logger.info(
-                f"Folder workflow completed successfully: {', '.join(batch.titles)}"
+                "Folder workflow completed successfully",
+                titles=batch.titles,
+                item_ids=batch.item_ids,
+                root_folder=batch.root_folder_path,
             )
 
         return self._summarize(outcomes.values())
@@ -313,7 +329,7 @@ class Renamarr:
         item_ids: tuple[int, ...],
         error: ArrOperationError,
     ) -> None:
-        logger.error(str(error))
+        logger.error(str(error), phase=phase.value, item_ids=item_ids)
         failures.append(ScanFailure(phase, item_ids, str(error)))
 
     @staticmethod
@@ -332,19 +348,27 @@ class Renamarr:
             failures=tuple(failures),
         )
         logger.debug(
-            f"Items found: {items_found} | analysis: [ success={analysis.success}, "
-            f"failed={analysis.failed}, skipped={analysis.skipped} ]"
+            "Items found",
+            items_found=items_found,
+            analysis_success=analysis.success,
+            analysis_failed=analysis.failed,
+            analysis_skipped=analysis.skipped,
         )
-        summary = (
-            f"file renames: [ success={file_renames.success}, "
-            f"failed={file_renames.failed}, skipped={file_renames.skipped} ] | "
-            f"folder renames: [ success={folder_renames.success}, "
-            f"failed={folder_renames.failed}, skipped={folder_renames.skipped} ]"
-        )
+        summary = {
+            "items_found": items_found,
+            "analysis_success": analysis.success,
+            "analysis_failed": analysis.failed,
+            "analysis_skipped": analysis.skipped,
+            "file_renames_success": file_renames.success,
+            "file_renames_failed": file_renames.failed,
+            "file_renames_skipped": file_renames.skipped,
+            "folder_renames_success": folder_renames.success,
+            "folder_renames_failed": folder_renames.failed,
+            "folder_renames_skipped": folder_renames.skipped,
+            "failure_count": len(result.failures),
+        }
         if result.successful:
-            logger.info(f"Finished Renamarr successfully | {summary}")
+            logger.info("Finished Renamarr successfully", **summary)
         else:
-            logger.error(
-                f"Finished Renamarr with {len(result.failures)} failures | {summary}"
-            )
+            logger.error("Finished Renamarr with failures", **summary)
         return result

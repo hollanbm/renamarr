@@ -24,6 +24,8 @@ repos:
     rev: v0.0.83
     hooks:
       - id: ty
+        # Use the project's uv; this hook pins an incompatible older version.
+        language: system
   - repo: https://github.com/hadolint/hadolint
     rev: v2.15.1
     hooks:
