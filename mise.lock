@@ -275,49 +275,49 @@ url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/568294490
 provenance = "github-attestations"
 
 [[tools.ty]]
-version = "0.0.83"
+version = "0.0.84"
 backend = "aqua:astral-sh/ty"
 
 [tools.ty."platforms.linux-arm64"]
-checksum = "sha256:0de6e6c215ba28579506488500a8fe91b868445de40f27bf022a4673feb6a5e0"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023279"
+checksum = "sha256:d575243e0586742ae0e9186441358bd7e57e8160e319b3afb781430126762a39"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999358"
 provenance = "github-attestations"
 
 [tools.ty."platforms.linux-arm64-musl"]
-checksum = "sha256:fc48538601ca7f9462b8d583b65bca88aba35bbe98ced5e8e72ca08794310630"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023286"
+checksum = "sha256:e0f1cbe08fad84a164dbac8945730a349d506836f185afdb927e16395136d091"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999372"
 provenance = "github-attestations"
 
 [tools.ty."platforms.linux-x64"]
-checksum = "sha256:dc1baa9f6135cb34712f4c7487dc8ce05fc91eb018360426eb78bba03c2e4d2e"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023441"
+checksum = "sha256:336bb36b7e917d844b8b16925d373b4614b326e452c881ff4ed6bc5904b65185"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999537"
 provenance = "github-attestations"
 
 [tools.ty."platforms.linux-x64-musl"]
-checksum = "sha256:019ba29db7d14023d956d08fe413fe1795f0369aa501edff0d706504879c72b4"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023448"
+checksum = "sha256:da32bd4cbfe124f1df974e78cc163037c5d4b12ceec532b7ed785b5b74a76cd1"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999548"
 provenance = "github-attestations"
 
 [tools.ty."platforms.macos-arm64"]
-checksum = "sha256:963def3419d2558e5a057329dbbbd8de54da7d73af6668c6d7f472ceffebe2c8"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023255"
+checksum = "sha256:c65c09f27bcef726c0b043dcee8d0f1e578bd1936799e5bc447235cbc3e19d91"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999334"
 provenance = "github-attestations"
 
 [tools.ty."platforms.macos-x64"]
-checksum = "sha256:4c1f6db572119a0e461895cd241a990ef616b30258394b02161b04d6a34d0911"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023421"
+checksum = "sha256:3891e5509d306721cee4dd4e69b94535dbd96371af7ec3b734ee65f25b167ae4"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999520"
 provenance = "github-attestations"
 
 [tools.ty."platforms.windows-x64"]
-checksum = "sha256:a6ac68c919e869b97dfd2c67cafe82e6211f7cf818ba41f48eb4223fa0bac931"
-url = "https://github.com/astral-sh/ty/releases/download/0.0.83/ty-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/580023432"
+checksum = "sha256:e4b3c7cd30ff8b4ee4c2a62621f293341ad3c89fb3e7c6e4d2686150a4dbcf08"
+url = "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/astral-sh/ty/releases/assets/585999524"
 provenance = "github-attestations"
 
 [[tools.uv]]
