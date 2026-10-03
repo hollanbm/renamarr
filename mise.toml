@@ -4,7 +4,7 @@ min_version = "2026.9.18"
 python.uv_venv_auto = "create|source"
 
 [tools]
-python = "3.14.7"
+python = "3.14.8"
 hadolint = "2.15.1"
 actionlint = "1.7.12"
 uv = "0.12.21"
