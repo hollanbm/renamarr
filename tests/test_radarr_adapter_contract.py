@@ -1,3 +1,4 @@
+from json import dumps
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -239,7 +240,6 @@ def test_uses_radarr_folder_endpoints_and_payloads(
     command = command_api.create_command.call_args.args[0]
     assert command.model_dump(mode="json", by_alias=True, exclude_none=True) == {
         "name": "RefreshMovie",
-        "priority": "high",
         "movieIds": [1, 2],
     }
 
@@ -284,7 +284,7 @@ def test_translates_api_errors_at_every_boundary(
 ) -> None:
     item = MediaItem(1, "Movie", "/movies/Movie")
     file_batch = FileRenameBatch((1,), (10,), "Movie")
-    folder_batch = FolderRenameBatch("/movies", (item,))
+    folder_batch = FolderRenameBatch("/movies", (item,), False)
     operations = {
         "list": adapter.list_media_items,
         "setting": adapter.is_media_analysis_enabled,
@@ -297,6 +297,11 @@ def test_translates_api_errors_at_every_boundary(
         "move": lambda: adapter.move_folder(folder_batch),
         "rescan": lambda: adapter.start_folder_rescan(folder_batch),
     }
+    snapshot = MagicMock(status=200)
+    snapshot.read.return_value = b"[]"
+    radarr_apis[
+        "CommandApi"
+    ].list_command_without_preload_content.return_value = snapshot
     api_error = ApiException(reason="broken")
     getattr(radarr_apis[api_name], method_name).side_effect = api_error
 
@@ -453,3 +458,110 @@ def test_rejects_malformed_folder_response(
         adapter.get_expected_folder_name(MediaItem(1, "Movie", "/movies/Movie"))
 
     folder_response.release_conn.assert_called_once_with()
+
+
+@pytest.mark.parametrize("status", ["failed", "aborted", "cancelled", "orphaned"])
+def test_terminal_failure_states_override_successful_result(
+    adapter: RadarrAdapter, radarr_apis: dict[str, MagicMock], status: str
+) -> None:
+    radarr_apis["CommandApi"].get_command_by_id.return_value = CommandResource(
+        status=RadarrCommandStatus(status), result=RadarrCommandResult.SUCCESSFUL
+    )
+
+    assert adapter.get_command_status(1) == CommandStatus(True, False)
+
+
+@pytest.mark.parametrize("deduplicated", [False, True])
+def test_identifies_move_command_using_raw_snapshots(
+    adapter: RadarrAdapter,
+    radarr_apis: dict[str, MagicMock],
+    mocker: MockerFixture,
+    deduplicated: bool,
+) -> None:
+    item = MediaItem(1, "Item", "/movies/old")
+    batch = FolderRenameBatch("/movies", (item,))
+    command = {
+        "id": 42,
+        "name": "BulkMoveMovie",
+        "status": "started",
+        "body": {
+            "destinationRootFolder": "/movies",
+            "movies": [{"movieId": 1, "sourcePath": item.path}],
+        },
+    }
+    before = mocker.Mock(status=200)
+    before.read.return_value = dumps([command] if deduplicated else []).encode()
+    after = mocker.Mock(status=200)
+    after.read.return_value = dumps([command]).encode()
+    command_api = radarr_apis["CommandApi"]
+    command_api.list_command_without_preload_content.side_effect = [before, after]
+    editor = radarr_apis["MovieEditorApi"].put_movie_editor
+    calls = mocker.Mock()
+    calls.attach_mock(command_api.list_command_without_preload_content, "snapshot")
+    calls.attach_mock(editor, "editor")
+
+    assert adapter.move_folder(batch) == 42
+
+    assert [entry[0] for entry in calls.mock_calls] == [
+        "snapshot",
+        "editor",
+        "snapshot",
+    ]
+    before.release_conn.assert_called_once_with()
+    after.release_conn.assert_called_once_with()
+    command_api.list_command.assert_not_called()
+    payload = editor.call_args.args[0].model_dump(
+        mode="json", by_alias=True, exclude_none=True
+    )
+    assert payload == {"movieIds": [1], "rootFolderPath": "/movies", "moveFiles": True}
+
+
+@pytest.mark.parametrize(
+    ("stage", "failure"),
+    [
+        (stage, failure)
+        for stage in ("before", "after")
+        for failure in ("http", "request", "read", "invalid")
+    ]
+    + [("after", "missing"), ("after", "ambiguous")],
+)
+def test_move_snapshot_errors_prevent_identification(
+    adapter: RadarrAdapter,
+    radarr_apis: dict[str, MagicMock],
+    mocker: MockerFixture,
+    stage: str,
+    failure: str,
+) -> None:
+    item = MediaItem(1, "Item", "/movies/old")
+    batch = FolderRenameBatch("/movies", (item,))
+    good = mocker.Mock(status=200)
+    good.read.return_value = b"[]"
+    broken = mocker.Mock(status=500 if failure == "http" else 200, reason="broken")
+    broken.read.return_value = b"invalid" if failure == "invalid" else b"[]"
+    if failure == "read":
+        broken.read.side_effect = ApiException(reason="read failed")
+    if failure == "ambiguous":
+        command = {
+            "id": 1,
+            "name": "BulkMoveMovie",
+            "status": "queued",
+            "body": {
+                "destinationRootFolder": "/movies",
+                "movies": [{"movieId": 1, "sourcePath": item.path}],
+            },
+        }
+        broken.read.return_value = dumps([command, command | {"id": 2}]).encode()
+    snapshot = radarr_apis["CommandApi"].list_command_without_preload_content
+    response = ApiException(reason="request failed") if failure == "request" else broken
+    snapshot.side_effect = [response] if stage == "before" else [good, response]
+
+    with pytest.raises(ArrOperationError):
+        adapter.move_folder(batch)
+
+    editor = radarr_apis["MovieEditorApi"].put_movie_editor
+    if stage == "before" and failure not in {"missing", "ambiguous"}:
+        editor.assert_not_called()
+    else:
+        editor.assert_called_once()
+    if failure != "request":
+        broken.release_conn.assert_called_once_with()
