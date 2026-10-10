@@ -24,6 +24,10 @@ repos:
     rev: v0.0.86
     hooks:
       - id: ty
+        entry: uv run --frozen --group dev --group test ty check
+        language: system
+        args:
+          - --fix
   - repo: https://github.com/hadolint/hadolint
     rev: v2.15.1
     hooks:
