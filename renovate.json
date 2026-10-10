@@ -32,6 +32,10 @@
       "groupName": "ruff"
     },
     {
+      "matchPackageNames": ["opentelemetry-*"],
+      "groupName": "OpenTelemetry"
+    },
+    {
       "matchPackageNames": ["jdx/mise"],
       "groupName": "mise",
       "minimumGroupSize": 2
