@@ -55,8 +55,8 @@ class ArrAdapter(Protocol):
         """Return the folder name expected for a media item."""
         ...
 
-    def move_folder(self, batch: FolderRenameBatch) -> None:
-        """Move the folders described by a rename batch."""
+    def move_folder(self, batch: FolderRenameBatch) -> int | None:
+        """Return the move command ID, or None when move_files is false."""
         ...
 
     def start_folder_rescan(self, batch: FolderRenameBatch) -> int:

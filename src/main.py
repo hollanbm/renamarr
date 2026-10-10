@@ -1,5 +1,5 @@
 import os
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from sys import exit
 from time import sleep
@@ -158,7 +158,7 @@ class Main:
 
 
 @contextmanager
-def set_directory(path: str) -> Iterator[None]:
+def set_directory(path: str) -> Generator[None]:
     oldpwd = os.getcwd()
     os.chdir(path)
     try:
