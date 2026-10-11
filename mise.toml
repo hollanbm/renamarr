@@ -13,7 +13,7 @@ ty = "0.0.86"
 "pipx:pyflakes" = "4.0.3"
 "pipx:yamlfix" = "1.19.1"
 "pipx:mdformat" = "1.0.0"
-direnv = "2.37.1"
+direnv = "2.38.2"
 
 [tools.prek]
 version = "0.5.5"
