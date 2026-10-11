@@ -136,7 +136,7 @@ version = "1.0.0"
 backend = "pipx:mdformat"
 
 [[tools."pipx:pyflakes"]]
-version = "4.0.2"
+version = "4.0.3"
 backend = "pipx:pyflakes"
 
 [[tools."pipx:yamlfix"]]
