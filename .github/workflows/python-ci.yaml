@@ -20,13 +20,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834  # v5.1.0
         with:
           version: 2026.10.4
           install_args: python
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
 
@@ -63,13 +63,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834  # v5.1.0
         with:
           version: 2026.10.4
           install_args: python
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
 
@@ -89,13 +89,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834  # v5.1.0
         with:
           version: 2026.10.4
           install_args: python
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
 
@@ -113,7 +113,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
 
       - name: Audit dependencies with uv
         run: uv audit --frozen --preview-features audit-command

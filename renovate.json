@@ -28,13 +28,33 @@
       "minimumGroupSize": 3
     },
     {
-      "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
+      "matchPackageNames": [
+        "ruff",
+        "astral-sh/ruff",
+        "astral-sh/ruff-pre-commit"
+      ],
       "groupName": "ruff"
     },
     {
       "matchPackageNames": ["jdx/mise"],
       "groupName": "mise",
       "minimumGroupSize": 2
+    },
+    {
+      "matchPackageNames": ["hadolint/hadolint"],
+      "groupName": "hadolint"
+    },
+    {
+      "matchPackageNames": ["rhysd/actionlint"],
+      "groupName": "actionlint"
+    },
+    {
+      "matchPackageNames": ["yamlfix", "lyz-code/yamlfix"],
+      "groupName": "yamlfix"
+    },
+    {
+      "matchPackageNames": ["mdformat", "hukkin/mdformat"],
+      "groupName": "mdformat"
     },
     {
       "matchPackageNames": "python",
