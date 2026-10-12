@@ -60,7 +60,7 @@ repos:
         exclude: \.md$
       - id: end-of-file-fixer
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 44.133.0
+    rev: 44.134.1
     hooks:
       - id: renovate-config-validator
         args:
