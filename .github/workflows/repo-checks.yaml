@@ -57,7 +57,7 @@ jobs:
 
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.6
+          version: 2026.10.7
           install_args: python prek
 
       - name: Run formatting checks
@@ -79,7 +79,7 @@ jobs:
 
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.6
+          version: 2026.10.7
           install_args: python hadolint
 
       - name: Run hadolint
@@ -96,7 +96,7 @@ jobs:
 
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.6
+          version: 2026.10.7
           install_args: python actionlint
 
       - name: Run actionlint
