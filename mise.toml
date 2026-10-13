@@ -1,4 +1,4 @@
-min_version = "2026.10.6"
+min_version = "2026.10.7"
 
 [settings]
 python.uv_venv_auto = "create|source"
