@@ -61,11 +61,14 @@ This config option will rename series or movie folders when they no longer match
   - moving the folder in place
 - sends a Sonarr `RescanSeries` command to rescan series after successful folder moves
 - sends a Radarr `RefreshMovie` command to rescan movies after successful folder moves
+- waits for each folder move command to complete successfully before submitting its rescan, using the default rescan priority
 - Series and movies are processed in bulk at the end of the run, **per root folder**
 
 #### Command Polling and Partial Results
 
-Analysis, file rename, and post-move rescan commands use the same polling settings. Renamarr checks each command immediately, then checks every `command_polling.check_interval_seconds` until it succeeds, reports a completed failure, encounters a status-check error, or reaches `command_polling.timeout_seconds`. The timeout applies separately to each asynchronous command; it is not an HTTP request or whole-scan timeout.
+Any file-rename failure skips the entire folder phase and counts its items as skipped. Folder move submission, command identification, polling, or completion failures mark that root-folder batch as failed and prevent its rescan; other root-folder batches can continue. Renamarr identifies moves by comparing command lists before and after the editor request, matching the destination root, item IDs, and source paths. A missing or ambiguous match fails the batch. An exact queued or running command can be reused when the service deduplicates the request.
+
+Analysis, file rename, folder move, and post-move rescan commands use the same polling settings. Renamarr checks each command immediately, then checks every `command_polling.check_interval_seconds` until it succeeds, reports a completed failure, encounters a status-check error, or reaches `command_polling.timeout_seconds`. Failed, aborted, cancelled, and orphaned commands stop polling as unsuccessful. The timeout applies separately to each asynchronous command; it is not an HTTP request or whole-scan timeout.
 
 ### Usage
 
@@ -124,7 +127,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `sonarr[].renamarr.analyze_files`                          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `sonarr[].renamarr.rename_folders`                         | boolean | No       | False         | This will rename series folders when the current series folder no longer matches your MediaFormat                                                |
 | `sonarr[].renamarr.log_to_file`                            | boolean | No       | False         | writes logs for this Sonarr instance to `LOG_DIR/sonarr/<name>.log` with daily rotation                                                          |
-| `sonarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, or rescan command                                                                                |
+| `sonarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, move, or rescan command                                                                          |
 | `sonarr[].renamarr.command_polling.check_interval_seconds` | integer | No       | 3             | seconds between command-status checks after the immediate first check                                                                            |
 | `radarr`                                                   | Array   | No       | []            | Radarr instances; when present, must contain at least one instance                                                                               |
 | `radarr[].name`                                            | string  | Yes      | N/A           | user friendly instance name, used in log messages                                                                                                |
@@ -139,7 +142,7 @@ _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official
 | `radarr[].renamarr.analyze_files`                          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 | `radarr[].renamarr.rename_folders`                         | boolean | No       | False         | This will rename movie folders when the current movie folder no longer matches your MediaFormat                                                  |
 | `radarr[].renamarr.log_to_file`                            | boolean | No       | False         | writes logs for this Radarr instance to `LOG_DIR/radarr/<name>.log` with daily rotation                                                          |
-| `radarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, or rescan command                                                                                |
+| `radarr[].renamarr.command_polling.timeout_seconds`        | integer | No       | 120           | maximum time to wait for each analysis, rename, move, or rescan command                                                                          |
 | `radarr[].renamarr.command_polling.check_interval_seconds` | integer | No       | 3             | seconds between command-status checks after the immediate first check                                                                            |
 
 Schedule interval values must be non-negative integers, and the combined interval cannot exceed 30 days. When scheduling is enabled, the combined interval must be greater than zero. A zero interval is valid only when `schedule.enabled` is `false`.

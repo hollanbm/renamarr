@@ -52,6 +52,7 @@ def configured_adapter(mocker: MockerFixture, items: list[MediaItem]) -> MagicMo
     adapter.get_expected_folder_name.side_effect = lambda item: (
         f"new-{item.title.lower()}"
     )
+    adapter.move_folder.return_value = None
     adapter.start_folder_rescan.side_effect = [30, 31]
     return adapter
 
@@ -533,7 +534,7 @@ def test_invalid_file_batches_fail_before_starting_commands(
     adapter.get_command_status.assert_not_called()
 
 
-def test_file_batch_failure_does_not_block_later_batches_or_folders(
+def test_file_batch_failure_allows_later_file_batches_but_skips_folders(
     mocker: MockerFixture,
 ) -> None:
     item_a = MediaItem(1, "A", "/root/old-a")
@@ -541,7 +542,6 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(
     adapter = configured_adapter(mocker, [item_a, item_b])
     file_batch_a = FileRenameBatch((1,), (10,), "A")
     file_batch_b = FileRenameBatch((2,), (20,), "B")
-    folder_batch = FolderRenameBatch("/root", (item_a, item_b))
     adapter.build_file_rename_batches.side_effect = None
     adapter.build_file_rename_batches.return_value = [file_batch_a, file_batch_b]
     adapter.start_file_rename.side_effect = [
@@ -553,7 +553,7 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(
     result = Renamarr("test", adapter, rename_folders=True).scan()
 
     assert result.file_renames == WorkSummary(success=1, failed=1)
-    assert result.folder_renames == WorkSummary(success=2)
+    assert result.folder_renames == WorkSummary(skipped=2)
     assert result.failures == (
         ScanFailure(ScanPhase.FILE_RENAMES, (1,), "rename failed"),
     )
@@ -561,9 +561,10 @@ def test_file_batch_failure_does_not_block_later_batches_or_folders(
         call(file_batch_a),
         call(file_batch_b),
     ]
-    assert adapter.move_folder.call_args_list == [call(folder_batch)]
-    assert adapter.start_folder_rescan.call_args_list == [call(folder_batch)]
-    assert adapter.get_command_status.call_args_list == [call(21), call(30)]
+    adapter.list_root_folders.assert_not_called()
+    adapter.move_folder.assert_not_called()
+    adapter.start_folder_rescan.assert_not_called()
+    assert adapter.get_command_status.call_args_list == [call(21)]
 
 
 def test_root_folder_listing_failure_marks_every_item_failed(
@@ -685,3 +686,114 @@ def test_root_folder_matching_uses_components_and_deepest_match() -> None:
     assert Renamarr._find_root_folder(exact_item, roots) == "/data/media/tv"
     assert Renamarr._find_root_folder(overlapping_item, roots) == "/data/media/tv-anime"
     assert Renamarr._find_root_folder(MediaItem(4, "None", "/other/x"), roots) is None
+
+
+def test_queued_renames_and_moves_finish_before_dependent_requests(
+    mocker: MockerFixture,
+) -> None:
+    item = MediaItem(1, "A", "/root/old-a")
+    adapter = configured_adapter(mocker, [item])
+    adapter.move_folder.return_value = 25
+    adapter.get_command_status.side_effect = [
+        CommandStatus(False, False),
+        CommandStatus(False, False),
+        CommandStatus(True, True),
+        CommandStatus(False, False),
+        CommandStatus(False, False),
+        CommandStatus(True, True),
+        CommandStatus(True, True),
+    ]
+    sleep = mocker.patch("renamarr.renamarr.time.sleep")
+
+    result = Renamarr("test", adapter, rename_folders=True).scan()
+
+    assert result.successful
+    batch = FolderRenameBatch("/root", (item,))
+    assert adapter.method_calls[4:] == [
+        call.get_command_status(20),
+        call.get_command_status(20),
+        call.get_command_status(20),
+        call.list_root_folders(),
+        call.get_expected_folder_name(item),
+        call.move_folder(batch),
+        call.get_command_status(25),
+        call.get_command_status(25),
+        call.get_command_status(25),
+        call.start_folder_rescan(batch),
+        call.get_command_status(30),
+    ]
+    assert sleep.call_count == 4
+
+
+@pytest.mark.parametrize("phase", ["rename", "move"])
+@pytest.mark.parametrize("failure", ["unsuccessful", "timeout", "status-error"])
+def test_failed_command_blocks_dependent_folder_work(
+    mocker: MockerFixture, phase: str, failure: str
+) -> None:
+    items = [MediaItem(1, "A", "/root/old-a"), MediaItem(2, "B", "/root/old-b")]
+    adapter = configured_adapter(mocker, items)
+    adapter.move_folder.return_value = 25
+    command_id = 20 if phase == "rename" else 25
+
+    def status(requested_id: int) -> CommandStatus:
+        if requested_id != command_id:
+            return CommandStatus(True, True)
+        if failure == "status-error":
+            raise ArrOperationError("status failed")
+        return CommandStatus(failure == "unsuccessful", False)
+
+    adapter.get_command_status.side_effect = status
+    mocker.patch(
+        "renamarr.renamarr.time.monotonic",
+        side_effect=[0, 10] if phase == "rename" else [0, 0, 10],
+    )
+
+    result = Renamarr(
+        "test",
+        adapter,
+        rename_folders=True,
+        command_polling=CommandPollingSettings(10, 3),
+    ).scan()
+
+    assert not result.successful
+    adapter.start_folder_rescan.assert_not_called()
+    if phase == "rename":
+        assert result.file_renames == WorkSummary(failed=2)
+        assert result.folder_renames == WorkSummary(skipped=2)
+        adapter.list_root_folders.assert_not_called()
+        adapter.get_expected_folder_name.assert_not_called()
+        adapter.move_folder.assert_not_called()
+        assert result.failures[0].phase == ScanPhase.FILE_RENAMES
+    else:
+        assert result.file_renames == WorkSummary(success=2)
+        assert result.folder_renames == WorkSummary(failed=2)
+        assert result.failures[0].phase == ScanPhase.FOLDER_RENAMES
+    assert result.failures[0].item_ids == (1, 2)
+
+
+def test_failed_move_completion_allows_other_root_batches(
+    mocker: MockerFixture,
+) -> None:
+    items = [MediaItem(1, "A", "/root/old-a"), MediaItem(2, "B", "/root-other/old-b")]
+    adapter = configured_adapter(mocker, items)
+    without_file_renames(adapter)
+    adapter.move_folder.side_effect = [25, 26]
+    adapter.get_command_status.side_effect = [
+        CommandStatus(True, False),
+        CommandStatus(True, True),
+        CommandStatus(True, True),
+    ]
+
+    result = Renamarr("test", adapter, rename_folders=True).scan()
+
+    assert result.folder_renames == WorkSummary(success=1, failed=1)
+    assert result.failures == (
+        ScanFailure(
+            ScanPhase.FOLDER_RENAMES,
+            (1,),
+            "Folder move: A command 25 completed unsuccessfully",
+        ),
+    )
+    adapter.start_folder_rescan.assert_called_once_with(
+        FolderRenameBatch("/root-other", (items[1],))
+    )

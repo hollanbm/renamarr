@@ -22,6 +22,11 @@ from sonarr import CommandStatus as SonarrCommandStatus
 from sonarr.rest import ApiException
 
 from renamarr.adapter_helpers import require, translate_api_error
+from renamarr.folder_commands import (
+    FolderMoveCommand,
+    find_folder_move_command,
+    parse_folder_commands,
+)
 from renamarr.models.command import CommandStatus
 from renamarr.models.media import (
     FileRenameBatch,
@@ -138,8 +143,18 @@ class SonarrAdapter:
             lambda: self._command_api.get_command_by_id(command_id),
         )
         return CommandStatus(
-            completed=response.status is SonarrCommandStatus.COMPLETED,
-            successful=response.result is SonarrCommandResult.SUCCESSFUL,
+            completed=response.status
+            in {
+                SonarrCommandStatus.COMPLETED,
+                SonarrCommandStatus.FAILED,
+                SonarrCommandStatus.ABORTED,
+                SonarrCommandStatus.CANCELLED,
+                SonarrCommandStatus.ORPHANED,
+            },
+            successful=(
+                response.status is SonarrCommandStatus.COMPLETED
+                and response.result is SonarrCommandResult.SUCCESSFUL
+            ),
         )
 
     def get_file_rename_candidate(self, item: MediaItem) -> FileRenameCandidate | None:
@@ -251,8 +266,32 @@ class SonarrAdapter:
             raise TypeError("Expected a folder name from Sonarr")
         return folder
 
-    def move_folder(self, batch: FolderRenameBatch) -> None:
-        """Move a batch of Sonarr series folders through the public API."""
+    def _list_folder_commands(self) -> list[FolderMoveCommand]:
+        def get_command_payload() -> bytes:
+            response = self._command_api.list_command_without_preload_content()
+            try:
+                payload = response.read()
+            finally:
+                response.release_conn()
+            if not 200 <= response.status <= 299:
+                raise ApiException(
+                    http_resp=response,
+                    body=payload.decode("utf-8", errors="replace"),
+                )
+            return payload
+
+        payload = translate_api_error(
+            "Sonarr",
+            ApiException,
+            "List",
+            "folder move commands",
+            get_command_payload,
+        )
+        return parse_folder_commands(payload)
+
+    def move_folder(self, batch: FolderRenameBatch) -> int | None:
+        """Move Sonarr folders and return the command ID when moving files."""
+        before = self._list_folder_commands() if batch.move_files else []
         translate_api_error(
             "Sonarr",
             ApiException,
@@ -267,6 +306,12 @@ class SonarrAdapter:
             ),
         )
 
+        if not batch.move_files:
+            return None
+        return find_folder_move_command(
+            before, self._list_folder_commands(), batch, "BulkMoveSeries"
+        )
+
     def start_folder_rescan(self, batch: FolderRenameBatch) -> int:
         """Start a Sonarr rescan for series whose folders moved."""
         response = translate_api_error(
@@ -277,7 +322,6 @@ class SonarrAdapter:
             lambda: self._command_api.create_command(
                 _SonarrCommandResource(
                     name="RescanSeries",
-                    priority=CommandPriority.HIGH,
                     series_ids=list(batch.item_ids),
                 )
             ),

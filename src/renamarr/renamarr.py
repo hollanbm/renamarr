@@ -77,7 +77,11 @@ class Renamarr:
                 analysis_outcome, analysis_error, items, failures
             )
             file_renames = self._rename_files(items, failures)
-            folder_renames = self._rename_folders(items, failures)
+            if file_renames.failed > 0:
+                logger.warning("Skipping folder renames because file renames failed")
+                folder_renames = WorkSummary(skipped=len(items))
+            else:
+                folder_renames = self._rename_folders(items, failures)
             return self._finish_scan(
                 len(items), analysis, file_renames, folder_renames, failures
             )
@@ -228,7 +232,11 @@ class Renamarr:
             batch = FolderRenameBatch(root_folder, tuple(batch_items))
             logger.info(f"Renaming folders: {', '.join(batch.titles)}")
             try:
-                self.adapter.move_folder(batch)
+                move_command_id = self.adapter.move_folder(batch)
+                if move_command_id is not None:
+                    self._wait_for_command(
+                        move_command_id, f"folder move: {', '.join(batch.titles)}"
+                    )
                 command_id = self.adapter.start_folder_rescan(batch)
                 self._wait_for_command(
                     command_id, f"folder rescan: {', '.join(batch.titles)}"
