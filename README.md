@@ -232,6 +232,8 @@ When file logging is enabled, `/logs` must also be mounted as a writable volume;
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
 
+The final-runtime telemetry smoke test requires TLS 1.2 or newer for its local HTTPS receiver and certificate verification probe. It verifies that an untrusted collector certificate is rejected before testing exports with an explicitly trusted certificate.
+
 The mise configuration installs the development toolchain and provides tasks for the common workflows:
 
 ```shell

@@ -55,18 +55,19 @@ def main() -> None:
     certificate = Path(os.environ["SMOKE_CERTIFICATE"])
     server = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certificate, os.environ["SMOKE_PRIVATE_KEY"])
     server.socket = context.wrap_socket(server.socket, server_side=True)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     port = server.server_port
     try:
+        client_context = ssl.create_default_context()
+        client_context.minimum_version = ssl.TLSVersion.TLSv1_2
         try:
             with (
                 socket.create_connection(("localhost", port)) as connection,
-                ssl.create_default_context().wrap_socket(
-                    connection, server_hostname="localhost"
-                ),
+                client_context.wrap_socket(connection, server_hostname="localhost"),
             ):
                 raise AssertionError("Untrusted collector certificate was accepted")
         except ssl.SSLCertVerificationError:
