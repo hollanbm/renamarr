@@ -148,6 +148,7 @@ class Renamarr:
             return self._summarize(outcomes.values())
 
         candidate_ids = tuple(candidate.item.id for candidate in candidates)
+        candidates_by_id = {candidate.item.id: candidate for candidate in candidates}
         try:
             batches = self.adapter.build_file_rename_batches(candidates)
         except ArrOperationError as error:
@@ -176,8 +177,30 @@ class Renamarr:
                 continue
 
             for item_id in batch.item_ids:
+                candidate = candidates_by_id[item_id]
+                item = candidate.item
+                try:
+                    remaining = self.adapter.get_file_rename_candidate(item)
+                    if remaining is not None:
+                        raise ArrOperationError(
+                            f"File rename incomplete for {item.title}: "
+                            f"file ID{'s' if len(remaining.file_ids) != 1 else ''} "
+                            f"{list(remaining.file_ids)} still "
+                            f"need{'s' if len(remaining.file_ids) == 1 else ''} renaming "
+                            f"after command {command_id}; check the Arr service logs for "
+                            "filename collisions or file access errors"
+                        )
+                except ArrOperationError as error:
+                    outcomes[item_id] = _WorkOutcome.FAILED
+                    self._record_failure(
+                        failures, ScanPhase.FILE_RENAMES, (item_id,), error
+                    )
+                    continue
+
                 outcomes[item_id] = _WorkOutcome.SUCCEEDED
-            logger.info(f"File rename completed successfully: {batch.description}")
+                logger.info(
+                    f"File rename completed successfully: {candidate.description}"
+                )
 
         return self._summarize(outcomes.values())
 

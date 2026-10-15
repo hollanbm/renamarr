@@ -23,11 +23,15 @@ def configured_adapter(mocker: MockerFixture, items: list[MediaItem]) -> MagicMo
     adapter.is_media_analysis_enabled.return_value = True
     adapter.start_media_analysis.return_value = 10
     adapter.get_command_status.return_value = CommandStatus(True, True)
-    adapter.get_file_rename_candidate.side_effect = lambda item: FileRenameCandidate(
-        item=item,
-        file_ids=(item.id * 10,),
-        description=item.title,
-    )
+    previewed_ids: set[int] = set()
+
+    def preview(item: MediaItem) -> FileRenameCandidate | None:
+        if item.id in previewed_ids:
+            return None
+        previewed_ids.add(item.id)
+        return FileRenameCandidate(item, (item.id * 10,), item.title)
+
+    adapter.get_file_rename_candidate.side_effect = preview
 
     def build_file_rename_batches(
         candidates: Sequence[FileRenameCandidate],
@@ -101,6 +105,8 @@ def test_scan_runs_shared_workflow_in_sorted_order(
         call.build_file_rename_batches([candidate_a, candidate_b]),
         call.start_file_rename(file_batch),
         call.get_command_status(20),
+        call.get_file_rename_candidate(item_a),
+        call.get_file_rename_candidate(item_b),
         call.list_root_folders(),
         call.get_expected_folder_name(item_a),
         call.get_expected_folder_name(item_b),
@@ -464,6 +470,8 @@ def test_file_preview_failures_and_noops_do_not_block_other_items(
             raise ArrOperationError("preview failed")
         if item == skipped:
             return None
+        if adapter.start_file_rename.called:
+            return None
         return FileRenameCandidate(item, (30,), item.title)
 
     adapter.get_file_rename_candidate.side_effect = preview
@@ -499,6 +507,86 @@ def test_file_batch_planning_failure_marks_all_candidates_failed(
         ScanFailure(ScanPhase.FILE_RENAMES, (1, 2), "batch failed"),
     )
     adapter.start_file_rename.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("verification_error", "file_ids", "expected_message"),
+    [
+        pytest.param(False, (11,), "ID [11] still needs renaming", id="single-file"),
+        pytest.param(
+            False, (11, 12), "IDs [11, 12] still need renaming", id="multiple-files"
+        ),
+        pytest.param(True, (11,), "", id="verification-error"),
+    ],
+)
+def test_completed_file_batch_verifies_each_item_and_preserves_partial_success(
+    verification_error: bool,
+    file_ids: tuple[int, ...],
+    expected_message: str,
+    mock_loguru_info: MagicMock,
+    mocker: MockerFixture,
+) -> None:
+    item_a = MediaItem(1, "A", "/root/A")
+    item_b = MediaItem(2, "B", "/root/B")
+    candidate_a = FileRenameCandidate(item_a, (10, 11, 12), "A")
+    candidate_b = FileRenameCandidate(item_b, (20, 21), "B")
+    remaining = FileRenameCandidate(item_a, file_ids, "A")
+    adapter = configured_adapter(mocker, [item_a, item_b])
+    adapter.get_file_rename_candidate.side_effect = [
+        candidate_a,
+        candidate_b,
+        ArrOperationError("verification failed") if verification_error else remaining,
+        None,
+    ]
+
+    result = Renamarr("test", adapter).scan()
+
+    assert result.file_renames == WorkSummary(success=1, failed=1)
+    assert not result.successful
+    assert result.failures == (
+        ScanFailure(
+            ScanPhase.FILE_RENAMES,
+            (1,),
+            "verification failed"
+            if verification_error
+            else f"File rename incomplete for A: file {expected_message} "
+            "after command 20; check the Arr service logs for filename collisions "
+            "or file access errors",
+        ),
+    )
+    adapter.start_file_rename.assert_called_once_with(
+        FileRenameBatch((1, 2), (10, 11, 12, 20, 21), "A, B")
+    )
+    assert call("File rename completed successfully: A") not in (
+        mock_loguru_info.call_args_list
+    )
+    assert call("File rename completed successfully: B") in (
+        mock_loguru_info.call_args_list
+    )
+
+
+def test_multiple_files_are_renamed_once_and_skipped_on_next_scan(
+    mocker: MockerFixture,
+) -> None:
+    item = MediaItem(1, "Movie", "/root/Movie")
+    adapter = configured_adapter(mocker, [item])
+    adapter.get_file_rename_candidate.side_effect = [
+        FileRenameCandidate(item, (10, 11, 12), "Movie"),
+        None,
+        None,
+    ]
+    renamarr = Renamarr("test", adapter)
+
+    first_result = renamarr.scan()
+    second_result = renamarr.scan()
+
+    assert first_result.file_renames == WorkSummary(success=1)
+    assert second_result.file_renames == WorkSummary(skipped=1)
+    assert first_result.successful
+    assert second_result.successful
+    adapter.start_file_rename.assert_called_once_with(
+        FileRenameBatch((1,), (10, 11, 12), "Movie")
+    )
 
 
 @pytest.mark.parametrize(
@@ -713,6 +801,7 @@ def test_queued_renames_and_moves_finish_before_dependent_requests(
         call.get_command_status(20),
         call.get_command_status(20),
         call.get_command_status(20),
+        call.get_file_rename_candidate(item),
         call.list_root_folders(),
         call.get_expected_folder_name(item),
         call.move_folder(batch),
