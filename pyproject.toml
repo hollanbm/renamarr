@@ -1,5 +1,5 @@
 [project]
-requires-python = ">= 3.14"
+requires-python = ">= 3.15"
 name = "renamarr"
 description = "continual rename tool for *arr apps"
 authors = [{ name = "Brad Holland", email = "hollanbm@gmail.com" }]
@@ -16,8 +16,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ruff==0.16.10",
-  "ty==0.0.85",
+  "ruff==0.17.0",
+  "ty==0.0.86",
 ]
 test = [
   "pytest>=9.0.1,<10",
@@ -27,7 +27,7 @@ test = [
 
 # Treat this repo as an application, so uv installs dependencies without packaging renamarr itself.
 [tool.uv]
-required-version = "==0.12.23"
+required-version = "==0.13.0"
 package = false
 exclude-dependencies = ["m2r2"]
 environments = [

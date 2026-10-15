@@ -55,9 +55,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.3
+          version: 2026.10.8
           install_args: python prek
 
       - name: Run formatting checks
@@ -77,9 +77,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.3
+          version: 2026.10.8
           install_args: python hadolint
 
       - name: Run hadolint
@@ -94,9 +94,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492  # v5.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
         with:
-          version: 2026.10.3
+          version: 2026.10.8
           install_args: python actionlint
 
       - name: Run actionlint
@@ -124,7 +124,7 @@ jobs:
           persist-credentials: false
 
       - name: Validate Renovate config
-        uses: suzuki-shunsuke/github-action-renovate-config-validator@b850926b611b1f3d3fe3729776339c217834bf2c  # v2.2.0
+        uses: suzuki-shunsuke/github-action-renovate-config-validator@1e1604219a6b38ae9a10aff42a28a3656322c31a  # v2.4.1
         with:
           config_file_path: renovate.json
           strict: 'true'
