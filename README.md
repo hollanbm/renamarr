@@ -43,7 +43,10 @@ Sonarr API access uses [devopsarr/sonarr-py](https://github.com/devopsarr/sonarr
     - Sonarr [get_api_v3_rename](https://sonarr.tv/docs/api/#/RenameEpisode/get_api_v3_rename)
   - Triggers a rename on any item that need be renamed
     - Series renames are batched up, for one rename call per series
-    - Movie renames are discovered per movie, then initiated in one batch command with all movie IDs that need a rename
+    - Movie renames are discovered per movie, then initiated in one batch command with all movie IDs that need a rename. Radarr processes all files associated with each movie.
+    - After a file rename command completes, Renamarr checks each item's rename preview again. An item counts as successful only when no files still need renaming; remaining renames and verification errors count as failures without affecting successfully renamed items in the same batch.
+
+If a movie repeatedly needs renaming, check Radarr's logs for filename collisions or file access errors. Radarr can complete a command successfully even when individual files cannot be renamed. Multiple files for the same movie must have distinct target filenames; if a target already exists, resolve the duplicate or adjust Radarr's naming configuration. Renamarr leaves those files intact and retries pending renames on subsequent runs.
 
 #### Analyze Files
 
@@ -85,6 +88,8 @@ Finished Renamarr successfully | file renames: [ success=0, failed=0, skipped=37
 ```
 
 Failed runs report the same totals at `ERROR` level after their individual errors. At `DEBUG` level, each run also reports its item count and analysis outcomes.
+
+Incomplete file rename errors identify the pending Radarr movie file IDs or Sonarr episode file IDs in square brackets, such as `file ID [10200] still needs renaming` or `file IDs [10200, 10201] still need renaming`, without a trailing comma.
 
 ### File Logging
 
