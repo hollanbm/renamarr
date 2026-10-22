@@ -12,6 +12,13 @@ dependencies = [
   "sonarr",
   "pydantic>=2,<3",
   "radarr>=1.2.1",
+  "opentelemetry-api==1.45.1",
+  "opentelemetry-sdk==1.45.1",
+  "opentelemetry-exporter-otlp-proto-http==1.45.1",
+  "opentelemetry-instrumentation-urllib3==0.66b1",
+  "opentelemetry-instrumentation-threading==0.66b1",
+  "opentelemetry-instrumentation-system-metrics==0.66b1",
+  "psutil==7.2.2",
 ]
 
 [dependency-groups]
@@ -29,6 +36,7 @@ test = [
 [tool.uv]
 required-version = "==0.13.1"
 package = false
+no-build-package = ["psutil", "wrapt", "protobuf", "charset-normalizer"]
 exclude-dependencies = ["m2r2"]
 environments = [
   "sys_platform == 'darwin'",
