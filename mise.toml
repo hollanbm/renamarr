@@ -16,7 +16,7 @@ ty = "0.0.89"
 direnv = "2.38.2"
 
 [tools.prek]
-version = "0.5.5"
+version = "0.5.6"
 postinstall = '''
 prek_path="$(command -v prek)"
 ln -sf "$prek_path" "$(dirname "$prek_path")/pre-commit"
