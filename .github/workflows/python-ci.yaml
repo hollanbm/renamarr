@@ -22,7 +22,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d  # v5.2.4
         with:
-          version: 2026.10.22
+          version: 2026.10.23
           install_args: python
 
       - name: Set up uv
@@ -65,7 +65,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d  # v5.2.4
         with:
-          version: 2026.10.22
+          version: 2026.10.23
           install_args: python
 
       - name: Set up uv
@@ -91,7 +91,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d  # v5.2.4
         with:
-          version: 2026.10.22
+          version: 2026.10.23
           install_args: python
 
       - name: Set up uv
