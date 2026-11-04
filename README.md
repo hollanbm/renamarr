@@ -115,6 +115,66 @@ _To avoid permission issues when creating log files, set the user option in dock
 
 _For more details on `LOG_RETENTION` or `LOG_ROTATION` values, see the [official documentation](https://loguru.readthedocs.io/en/stable/overview.html#easier-file-logging-with-rotation-retention-compression)_
 
+### OpenTelemetry
+
+Renamarr optionally exports metrics and traces using OTLP HTTP/protobuf. Set a shared endpoint to enable both signals:
+
+```yaml
+environment:
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=home
+```
+
+No telemetry is exported without an endpoint. A shared endpoint receives metrics at `/v1/metrics` and traces at `/v1/traces`. Signal-specific endpoint values are complete URLs and override the shared endpoint for that signal.
+
+Common settings and Renamarr's defaults:
+
+| Variable                                        | Purpose                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                   | Collector base URL; enables metrics and traces. Telemetry is disabled until an endpoint is configured. |
+| `OTEL_SERVICE_NAME`                             | Service name; Renamarr defaults to `renamarr`.                                                         |
+| `OTEL_RESOURCE_ATTRIBUTES`                      | Add resource attributes such as `deployment.environment.name=home`.                                    |
+| `OTEL_EXPORTER_OTLP_HEADERS`                    | Authentication headers for collectors that require them.                                               |
+| `OTEL_EXPORTER_OTLP_CERTIFICATE`                | PEM CA certificate file for a collector using a private CA. TLS verification remains enabled.          |
+| `OTEL_METRICS_EXPORTER`, `OTEL_TRACES_EXPORTER` | Set either to `none` to disable that signal. Enabled signals use HTTP/protobuf.                        |
+
+For other options, including signal-specific endpoints, timeouts, and sampling, see the official [OTLP exporter configuration](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/) and [general SDK configuration](https://opentelemetry.io/docs/languages/sdk-configuration/general/) documentation. Renamarr otherwise uses the Python SDK's defaults.
+
+Telemetry initializes once before jobs start and flushes on one-shot completion, startup failure, SIGTERM, and interruption. Export errors do not change rename results or stop scheduling. Shutdown flush attempts have a five-second budget per provider; exporter shutdown may also perform its final collection using configured exporter timeouts.
+
+#### Application metrics
+
+Application metrics carry `arr.service` (`sonarr` or `radarr`) and configured `arr.instance`, plus bounded `kind`, `phase`, and `outcome` attributes where applicable. IDs, titles, paths, bodies, and error messages are excluded from metric labels.
+
+| Metric                                 | Type                | Meaning                                                                       |
+| -------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `renamarr.scan.count`                  | Counter             | Completed instance runs by outcome, including unexpected failures.            |
+| `renamarr.scan.duration`               | Histogram, seconds  | Instance run duration, including adapter setup and cleanup.                   |
+| `renamarr.scan.last_success_timestamp` | Gauge, Unix seconds | Last successful scan; zero until the first success.                           |
+| `renamarr.scan.items`                  | Histogram, items    | Library size observed per completed scan.                                     |
+| `renamarr.work.items`                  | Counter             | Existing media-item summaries, grouped by phase and succeeded/failed/skipped. |
+| `renamarr.rename.candidates`           | Counter             | Unique candidate files per media item, or candidate folders.                  |
+| `renamarr.rename.requested`            | Counter             | File/folder units in successfully submitted rename operations.                |
+| `renamarr.rename.confirmed`            | Counter             | File/folder units confirmed successful.                                       |
+| `renamarr.operation.count`             | Counter             | File/folder batches by outcome.                                               |
+| `renamarr.operation.duration`          | Histogram, seconds  | Batch duration, including waiting and file verification or folder rescan.     |
+| `renamarr.command.count`               | Counter             | Commands by kind and succeeded/failed/timed_out/status_check_error outcome.   |
+| `renamarr.command.duration`            | Histogram, seconds  | Time waiting for each asynchronous command.                                   |
+| `renamarr.command.polls`               | Counter             | Status-check attempts, including failed checks.                               |
+| `renamarr.job.active`                  | Gauge               | One during an active phase, zero when that phase exits.                       |
+
+The existing rename summaries count media items (series/movies). Physical-file metrics count unique candidate file IDs separately. Files are confirmed only when the item's existing post-command verification succeeds. A failed operation can have partially renamed files, so the unconfirmed difference is **not** a physical-file failure count. Folder confirmation means the existing move/rescan workflow completed; it does not add filesystem verification. Individual physical-file durations are unavailable from the Arr APIs; durations represent batches and commands.
+
+Official urllib3 instrumentation supplies HTTP client latency, size, and error information using its HTTP semantic conventions. HTTP metrics and spans carry the Arr service and instance alongside standard network attributes. Official threading instrumentation propagates trace context. The system-metrics instrumentor reports process CPU time/utilization, current RSS/virtual memory, threads, file descriptors, context switches, and I/O. It does not enable host-wide monitoring.
+
+Suggested alerts include no successful scan within the configured interval plus a grace period, repeated failed runs or command timeouts, increasing run/command latency, and sustained process memory growth. Counters and freshness reset on restart; also alert on absent telemetry. One-shot runs export final values before exiting, so monitor their expected execution schedule externally.
+
+#### Trace contents and runtime compatibility
+
+Each instance run has a root span with child spans for phases, previews, batches, command waits, verification, and HTTP requests. Structured JSON request bodies, media titles, filesystem paths, and identifying IDs may appear in traces. Streams and non-JSON bodies are not captured. API keys and authentication credentials are redacted before trace export, including automatic exception details and credential-bearing URLs. HTTP headers are not captured. Existing stdout/file logging is unchanged; logs are not exported through OTLP.
+
+The runtime remains `dhi.io/debian-base:trixie`, without additional system packages, executables, compilers, or shared libraries. New native dependencies (`psutil`, `wrapt`, `protobuf`, and `charset-normalizer`) require prebuilt wheels. CI validates the actual final image on Linux AMD64 and ARM64 as its nonroot user with a read-only filesystem, dropped capabilities, HTTPS export, and process metric collection. No collector, dashboard, or listening metrics port is added to the application.
+
 ### Configuration
 
 | Name                                                       | Type    | Required | Default Value | Description                                                                                                                                      |
@@ -171,6 +231,8 @@ When file logging is enabled, `/logs` must also be mounted as a writable volume;
 ### Local Development
 
 See [Local Development](docs/local-development.md) for local development requirements, environment details, and startup commands.
+
+The final-runtime telemetry smoke test requires TLS 1.2 or newer for its local HTTPS receiver and certificate verification probe. It verifies that an untrusted collector certificate is rejected before testing exports with an explicitly trusted certificate.
 
 The mise configuration installs the development toolchain and provides tasks for the common workflows:
 
