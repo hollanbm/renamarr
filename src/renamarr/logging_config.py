@@ -11,6 +11,11 @@ if TYPE_CHECKING:
 class LoggingConfigurator:
     """Configure Renamarr's Loguru sinks."""
 
+    _DEFAULT_LOG_LEVEL = "INFO"
+    _VALID_LOG_LEVELS = frozenset(
+        {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
+    )
+
     _LOG_FORMAT = (
         "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
         "<level>{level}</level> | "
@@ -28,18 +33,28 @@ class LoggingConfigurator:
     )
 
     def __init__(self) -> None:
-        self._log_level = os.getenv("LOG_LEVEL", "INFO")
+        self._log_level = self._resolve_log_level(os.getenv("LOG_LEVEL"))
         self._logger_format = (
-            self._DEBUG_LOG_FORMAT
-            if self._log_level.upper() == "DEBUG"
-            else self._LOG_FORMAT
+            self._DEBUG_LOG_FORMAT if self._log_level == "DEBUG" else self._LOG_FORMAT
         )
+
+    @classmethod
+    def _resolve_log_level(cls, log_level: str | None) -> str:
+        """Return a Loguru level name, falling back to INFO for unknown values.
+
+        Loguru raises ValueError for unknown level names, which would crash
+        startup, so an unrecognized LOG_LEVEL behaves as if it were unset.
+        """
+        normalized = (log_level or cls._DEFAULT_LOG_LEVEL).upper()
+        if normalized in cls._VALID_LOG_LEVELS:
+            return normalized
+        return cls._DEFAULT_LOG_LEVEL
 
     def configure_stdout(self) -> None:
         """Configure the default stdout sink."""
         self._configure_records()
         logger.remove()
-        logger.add(stdout, format=self._logger_format, level=self._log_level.upper())
+        logger.add(stdout, format=self._logger_format, level=self._log_level)
 
     def configure_instance_file(self, service: str, instance_name: str) -> bool:
         """Configure a file sink for one service instance.
@@ -65,7 +80,7 @@ class LoggingConfigurator:
             logger.add(
                 log_path,
                 format=self._logger_format,
-                level=os.getenv("LOG_LEVEL", "INFO"),
+                level=self._log_level,
                 rotation=os.getenv("LOG_ROTATION", "00:00"),
                 retention=os.getenv("LOG_RETENTION", "7 days"),
                 filter=matches_instance,

@@ -108,7 +108,7 @@ _To avoid permission issues when creating log files, set the user option in dock
 
 | Environment Variable | Description                                                                                           | Default  |
 | -------------------- | ----------------------------------------------------------------------------------------------------- | -------- |
-| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. | `INFO`   |
+| `LOG_LEVEL`          | Log level passed to Loguru for stdout and file sinks. `DEBUG` also adds source location to log lines. Unrecognized values fall back to `INFO` instead of crashing startup. | `INFO`   |
 | `LOG_DIR`            | Directory containing per-instance log files.                                                          | `/logs`  |
 | `LOG_ROTATION`       | Rotation schedule passed to Loguru for file log rotation.                                             | `00:00`  |
 | `LOG_RETENTION`      | Retention period passed to Loguru for rotated log files.                                              | `7 days` |
