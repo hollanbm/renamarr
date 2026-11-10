@@ -491,6 +491,24 @@ def test_rejects_malformed_folder_response(
     folder_response.release_conn.assert_called_once_with()
 
 
+def test_rejects_invalid_json_folder_response(
+    adapter: SonarrAdapter,
+    sonarr_apis: dict[str, MagicMock],
+) -> None:
+    folder_response = MagicMock(status=200)
+    folder_response.read.return_value = b"not json"
+    sonarr_apis[
+        "SeriesFolderApi"
+    ].get_series_folder_without_preload_content.return_value = folder_response
+
+    with pytest.raises(
+        ArrOperationError, match="Expected a JSON object response"
+    ):
+        adapter.get_expected_folder_name(MediaItem(1, "Show", "/tv/Show"))
+
+    folder_response.release_conn.assert_called_once_with()
+
+
 @pytest.mark.parametrize("status", ["failed", "aborted", "cancelled", "orphaned"])
 def test_terminal_failure_states_override_successful_result(
     adapter: SonarrAdapter, sonarr_apis: dict[str, MagicMock], status: str

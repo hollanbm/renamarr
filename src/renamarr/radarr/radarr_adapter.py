@@ -21,6 +21,7 @@ from radarr import CommandStatus as RadarrCommandStatus
 from radarr.rest import ApiException
 
 from renamarr.adapter_helpers import require, translate_api_error
+from renamarr.exceptions import ArrOperationError
 from renamarr.folder_commands import (
     FolderMoveCommand,
     find_folder_move_command,
@@ -242,7 +243,12 @@ class RadarrAdapter:
             f"folder for {item.title}",
             get_folder_payload,
         )
-        folder_response = loads(payload)
+        try:
+            folder_response = loads(payload)
+        except ValueError as error:
+            raise ArrOperationError(
+                "Expected a JSON object response from Radarr"
+            ) from error
         if not isinstance(folder_response, dict):
             raise TypeError("Expected an object response from Radarr")
         folder = folder_response.get("folder")
