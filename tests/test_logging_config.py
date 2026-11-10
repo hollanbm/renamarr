@@ -70,6 +70,38 @@ class TestLoggingConfigurator:
             is includes_source_location
         )
 
+    def test_configure_stdout_falls_back_to_info_for_unknown_log_level(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        mocker.patch.dict(os.environ, {"LOG_LEVEL": "VERBOSE"}, clear=True)
+        logger_add = mocker.patch.object(logger, "add")
+
+        LoggingConfigurator().configure_stdout()
+
+        assert logger_add.call_args.kwargs["level"] == "INFO"
+        configured_format = logger_add.call_args.kwargs["format"]
+        assert all(
+            field not in configured_format
+            for field in ("{name}", "{function}", "{line}")
+        )
+
+    def test_configure_instance_file_falls_back_to_info_for_unknown_log_level(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        mocker.patch.dict(
+            os.environ,
+            {"LOG_DIR": "/tmp/renamarr-logs", "LOG_LEVEL": "VERBOSE"},
+            clear=True,
+        )
+        logger_add = mocker.patch.object(logger, "add")
+
+        configured = LoggingConfigurator().configure_instance_file("sonarr", "shows")
+
+        assert configured
+        assert logger_add.call_args.kwargs["level"] == "INFO"
+
     @pytest.mark.parametrize("log_level", ["INFO", "DEBUG"])
     def test_text_format_only_includes_item_column_when_item_is_set(
         self,
