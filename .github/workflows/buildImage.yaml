@@ -112,6 +112,29 @@ jobs:
               "$EXPECTED_VERSION" "$METADATA_VERSION" "$LABEL_VERSION"
             exit 1
           fi
+      - name: Validate telemetry in final runtime on both architectures
+        env:
+          RUNTIME_IMAGE: ${{ matrix.variant.runtime_image }}
+        run: |
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$smoke_dir/key.pem" -out "$smoke_dir/cert.pem" \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost'
+          chmod 755 "$smoke_dir"
+          chmod 644 "$smoke_dir/key.pem" "$smoke_dir/cert.pem"
+          for arch in amd64 arm64; do
+            docker buildx build --load --platform "linux/$arch" \
+              --build-arg "RUNTIME_IMAGE=$RUNTIME_IMAGE" \
+              --tag "renamarr-smoke:$arch" .
+            docker run --rm --platform "linux/$arch" --read-only --tmpfs /tmp \
+              --cap-drop ALL --security-opt no-new-privileges --network none \
+              --mount "type=bind,src=$smoke_dir,dst=/smoke,readonly" \
+              --mount "type=bind,src=$PWD/scripts/telemetry_smoke.py,dst=/telemetry_smoke.py,readonly" \
+              --env SMOKE_CERTIFICATE=/smoke/cert.pem \
+              --env SMOKE_PRIVATE_KEY=/smoke/key.pem --env PYTHONPATH=/renamarr/src \
+              --entrypoint python "renamarr-smoke:$arch" /telemetry_smoke.py
+          done
       - name: Build Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7
         with:

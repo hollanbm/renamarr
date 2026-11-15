@@ -1,9 +1,11 @@
 import os
+import signal
 from collections.abc import Iterator
 from contextlib import nullcontext
 from pathlib import Path
+from threading import main_thread
 from typing import Protocol
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from loguru import logger
@@ -164,6 +166,7 @@ class TestMain:
             analyze_files=True,
             rename_folders=True,
             command_polling=CommandPollingSettings(),
+            telemetry=ANY,
         )
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
@@ -263,6 +266,7 @@ class TestMain:
             analyze_files=True,
             rename_folders=True,
             command_polling=config.sonarr[0].renamarr.command_polling,
+            telemetry=ANY,
         )
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
@@ -340,6 +344,7 @@ class TestMain:
             "main.create_arr_adapter", return_value=adapter
         )
         renamarr = mocker.patch("main.Renamarr")
+        renamarr.return_value.scan.return_value.successful = True
         lifecycle = mocker.Mock()
         lifecycle.attach_mock(renamarr.return_value.scan, "scan")
         lifecycle.attach_mock(adapter.close, "close")
@@ -370,6 +375,7 @@ class TestMain:
             analyze_files=service_config.renamarr.analyze_files,
             rename_folders=service_config.renamarr.rename_folders,
             command_polling=service_config.renamarr.command_polling,
+            telemetry=ANY,
         )
         assert renamarr.call_args_list == [
             expected_renamarr_call,
@@ -431,6 +437,7 @@ class TestMain:
                 analyze_files=instance_config.renamarr.analyze_files,
                 rename_folders=instance_config.renamarr.rename_folders,
                 command_polling=instance_config.renamarr.command_polling,
+                telemetry=ANY,
             )
             for (_, instance_config), adapter in zip(
                 enabled_instances, adapters, strict=True
@@ -575,6 +582,7 @@ class TestMain:
             analyze_files=config.radarr[0].renamarr.analyze_files,
             rename_folders=config.radarr[0].renamarr.rename_folders,
             command_polling=config.radarr[0].renamarr.command_polling,
+            telemetry=ANY,
         )
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
@@ -602,6 +610,7 @@ class TestMain:
             analyze_files=True,
             rename_folders=True,
             command_polling=config.radarr[0].renamarr.command_polling,
+            telemetry=ANY,
         )
         renamarr.return_value.scan.assert_called_once_with()
         adapter.close.assert_called_once_with()
@@ -640,3 +649,70 @@ class TestMain:
             mocker.ANY, service=ArrService.RADARR, config=config.radarr[0]
         )
         renamarr.return_value.scan.assert_called_once_with()
+
+    def test_unsuccessful_scan_marks_run_failed(
+        self, config, mocker: MockerFixture
+    ) -> None:
+        instance = _service_config(config, "sonarr")
+        instance.renamarr.enabled = True
+        instance.renamarr.schedule.enabled = False
+        mocker.patch("main.configparser.get_config", return_value=config)
+        mocker.patch("main.create_arr_adapter")
+        job = mocker.patch("main.Renamarr")
+        job.return_value.scan.return_value.successful = False
+        app = Main()
+        app.start()
+        job.return_value.scan.assert_called_once_with()
+
+    def test_instance_telemetry_failure_does_not_prevent_scan(
+        self, config, mocker: MockerFixture
+    ) -> None:
+        instance = _service_config(config, "sonarr")
+        instance.renamarr.enabled = True
+        instance.renamarr.schedule.enabled = False
+        mocker.patch("main.configparser.get_config", return_value=config)
+        mocker.patch("main.create_arr_adapter")
+        job = mocker.patch("main.Renamarr")
+        app = Main()
+        mocker.patch.object(
+            app._telemetry, "workflow", side_effect=RuntimeError("telemetry")
+        )
+        app.start()
+        job.return_value.scan.assert_called_once_with()
+
+
+@pytest.mark.parametrize("background", [False, True])
+@pytest.mark.parametrize("shutdown_error", [False, True])
+def test_start_restores_signal_handler_and_shuts_down_after_exit(
+    mocker: MockerFixture, background: bool, shutdown_error: bool
+) -> None:
+    mocker.patch(
+        "main.current_thread", return_value=object() if background else main_thread()
+    )
+    handler = mocker.patch("main.signal.signal", return_value=signal.SIG_DFL)
+    app = Main()
+    mocker.patch.object(app, "_start", side_effect=SystemExit(0))
+    shutdown = mocker.patch.object(
+        app._telemetry,
+        "shutdown",
+        side_effect=RuntimeError("shutdown") if shutdown_error else None,
+    )
+    with pytest.raises(RuntimeError if shutdown_error else SystemExit):
+        app.start()
+    shutdown.assert_called_once_with()
+    assert handler.call_count == (0 if background else 2)
+
+
+def test_sigterm_exits_cleanly() -> None:
+    with pytest.raises(SystemExit) as error:
+        Main._terminate(15, None)
+    assert error.value.code == 0
+
+
+def test_background_start_can_return_normally(mocker: MockerFixture) -> None:
+    mocker.patch("main.current_thread", return_value=object())
+    app = Main()
+    mocker.patch.object(app, "_start")
+    shutdown = mocker.patch.object(app._telemetry, "shutdown")
+    app.start()
+    shutdown.assert_called_once_with()

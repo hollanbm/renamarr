@@ -6,12 +6,15 @@ from pathlib import PurePosixPath
 from typing import NoReturn
 
 from loguru import logger
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 from renamarr.exceptions import ArrOperationError
-from renamarr.models.command import CommandPollingSettings
+from renamarr.models.command import CommandPollingSettings, CommandStatus
 from renamarr.models.media import FileRenameCandidate, FolderRenameBatch, MediaItem
 from renamarr.models.scan import ScanFailure, ScanPhase, ScanResult, WorkSummary
 from renamarr.protocols import ArrAdapter
+from renamarr.telemetry import Operation, WorkflowTelemetry, disabled_workflow
 
 _DEFAULT_COMMAND_POLLING = CommandPollingSettings()
 
@@ -32,24 +35,28 @@ class Renamarr:
         analyze_files: bool = False,
         rename_folders: bool = False,
         command_polling: CommandPollingSettings = _DEFAULT_COMMAND_POLLING,
+        telemetry: WorkflowTelemetry | None = None,
     ) -> None:
         self.name = name
         self.adapter = adapter
         self.analyze_files = analyze_files
         self.rename_folders = rename_folders
         self.command_polling = command_polling
+        self.telemetry = telemetry if telemetry is not None else disabled_workflow()
 
     def scan(self) -> ScanResult:
         """Run a scan and return its structured outcome."""
         with logger.contextualize(instance=self.name):
             logger.info("Starting Renamarr")
             failures: list[ScanFailure] = []
-            analysis_outcome, analysis_error = self._analyze_media()
+            with self.telemetry.phase("analysis"):
+                analysis_outcome, analysis_error = self._analyze_media()
 
             try:
-                items = sorted(
-                    self.adapter.list_media_items(), key=lambda item: item.title
-                )
+                with self.telemetry.phase("discovery"):
+                    items = sorted(
+                        self.adapter.list_media_items(), key=lambda item: item.title
+                    )
             except ArrOperationError as error:
                 analysis = self._summarize_analysis(
                     analysis_outcome, analysis_error, (), failures
@@ -76,12 +83,14 @@ class Renamarr:
             analysis = self._summarize_analysis(
                 analysis_outcome, analysis_error, items, failures
             )
-            file_renames = self._rename_files(items, failures)
+            with self.telemetry.phase("file_renames"):
+                file_renames = self._rename_files(items, failures)
             if file_renames.failed > 0:
                 logger.warning("Skipping folder renames because file renames failed")
                 folder_renames = WorkSummary(skipped=len(items))
             else:
-                folder_renames = self._rename_folders(items, failures)
+                with self.telemetry.phase("folder_renames"):
+                    folder_renames = self._rename_folders(items, failures)
             return self._finish_scan(
                 len(items), analysis, file_renames, folder_renames, failures
             )
@@ -97,8 +106,10 @@ class Renamarr:
 
             logger.info("Starting media analysis")
             command_id = self.adapter.start_media_analysis()
-            self._wait_for_command(command_id, "media analysis")
+            self._wait_for_command(command_id, "media analysis", "analysis")
         except ArrOperationError as error:
+            trace.get_current_span().set_status(StatusCode.ERROR)
+            trace.get_current_span().record_exception(error)
             return _WorkOutcome.FAILED, error
 
         logger.info("Media analysis completed successfully")
@@ -129,7 +140,15 @@ class Renamarr:
         for item in items:
             with logger.contextualize(item=item.title):
                 try:
-                    candidate = self.adapter.get_file_rename_candidate(item)
+                    with self.telemetry.span(
+                        "renamarr.preview.file",
+                        {
+                            "media.id": item.id,
+                            "media.title": item.title,
+                            "media.path": item.path,
+                        },
+                    ):
+                        candidate = self.adapter.get_file_rename_candidate(item)
                 except ArrOperationError as error:
                     outcomes[item.id] = _WorkOutcome.FAILED
                     self._record_failure(
@@ -142,6 +161,11 @@ class Renamarr:
                     outcomes[item.id] = _WorkOutcome.SKIPPED
                     continue
 
+                self.telemetry.count(
+                    "renamarr.rename.candidates",
+                    len(set(candidate.file_ids)),
+                    kind="file",
+                )
                 candidates.append(candidate)
 
         if not candidates:
@@ -164,44 +188,75 @@ class Renamarr:
             )
 
         for batch in batches:
-            logger.info(f"Renaming files: {batch.description}")
-            try:
-                command_id = self.adapter.start_file_rename(batch)
-                self._wait_for_command(command_id, f"file rename: {batch.description}")
-            except ArrOperationError as error:
-                for item_id in batch.item_ids:
-                    outcomes[item_id] = _WorkOutcome.FAILED
-                self._record_failure(
-                    failures, ScanPhase.FILE_RENAMES, batch.item_ids, error
-                )
-                continue
-
-            for item_id in batch.item_ids:
-                candidate = candidates_by_id[item_id]
-                item = candidate.item
+            with self.telemetry.operation(
+                "operation",
+                "file",
+                {
+                    "media.ids": batch.item_ids,
+                    "file.ids": batch.file_ids,
+                    "description": batch.description,
+                },
+            ) as operation:
+                logger.info(f"Renaming files: {batch.description}")
                 try:
-                    remaining = self.adapter.get_file_rename_candidate(item)
-                    if remaining is not None:
-                        raise ArrOperationError(
-                            f"File rename incomplete for {item.title}: "
-                            f"file ID{'s' if len(remaining.file_ids) != 1 else ''} "
-                            f"{list(remaining.file_ids)} still "
-                            f"need{'s' if len(remaining.file_ids) == 1 else ''} renaming "
-                            f"after command {command_id}; check the Arr service logs for "
-                            "filename collisions or file access errors"
-                        )
+                    command_id = self.adapter.start_file_rename(batch)
+                    self.telemetry.count(
+                        "renamarr.rename.requested",
+                        len(set(batch.file_ids)),
+                        kind="file",
+                    )
+                    self._wait_for_command(
+                        command_id, f"file rename: {batch.description}", "file_rename"
+                    )
                 except ArrOperationError as error:
-                    outcomes[item_id] = _WorkOutcome.FAILED
+                    operation.outcome = "failed"
+                    for item_id in batch.item_ids:
+                        outcomes[item_id] = _WorkOutcome.FAILED
                     self._record_failure(
-                        failures, ScanPhase.FILE_RENAMES, (item_id,), error
+                        failures, ScanPhase.FILE_RENAMES, batch.item_ids, error
                     )
                     continue
 
-                outcomes[item_id] = _WorkOutcome.SUCCEEDED
-                logger.info(
-                    f"File rename completed successfully: {candidate.description}"
-                )
+                for item_id in batch.item_ids:
+                    candidate = candidates_by_id[item_id]
+                    item = candidate.item
+                    try:
+                        with self.telemetry.span(
+                            "renamarr.verification",
+                            {
+                                "media.id": item.id,
+                                "media.title": item.title,
+                                "media.path": item.path,
+                                "file.ids": candidate.file_ids,
+                            },
+                        ):
+                            remaining = self.adapter.get_file_rename_candidate(item)
+                            if remaining is not None:
+                                raise ArrOperationError(
+                                    f"File rename incomplete for {item.title}: "
+                                    f"file ID{'s' if len(remaining.file_ids) != 1 else ''} "
+                                    f"{list(remaining.file_ids)} still "
+                                    f"need{'s' if len(remaining.file_ids) == 1 else ''} renaming "
+                                    f"after command {command_id}; check the Arr service logs for "
+                                    "filename collisions or file access errors"
+                                )
+                    except ArrOperationError as error:
+                        operation.outcome = "failed"
+                        outcomes[item_id] = _WorkOutcome.FAILED
+                        self._record_failure(
+                            failures, ScanPhase.FILE_RENAMES, (item_id,), error
+                        )
+                        continue
 
+                    self.telemetry.count(
+                        "renamarr.rename.confirmed",
+                        len(set(candidate.file_ids)),
+                        kind="file",
+                    )
+                    outcomes[item_id] = _WorkOutcome.SUCCEEDED
+                    logger.info(
+                        f"File rename completed successfully: {candidate.description}"
+                    )
         return self._summarize(outcomes.values())
 
     def _rename_folders(
@@ -235,7 +290,17 @@ class Renamarr:
                     continue
 
                 try:
-                    expected_folder_name = self.adapter.get_expected_folder_name(item)
+                    with self.telemetry.span(
+                        "renamarr.preview.folder",
+                        {
+                            "media.id": item.id,
+                            "media.title": item.title,
+                            "media.path": item.path,
+                        },
+                    ):
+                        expected_folder_name = self.adapter.get_expected_folder_name(
+                            item
+                        )
                 except ArrOperationError as error:
                     outcomes[item.id] = _WorkOutcome.FAILED
                     self._record_failure(
@@ -249,44 +314,76 @@ class Renamarr:
                     outcomes[item.id] = _WorkOutcome.SKIPPED
                     continue
 
+                self.telemetry.count("renamarr.rename.candidates", kind="folder")
                 grouped_items.setdefault(root_folder, []).append(item)
 
         for root_folder, batch_items in grouped_items.items():
             batch = FolderRenameBatch(root_folder, tuple(batch_items))
-            logger.info(f"Renaming folders: {', '.join(batch.titles)}")
-            try:
-                move_command_id = self.adapter.move_folder(batch)
-                if move_command_id is not None:
-                    self._wait_for_command(
-                        move_command_id, f"folder move: {', '.join(batch.titles)}"
+            with self.telemetry.operation(
+                "operation",
+                "folder",
+                {
+                    "media.ids": batch.item_ids,
+                    "media.titles": batch.titles,
+                    "folder.root": root_folder,
+                    "media.paths": tuple(item.path for item in batch.items),
+                },
+            ) as operation:
+                logger.info(f"Renaming folders: {', '.join(batch.titles)}")
+                try:
+                    move_command_id = self.adapter.move_folder(batch)
+                    self.telemetry.count(
+                        "renamarr.rename.requested", len(batch.items), kind="folder"
                     )
-                command_id = self.adapter.start_folder_rescan(batch)
-                self._wait_for_command(
-                    command_id, f"folder rescan: {', '.join(batch.titles)}"
+                    if move_command_id is not None:
+                        self._wait_for_command(
+                            move_command_id,
+                            f"folder move: {', '.join(batch.titles)}",
+                            "folder_move",
+                        )
+                    command_id = self.adapter.start_folder_rescan(batch)
+                    self._wait_for_command(
+                        command_id,
+                        f"folder rescan: {', '.join(batch.titles)}",
+                        "folder_rescan",
+                    )
+                except ArrOperationError as error:
+                    operation.outcome = "failed"
+                    for item_id in batch.item_ids:
+                        outcomes[item_id] = _WorkOutcome.FAILED
+                    self._record_failure(
+                        failures, ScanPhase.FOLDER_RENAMES, batch.item_ids, error
+                    )
+                    continue
+
+                self.telemetry.count(
+                    "renamarr.rename.confirmed", len(batch.items), kind="folder"
                 )
-            except ArrOperationError as error:
                 for item_id in batch.item_ids:
-                    outcomes[item_id] = _WorkOutcome.FAILED
-                self._record_failure(
-                    failures, ScanPhase.FOLDER_RENAMES, batch.item_ids, error
+                    outcomes[item_id] = _WorkOutcome.SUCCEEDED
+                logger.info(
+                    f"Folder workflow completed successfully: {', '.join(batch.titles)}"
                 )
-                continue
-
-            for item_id in batch.item_ids:
-                outcomes[item_id] = _WorkOutcome.SUCCEEDED
-            logger.info(
-                f"Folder workflow completed successfully: {', '.join(batch.titles)}"
-            )
-
         return self._summarize(outcomes.values())
 
-    def _wait_for_command(self, command_id: int, description: str) -> None:
+    def _wait_for_command(
+        self, command_id: int, description: str, kind: str = "command"
+    ) -> None:
+        with self.telemetry.operation(
+            "command", kind, {"command.id": command_id, "description": description}
+        ) as operation:
+            self._poll_command(command_id, description, kind, operation)
+
+    def _poll_command(
+        self, command_id: int, description: str, kind: str, operation: Operation
+    ) -> None:
         started_at = time.monotonic()
-        status = self.adapter.get_command_status(command_id)
+        status = self._command_status(command_id, kind, operation)
 
         while not status.completed:
             elapsed_seconds = time.monotonic() - started_at
             if self._deadline_exceeded(elapsed_seconds, inclusive=True):
+                operation.outcome = "timed_out"
                 self._raise_timeout(command_id, description)
             time.sleep(
                 min(
@@ -295,14 +392,26 @@ class Renamarr:
                 )
             )
             if self._deadline_exceeded(time.monotonic() - started_at, inclusive=False):
+                operation.outcome = "timed_out"
                 self._raise_timeout(command_id, description)
-            status = self.adapter.get_command_status(command_id)
+            status = self._command_status(command_id, kind, operation)
 
         if not status.successful:
+            operation.outcome = "failed"
             normalized_description = description[:1].upper() + description[1:]
             raise ArrOperationError(
                 f"{normalized_description} command {command_id} completed unsuccessfully"
             )
+
+    def _command_status(
+        self, command_id: int, kind: str, operation: Operation
+    ) -> CommandStatus:
+        self.telemetry.count("renamarr.command.polls", kind=kind)
+        try:
+            return self.adapter.get_command_status(command_id)
+        except ArrOperationError:
+            operation.outcome = "status_check_error"
+            raise
 
     def _deadline_exceeded(self, elapsed_seconds: float, *, inclusive: bool) -> bool:
         if inclusive:
@@ -344,11 +453,13 @@ class Renamarr:
         item_ids: tuple[int, ...],
         error: ArrOperationError,
     ) -> None:
+        trace.get_current_span().set_status(StatusCode.ERROR)
+        trace.get_current_span().record_exception(error)
         logger.error(str(error))
         failures.append(ScanFailure(phase, item_ids, str(error)))
 
-    @staticmethod
     def _finish_scan(
+        self,
         items_found: int,
         analysis: WorkSummary,
         file_renames: WorkSummary,
@@ -362,6 +473,7 @@ class Renamarr:
             folder_renames=folder_renames,
             failures=tuple(failures),
         )
+        self.telemetry.finish_scan(result)
         logger.debug(
             f"Items found: {items_found} | analysis: [ success={analysis.success}, "
             f"failed={analysis.failed}, skipped={analysis.skipped} ]"

@@ -1,13 +1,17 @@
 import os
+import signal
 from collections.abc import Generator
 from contextlib import contextmanager
 from sys import exit
+from threading import current_thread, main_thread
 from time import sleep
+from types import FrameType
 from typing import NoReturn, Protocol
 
 import schedule
 from dotenv import load_dotenv
 from loguru import logger
+from opentelemetry import trace
 from pyconfigparser import ConfigError, ConfigFileNotFoundError, configparser
 
 from config_schema import CONFIG_SCHEMA
@@ -17,6 +21,7 @@ from renamarr.healthcheck.health_reporter import HealthReporter
 from renamarr.logging_config import LoggingConfigurator
 from renamarr.models.command import CommandPollingSettings
 from renamarr.renamarr import Renamarr
+from renamarr.telemetry import Telemetry, disabled_workflow
 
 _DEPRECATED_HOURLY_JOB_WARNING: str = (
     "renamarr.hourly_job is deprecated; use renamarr.schedule.enabled instead. "
@@ -55,9 +60,19 @@ class Main:
         self._health_reporter = HealthReporter()
         self._logging_configurator = LoggingConfigurator()
         self._logging_configurator.configure_stdout()
+        self._telemetry = Telemetry()
 
     def __renamarr_job(self, service: ArrService, config: _ArrInstanceConfig) -> None:
+        try:
+            self._telemetry.redactor.register(config.api_key)
+            telemetry = self._telemetry.workflow(service.value, config.name)
+        except Exception:  # noqa: BLE001 - Telemetry setup must not stop rename jobs.
+            logger.warning(
+                "Unable to initialize instance telemetry; continuing without telemetry"
+            )
+            telemetry = disabled_workflow()
         with (
+            telemetry.operation("scan", "run") as operation,
             self._health_reporter.running_job(),
             logger.contextualize(service=service.value, instance=config.name),
         ):
@@ -71,16 +86,21 @@ class Main:
                     api_key=config.api_key,
                 )
                 try:
-                    Renamarr(
+                    result = Renamarr(
                         name=config.name,
                         adapter=adapter,
                         analyze_files=config.renamarr.analyze_files,
                         rename_folders=config.renamarr.rename_folders,
                         command_polling=config.renamarr.command_polling,
+                        telemetry=telemetry,
                     ).scan()
+                    if not result.successful:
+                        operation.outcome = "failed"
                 finally:
                     adapter.close()
-            except Exception:  # noqa: BLE001 - A failed job must not stop the scheduler.
+            except Exception as error:  # noqa: BLE001 - A failed job must not stop the scheduler.
+                operation.outcome = "failed"
+                trace.get_current_span().record_exception(error)
                 logger.exception(
                     "Unexpected failure while running Renamarr for "
                     f"{service.value} instance {config.name!r}."
@@ -106,7 +126,25 @@ class Main:
             schedule.run_pending()
             sleep(1)
 
+    @staticmethod
+    def _terminate(_signum: int, _frame: FrameType | None) -> NoReturn:
+        raise SystemExit(0)
+
     def start(self) -> None:
+        """Run configured jobs and release telemetry on every exit path."""
+        previous_handler = None
+        if current_thread() is main_thread():
+            previous_handler = signal.signal(signal.SIGTERM, self._terminate)
+        try:
+            self._start()
+        finally:
+            try:
+                self._telemetry.shutdown()
+            finally:
+                if previous_handler is not None:
+                    signal.signal(signal.SIGTERM, previous_handler)
+
+    def _start(self) -> None:
         config_dir = os.getenv("CONFIG_DIR", "/")
         try:
             with set_directory(config_dir):
