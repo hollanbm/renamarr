@@ -139,49 +139,49 @@ version = "1.19.1"
 backend = "pipx:yamlfix"
 
 [[tools.prek]]
-version = "0.5.10"
+version = "0.5.11"
 backend = "aqua:j178/prek"
 
 [tools.prek."platforms.linux-arm64"]
-checksum = "sha256:6ee3e5696f0b76bb4c95708579a54714aabd9a20e89c998f69a1a5cc41dbbbee"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839366"
+checksum = "sha256:f5ce760188710a34f32cf7cc52a5f2150e5d0e90189e4328243f3ff5d4037164"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780074"
 provenance = "github-attestations"
 
 [tools.prek."platforms.linux-arm64-musl"]
-checksum = "sha256:352b97c18cc1659786232f3fde9e75b5ec96279893563f6b31b36f2d43dca00f"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839372"
+checksum = "sha256:bb8aa2339f983f7aba8d2d298ce8ef53719388dc58f7868f4c755b9f48abb319"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780093"
 provenance = "github-attestations"
 
 [tools.prek."platforms.linux-x64"]
-checksum = "sha256:5c832a9ccd0855b7c054320d8921d90165a37459d3ac175923bdf121ff1aa9b1"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839458"
+checksum = "sha256:a4ff4c70aef6f21925aa52b82d0746095fbd66893ac3b053e859f6d3454c16ae"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780154"
 provenance = "github-attestations"
 
 [tools.prek."platforms.linux-x64-musl"]
-checksum = "sha256:c70a639cb98c90feafa213c23fb487644af73c906c5a6cee757403090f253c30"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839467"
+checksum = "sha256:e9e283683dae28716652a4c172bc4fb053eecd28b8938132d576af266f8dfecb"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780176"
 provenance = "github-attestations"
 
 [tools.prek."platforms.macos-arm64"]
-checksum = "sha256:28186099374a3158e7b27e82fedb0bd20723658dc8ee24a841bdffe8a91b1ad9"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839320"
+checksum = "sha256:9c5ddc45402468a7e29b0e8b01453285f0bcd89e6e2eb02cbbb18bd54d13ed7d"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780046"
 provenance = "github-attestations"
 
 [tools.prek."platforms.macos-x64"]
-checksum = "sha256:bbd0cb4b8d2dea949730ba631e5176e99507e5d799464ea8d71386af98bdcb0a"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839419"
+checksum = "sha256:3242c1d10f4bdb808a9fea4e96b4cdf38b7235bd859d50c6f481bd7493bd2e35"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780132"
 provenance = "github-attestations"
 
 [tools.prek."platforms.windows-x64"]
-checksum = "sha256:4a506e19a95a1bbf40f304b245446c32078c7be4d5b7e4cb412ea93a0cf8b4e5"
-url = "https://github.com/j178/prek/releases/download/v0.5.10/prek-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/j178/prek/releases/assets/707839436"
+checksum = "sha256:6b396f6e369832b2458ac95e2e169536d64be4941b48fe116af21df7e1e9aea6"
+url = "https://github.com/j178/prek/releases/download/v0.5.11/prek-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/j178/prek/releases/assets/753780141"
 provenance = "github-attestations"
 
 [[tools.python]]
